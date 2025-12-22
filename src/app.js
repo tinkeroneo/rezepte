@@ -25,6 +25,13 @@ const USE_BACKEND = true;
 
 const appEl = document.getElementById("app");
 
+// Global UI state (view-unabhängig), damit das Timer-Overlay stabil bleibt
+const globalState = {
+  ui: {
+    timerExpanded: false,
+  },
+};
+
 let recipes = [];
 let recipeParts = [];
 let partsByParent = new Map();
@@ -66,7 +73,9 @@ function render(view, setView) {
     Wake.disable();
   }
 
-  renderTimersOverlay({ appEl: app, state });
+  // Global overlay: immer rendern, unabhängig vom View-State
+  renderTimersOverlay({ appEl, state: globalState });
+
   if (view.name === "list") {
     return renderListView({ appEl, state: view, recipes, setView });
   }
