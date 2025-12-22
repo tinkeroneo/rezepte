@@ -1,21 +1,49 @@
 // src/utils.js
 
-/**
- * Shorthand for querySelector
- * @param {string} sel
- * @param {ParentNode} root
- */
-export function qs(sel, root = document) {
-  return root.querySelector(sel);
+function isDomRoot(x) {
+  return x && typeof x.querySelector === "function";
+}
+
+function normalizeArgs(a, b) {
+  // Standard: (selector, root)
+  // Unterstützt auch: (root, selector)
+  // und: (selector) oder (root) -> sinnvoller Fallback
+  if (typeof a === "string") {
+    const selector = a;
+    const root = isDomRoot(b) ? b : document;
+    return { selector, root };
+  }
+
+  if (isDomRoot(a) && typeof b === "string") {
+    return { selector: b, root: a };
+  }
+
+  // Falls komplett falsch genutzt:
+  // - a ist root -> selector fehlt -> leere Auswahl
+  // - a ist irgendwas -> fallback
+  return { selector: null, root: document };
 }
 
 /**
- * Shorthand for querySelectorAll (array!)
- * @param {string} sel
- * @param {ParentNode} root
+ * querySelector helper (robust, supports arg order)
+ * Usage:
+ *   qs(".x")                 -> document.querySelector(".x")
+ *   qs(".x", rootEl)         -> rootEl.querySelector(".x")
+ *   qs(rootEl, ".x")         -> rootEl.querySelector(".x")  (supported)
  */
-export function qsa(sel, root = document) {
-  return Array.from(root.querySelectorAll(sel));
+export function qs(a, b) {
+  const { selector, root } = normalizeArgs(a, b);
+  if (!selector) return null;
+  return root.querySelector(selector);
+}
+
+/**
+ * querySelectorAll helper (array!, robust, supports arg order)
+ */
+export function qsa(a, b) {
+  const { selector, root } = normalizeArgs(a, b);
+  if (!selector) return [];
+  return Array.from(root.querySelectorAll(selector));
 }
 
 /**
