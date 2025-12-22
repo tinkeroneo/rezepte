@@ -9,47 +9,9 @@ function toFiniteNumber(x) {
   return Number.isFinite(n) ? n : NaN;
 }
 
-/**
- * Accepts various shapes:
- * - { durationSec }
- * - { durationMin } / { minutes }
- * - { durationMs } / { ms }
- * - { seconds } / { sec }
- * - { duration } (assume minutes if small, else seconds if big)
- */
-function normalizeDurationSec(input) {
-  const obj = input && typeof input === "object" ? input : {};
-
-  // explicit seconds
-  let sec = toFiniteNumber(obj.durationSec);
-  if (!Number.isFinite(sec)) sec = toFiniteNumber(obj.seconds);
-  if (!Number.isFinite(sec)) sec = toFiniteNumber(obj.sec);
-
-  // minutes
-  if (!Number.isFinite(sec)) {
-    let min = toFiniteNumber(obj.durationMin);
-    if (!Number.isFinite(min)) min = toFiniteNumber(obj.minutes);
-    if (Number.isFinite(min)) sec = min * 60;
-  }
-
-  // milliseconds
-  if (!Number.isFinite(sec)) {
-    let ms = toFiniteNumber(obj.durationMs);
-    if (!Number.isFinite(ms)) ms = toFiniteNumber(obj.ms);
-    if (Number.isFinite(ms)) sec = ms / 1000;
-  }
-
-  // generic duration heuristic
-  if (!Number.isFinite(sec)) {
-    const d = toFiniteNumber(obj.duration);
-    if (Number.isFinite(d)) {
-      // Heuristic: <= 180 looks like minutes, otherwise seconds
-      sec = d <= 180 ? d * 60 : d;
-    }
-  }
-
-  // final guard
-  if (!Number.isFinite(sec) || sec <= 0) sec = 60;
+function normalizeDurationSecFromAny(x) {
+  const sec = toFiniteNumber(x);
+  if (!Number.isFinite(sec) || sec <= 0) return 60;
   return Math.round(sec);
 }
 
@@ -77,20 +39,19 @@ export function saveTimers(timers, storageKey = DEFAULT_TIMERS_KEY) {
   saveTimersRaw(timers, storageKey);
 }
 
-export function createTimer(input) {
+export function createTimer({ title, durationSec, key = null }) {
   const now = Date.now();
-  const durationSec = normalizeDurationSec(input);
+  const dur = normalizeDurationSecFromAny(durationSec);
 
-  const title =
-    (input && typeof input === "object" && typeof input.title === "string" && input.title.trim())
-      ? input.title.trim()
-      : "Timer";
+  const safeTitle =
+    (typeof title === "string" && title.trim()) ? title.trim() : "Timer";
 
   return {
     id: crypto.randomUUID(),
-    title,
+    key, // optional: recipe step key or any identifier
+    title: safeTitle,
     createdAt: now,
-    endsAt: now + durationSec * 1000,
+    endsAt: now + dur * 1000,
     dismissed: false,
     beeped: false,
   };
@@ -101,11 +62,9 @@ export function extendTimer(timers, timerId, seconds) {
   const t = timers[timerId];
   if (!t) return timers;
 
-  const addSec = toFiniteNumber(seconds);
-  const delta = Number.isFinite(addSec) ? addSec : 0;
-
+  const addSec = normalizeDurationSecFromAny(seconds);
   const now = Date.now();
-  t.endsAt = Math.max(now, t.endsAt) + delta * 1000;
+  t.endsAt = Math.max(now, t.endsAt) + addSec * 1000;
   t.dismissed = false;
   t.beeped = false;
 
@@ -210,9 +169,28 @@ export function createTimerManager({
     }
   }
 
-  function addTimer(input) {
+  /**
+   * Overload:
+   * - addTimer({ key, title, durationSec })
+   * - addTimer(key, title, durationSec)  <-- cook.view.js uses this
+   */
+  function addTimer(a, b, c) {
+    let key = null;
+    let title = "Timer";
+    let durationSec = 60;
+
+    if (a && typeof a === "object") {
+      key = a.key ?? null;
+      title = a.title ?? "Timer";
+      durationSec = a.durationSec ?? a.seconds ?? a.sec ?? 60;
+    } else {
+      key = a ?? null;
+      title = b ?? "Timer";
+      durationSec = c ?? 60;
+    }
+
     const timers = loadTimersRaw(storageKey);
-    const t = createTimer(input); // <- now robust
+    const t = createTimer({ key, title, durationSec });
     timers[t.id] = t;
     saveTimersRaw(timers, storageKey);
     renderNow();
