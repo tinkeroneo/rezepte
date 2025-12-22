@@ -68,7 +68,8 @@ export function renderTimersOverlay({ appEl, state }) {
 
   // extend
   root.querySelectorAll("[data-ext]").forEach(btn => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
       const id = btn.dataset.ext;
       const sec = parseInt(btn.dataset.sec, 10);
       extendTimer(timers, id, sec);
@@ -77,10 +78,19 @@ export function renderTimersOverlay({ appEl, state }) {
     });
   });
 
-  // dismiss
+  // dismiss (robust: timers kann Array oder Object sein)
   root.querySelectorAll("[data-dismiss]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      timers[btn.dataset.dismiss].dismissed = true;
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.dismiss;
+
+      if (Array.isArray(timers)) {
+        const t = timers.find(x => x?.id === id);
+        if (t) t.dismissed = true;
+      } else if (timers && typeof timers === "object") {
+        if (timers[id]) timers[id].dismissed = true;
+      }
+
       saveTimers(timers);
       renderTimersOverlay({ appEl, state });
     });
