@@ -2,6 +2,57 @@
 
 const DEFAULT_TIMERS_KEY = "tinkeroneo_timers_v1";
 
+/* -------------------- duration normalization -------------------- */
+
+function toFiniteNumber(x) {
+  const n = typeof x === "string" ? Number(x.trim()) : Number(x);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+/**
+ * Accepts various shapes:
+ * - { durationSec }
+ * - { durationMin } / { minutes }
+ * - { durationMs } / { ms }
+ * - { seconds } / { sec }
+ * - { duration } (assume minutes if small, else seconds if big)
+ */
+function normalizeDurationSec(input) {
+  const obj = input && typeof input === "object" ? input : {};
+
+  // explicit seconds
+  let sec = toFiniteNumber(obj.durationSec);
+  if (!Number.isFinite(sec)) sec = toFiniteNumber(obj.seconds);
+  if (!Number.isFinite(sec)) sec = toFiniteNumber(obj.sec);
+
+  // minutes
+  if (!Number.isFinite(sec)) {
+    let min = toFiniteNumber(obj.durationMin);
+    if (!Number.isFinite(min)) min = toFiniteNumber(obj.minutes);
+    if (Number.isFinite(min)) sec = min * 60;
+  }
+
+  // milliseconds
+  if (!Number.isFinite(sec)) {
+    let ms = toFiniteNumber(obj.durationMs);
+    if (!Number.isFinite(ms)) ms = toFiniteNumber(obj.ms);
+    if (Number.isFinite(ms)) sec = ms / 1000;
+  }
+
+  // generic duration heuristic
+  if (!Number.isFinite(sec)) {
+    const d = toFiniteNumber(obj.duration);
+    if (Number.isFinite(d)) {
+      // Heuristic: <= 180 looks like minutes, otherwise seconds
+      sec = d <= 180 ? d * 60 : d;
+    }
+  }
+
+  // final guard
+  if (!Number.isFinite(sec) || sec <= 0) sec = 60;
+  return Math.round(sec);
+}
+
 /* -------------------- storage helpers -------------------- */
 
 function loadTimersRaw(storageKey = DEFAULT_TIMERS_KEY) {
@@ -26,8 +77,15 @@ export function saveTimers(timers, storageKey = DEFAULT_TIMERS_KEY) {
   saveTimersRaw(timers, storageKey);
 }
 
-export function createTimer({ title, durationSec }) {
+export function createTimer(input) {
   const now = Date.now();
+  const durationSec = normalizeDurationSec(input);
+
+  const title =
+    (input && typeof input === "object" && typeof input.title === "string" && input.title.trim())
+      ? input.title.trim()
+      : "Timer";
+
   return {
     id: crypto.randomUUID(),
     title,
@@ -43,8 +101,11 @@ export function extendTimer(timers, timerId, seconds) {
   const t = timers[timerId];
   if (!t) return timers;
 
+  const addSec = toFiniteNumber(seconds);
+  const delta = Number.isFinite(addSec) ? addSec : 0;
+
   const now = Date.now();
-  t.endsAt = Math.max(now, t.endsAt) + seconds * 1000;
+  t.endsAt = Math.max(now, t.endsAt) + delta * 1000;
   t.dismissed = false;
   t.beeped = false;
 
@@ -72,6 +133,25 @@ export function createBeep() {
     if (!AudioCtx) return null;
     ctx = new AudioCtx();
     return ctx;
+  }
+
+  async function prime() {
+    const c = ensureCtx();
+    if (!c) return false;
+    try {
+      if (c.state === "suspended") await c.resume();
+      const osc = c.createOscillator();
+      const gain = c.createGain();
+      gain.gain.value = 0.0001;
+      osc.connect(gain);
+      gain.connect(c.destination);
+      const now = c.currentTime;
+      osc.start(now);
+      osc.stop(now + 0.02);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function play({
@@ -105,19 +185,11 @@ export function createBeep() {
     osc.stop(now + durationMs / 1000 + 0.02);
   }
 
-  return { play };
+  return { play, prime };
 }
 
 /* -------------------- manager (cook.view.js compatible) -------------------- */
 
-/**
- * createTimerManager({ storageKey, onRender, beep })
- *
- * Expected by cook.view.js:
- * - onRender(snap) gets called on changes and on tick
- * - snap is used by renderTimersBarHtml(snap)
- * - manager has removeTimer(id) and extendTimer(id, seconds)
- */
 export function createTimerManager({
   storageKey = DEFAULT_TIMERS_KEY,
   onRender = null,
@@ -138,9 +210,9 @@ export function createTimerManager({
     }
   }
 
-  function addTimer({ title, durationSec }) {
+  function addTimer(input) {
     const timers = loadTimersRaw(storageKey);
-    const t = createTimer({ title, durationSec });
+    const t = createTimer(input); // <- now robust
     timers[t.id] = t;
     saveTimersRaw(timers, storageKey);
     renderNow();
@@ -165,7 +237,6 @@ export function createTimerManager({
     return false;
   }
 
-  // tick: beep once on overdue timers
   function tick() {
     const timers = loadTimersRaw(storageKey);
     const list = getSortedActiveTimers(timers);
@@ -191,7 +262,6 @@ export function createTimerManager({
 
   function start() {
     if (interval) return;
-    // initial render
     renderNow();
     interval = setInterval(tick, tickMs);
   }
@@ -201,11 +271,9 @@ export function createTimerManager({
     interval = null;
   }
 
-  // Start automatically (cook view expects it to be “alive”)
   start();
 
   return {
-    // expected-ish API
     getSnapshot,
     addTimer,
     extendTimer: extendTimerBy,
@@ -217,14 +285,6 @@ export function createTimerManager({
 
 /* -------------------- HTML renderer (cookbar) -------------------- */
 
-/**
- * renderTimersBarHtml(snap)
- * snap: { timers, list, now }
- *
- * Expects dataset hooks:
- * - [data-timer-stop="<id>"]
- * - [data-timer-ext="<id>"] + [data-sec="60|300"]
- */
 export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 } = {}) {
   const list = snap?.list ?? [];
   if (!list.length) return "";
