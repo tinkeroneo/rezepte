@@ -23,9 +23,10 @@ export function renderDetailView({
       <div class="card">
       <div class="row" style="justify-content:space-between; gap:.5rem;">
         <button class="btn btn-ghost" id="backBtn">← Zurück</button>
-        <button class="btn btn-ghost" id="cookBtn">Kochen</button>
-        </div>
-        <h2>${escapeHtml(r.title)}</h2>
+        <button class="btn btn-ghost" id="cookBtn">👨‍🍳Kochen</button>
+      </div>
+        <h2>${escapeHtml(r.title)} 
+        <button class="btn btn-ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button></h2>
         <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
         ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
 
@@ -39,19 +40,18 @@ export function renderDetailView({
         <hr />
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Zutaten</h3>
-          <button class="btn btn-ghost" id="addToShoppingBtn">🧺 Einkaufsliste</button>
+          <button class="btn btn-ghost" id="addToShoppingBtn" >🧺</button>
         </div>
 
-        ${
-          isMenu
-            ? buildMenuIngredients(r, recipes, partsByParent).map(section => `
+        ${isMenu
+      ? buildMenuIngredients(r, recipes, partsByParent).map(section => `
                 <div style="margin-bottom:1rem;">
                   <div class="muted" style="font-weight:800; margin-bottom:.25rem;">${escapeHtml(section.title)}</div>
                   ${renderIngredientsHtml(section.items)}
                 </div>
               `).join("")
-            : renderIngredientsHtml(r.ingredients ?? [])
-        }
+      : renderIngredientsHtml(r.ingredients ?? [])
+    }
 
         <hr />
         <div class="row" style="justify-content:space-between; align-items:center;">
@@ -108,6 +108,7 @@ export function renderDetailView({
     </div>
   `;
 
+
   const sheetRoot = qs(appEl, "#sheetRoot");
 
   // Image lightbox
@@ -132,6 +133,27 @@ export function renderDetailView({
     });
   }
 
+
+  qs(appEl, "#copyCookLinkBtn")?.addEventListener("click", async () => {
+    const url = `${location.origin}${location.pathname}#cook?id=${encodeURIComponent(state.selectedId || "")}&q=${encodeURIComponent(state.q || "")}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Kochen", url });
+        return;
+      } catch { }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      // alert("Link kopiert ✅");
+      const b = qs(appEl, "#copyCookLinkBtn");
+      b && ack(b);
+
+    } catch {
+      prompt("Link kopieren:", url);
+    }
+  });
   qs(appEl, "#backBtn").addEventListener("click", () => setView({ name: "list", selectedId: null, q: state.q }));
   qs(appEl, "#cookBtn").addEventListener("click", () => setView({ name: "cook", selectedId: r.id, q: state.q }));
   qs(appEl, "#editBtn").addEventListener("click", () => setView({ name: "add", selectedId: r.id, q: state.q }));
@@ -148,7 +170,7 @@ export function renderDetailView({
   qs(appEl, "#deleteBtn").addEventListener("click", async () => {
     if (!confirm("Rezept wirklich löschen?")) return;
     // local deletion is handled in app.js via callback — simplest: reload after delete
-    await sbDelete?.(r.id).catch(() => {});
+    await sbDelete?.(r.id).catch(() => { });
     location.reload();
   });
 

@@ -1,5 +1,6 @@
 // Minimaler Supabase REST-Client (ohne externe Libraries)
 // Nutzt: Project URL + anon key aus Supabase
+import { getClientId } from "./domain/clientId.js";
 
 const SUPABASE_URL = "https://iwpqodzaedprukqotckb.supabase.co";
 
@@ -149,3 +150,42 @@ export async function removeRecipePart(parentId, childId) {
   return true;
 }
 
+
+// Cook Events (client-scoped via client_id)
+export async function listCookEventsSb(recipeId) {
+  const clientId = getClientId();
+  const { data, error } = await sb
+    .from("cook_events")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("recipe_id", recipeId)
+    .order("at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function upsertCookEventSb(ev) {
+  const clientId = getClientId();
+  const payload = { ...ev, client_id: clientId };
+
+  const { data, error } = await sb
+    .from("cook_events")
+    .upsert(payload, { onConflict: "id" })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCookEventSb(id) {
+  const clientId = getClientId();
+  const { error } = await sb
+    .from("cook_events")
+    .delete()
+    .eq("client_id", clientId)
+    .eq("id", id);
+
+  if (error) throw error;
+}

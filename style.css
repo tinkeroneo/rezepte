@@ -563,3 +563,41 @@ ul li.muted {
 .ingredients-ul {
   padding-left: 1.2rem;
 }
+
+#addToShoppingBtn:hover::after {
+  content: "auf den Einkaufszettel";
+}
+/* --- Category accent (subtil) --- */
+.grid-card,
+.card {
+  position: relative;
+}
+
+.grid-card::before,
+.card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 6px;
+  border-radius: 999px;
+  background: var(--cat-accent, rgba(0,0,0,0.08));
+  opacity: 0.85;
+}
+
+/* ein bisschen Abstand, damit der Streifen nicht "klebt" */
+.grid-card {
+  padding-left: 6px;
+}
+.card {
+  padding-left: 6px;
+}
+
+select {
+  padding: .65rem .75rem;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: white;
+}
+

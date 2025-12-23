@@ -74,25 +74,59 @@ export function extendTimer(timers, timerId, seconds) {
 
 export function getSortedActiveTimers(timers) {
   return Object.values(timers)
-    .filter((t) => t && !t.dismissed)
-    .map((t) => ({
+    .filter(t => t && !t.dismissed)
+    .map(t => ({
       ...t,
       remainingSec: Math.ceil((t.endsAt - Date.now()) / 1000),
     }))
     .sort((a, b) => a.remainingSec - b.remainingSec);
 }
 
+
 /* -------------------- beep -------------------- */
 
+// Robust beep helper (works even when AudioContext fails)
 export function createBeep() {
   let ctx = null;
+  let enabled = true;
+  let warned = false;
+
+  function warnOnce(err) {
+    if (warned) return;
+    warned = true;
+    console.warn("Beep disabled: AudioContext error.", err);
+  }
 
   function ensureCtx() {
-    if (ctx) return ctx;
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (!AudioCtx) return null;
-    ctx = new AudioCtx();
-    return ctx;
+    if (!enabled) return null;
+
+    try {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) {
+          enabled = false;
+          return null;
+        }
+        ctx = new AC();
+
+        // if device/renderer errors out, permanently disable
+        ctx.onstatechange = () => {
+          if (ctx && ctx.state === "closed") enabled = false;
+        };
+      }
+
+      // If the context is already errored/suspended badly, disable
+      if (ctx.state === "closed") {
+        enabled = false;
+        return null;
+      }
+
+      return ctx;
+    } catch (e) {
+      enabled = false;
+      warnOnce(e);
+      return null;
+    }
   }
 
   async function prime() {
@@ -100,53 +134,65 @@ export function createBeep() {
     if (!c) return false;
     try {
       if (c.state === "suspended") await c.resume();
-      const osc = c.createOscillator();
-      const gain = c.createGain();
-      gain.gain.value = 0.0001;
-      osc.connect(gain);
-      gain.connect(c.destination);
-      const now = c.currentTime;
-      osc.start(now);
-      osc.stop(now + 0.02);
       return true;
-    } catch {
+    } catch (e) {
+      enabled = false;
+      warnOnce(e);
       return false;
     }
   }
 
-  function play({
-    frequency = 880,
-    durationMs = 180,
-    volume = 0.08,
-    type = "sine",
-  } = {}) {
-    const c = ensureCtx();
-    if (!c) return;
-
-    if (c.state === "suspended") {
-      c.resume().catch(() => {});
+  function beep({ ms = 120, freq = 880 } = {}) {
+    if (!enabled) {
+      // fallback: vibration if available
+      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+      return false;
     }
 
-    const osc = c.createOscillator();
-    const gain = c.createGain();
+    const c = ensureCtx();
+    if (!c) {
+      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+      return false;
+    }
 
-    osc.type = type;
-    osc.frequency.value = frequency;
+    try {
+      // do NOT create beep if context is not running and can't be resumed
+      if (c.state === "suspended") {
+        // best effort resume, but don't spam; if fails -> disable
+        c.resume().catch((e) => { enabled = false; warnOnce(e); });
+        return false;
+      }
 
-    const now = c.currentTime;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume), now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + durationMs / 1000);
+      const o = c.createOscillator();
+      const g = c.createGain();
 
-    osc.connect(gain);
-    gain.connect(c.destination);
+      o.type = "sine";
+      o.frequency.value = freq;
 
-    osc.start(now);
-    osc.stop(now + durationMs / 1000 + 0.02);
+      // gentle envelope (avoid clicks)
+      const t0 = c.currentTime;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.12, t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
+
+      o.connect(g);
+      g.connect(c.destination);
+
+      o.start(t0);
+      o.stop(t0 + ms / 1000 + 0.02);
+
+      return true;
+    } catch (e) {
+      enabled = false;
+      warnOnce(e);
+      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+      return false;
+    }
   }
 
-  return { play, prime };
+  return { prime, beep };
 }
+
 
 /* -------------------- manager (cook.view.js compatible) -------------------- */
 
