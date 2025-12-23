@@ -5,6 +5,8 @@ export const KEYS = {
   VIEWMODE: "tinkeroneo_viewmode_v1",
   SHOPPING: "tinkeroneo_shopping_v1",
   NAV: "tinkeroneo_nav_v1",
+  LIST_SORT: "tinkeroneo_list_sort_v1",
+  LIST_CAT: "tinkeroneo_list_cat_v1",
 };
 
 export function lsGet(key, fallback = null) {

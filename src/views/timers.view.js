@@ -3,10 +3,12 @@ import {
   loadTimers,
   saveTimers,
   extendTimer,
-  getSortedActiveTimers
+  getSortedActiveTimers, createBeep
 } from "../domain/timers.js";
 import { formatTime, escapeHtml, qsa, qs } from "../utils.js";
 import { ack } from "../ui/feedback.js";
+const audio = createBeep();
+
 let tickHandle = null;
 
 
@@ -26,13 +28,13 @@ export function renderTimersOverlay({ appEl, state, setView }) {
 
   const isCook = state?.name === "cook";
   state.ui ||= {};
-// In cook view we already have the cookbar timer UI -> avoid duplicates
-if (isCook) {
-  const root = ensureRoot();
-  root.innerHTML = "";
-  stopTick();
-  return;
-}
+  // In cook view we already have the cookbar timer UI -> avoid duplicates
+  if (isCook) {
+    const root = ensureRoot();
+    root.innerHTML = "";
+    stopTick();
+    return;
+  }
 
   // In cook allow expand; outside cook always show compact chip
   const expanded = isCook ? !!state.ui.timerExpanded : false;
@@ -42,6 +44,22 @@ if (isCook) {
 
   const timers = loadTimers();
   const list = getSortedActiveTimers(timers);
+let changed = false;
+
+// Beep exactly once per timer when it hits <= 0
+for (const t of list) {
+  if (t.remainingSec <= 0) {
+    const live = timers[t.id];
+    if (live && !live.beeped) {
+      live.beeped = true;
+      changed = true;
+      audio.beep();
+    }
+  }
+}
+
+if (changed) saveTimers(timers);
+
 
   if (!list.length) {
     root.innerHTML = "";
@@ -56,11 +74,11 @@ if (isCook) {
   const hiddenCount = Math.max(0, total - 1);
 
   // --- OUTSIDE COOK: compact chip only ---
-if (!isCook) {
-  const label = top.remainingSec <= 0 ? "⏰" : "⏱";
-  const time = top.remainingSec <= 0 ? "abgelaufen" : formatTime(top.remainingSec);
+  if (!isCook) {
+    const label = top.remainingSec <= 0 ? "⏰" : "⏱";
+    const time = top.remainingSec <= 0 ? "abgelaufen" : formatTime(top.remainingSec);
 
-root.innerHTML = `
+    root.innerHTML = `
   <button type="button"
           class="timer-chip ${top.remainingSec <= 0 ? "overdue" : ""}"
           data-timer-chip="1"
@@ -72,20 +90,20 @@ root.innerHTML = `
 `;
 
 
-const chip = qs(root, "[data-timer-chip]");
-if (chip) {
-  chip.addEventListener("click", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-    ack(chip);
-    chip.classList.toggle("show-title");
-  }, true);
-}
-return;
+    const chip = qs(root, "[data-timer-chip]");
+    if (chip) {
+      chip.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        ack(chip);
+        chip.classList.toggle("show-title");
+      }, true);
+    }
+    return;
 
 
-}
+  }
 
 
   // --- COOK VIEW: full overlay ---

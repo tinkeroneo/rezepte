@@ -1,53 +1,54 @@
-import { lsGet, lsSet } from "./storage.js";
-import { KEYS } from "./storage.js";
+// src/state.js
+import { KEYS, lsGet, lsSet } from "./storage.js";
 
-export function encodeView(v) {
+// Parse: #cook?id=123&q=abc
+function parseHash() {
+  const raw = (location.hash || "#list").slice(1);
+  const [namePart, qsPart] = raw.split("?");
+  const params = new URLSearchParams(qsPart || "");
+
   return {
-    name: v?.name ?? "list",
-    selectedId: v?.selectedId ?? null,
-    q: v?.q ?? ""
+    name: namePart || "list",
+    selectedId: params.get("id"),
+    q: params.get("q") || "",
+    // optional UI state persists elsewhere if needed
   };
 }
 
+function setHash(view) {
+  const params = new URLSearchParams();
+  if (view.selectedId) params.set("id", view.selectedId);
+  if (view.q) params.set("q", view.q);
+
+  const qs = params.toString();
+  const next = `#${view.name}${qs ? "?" + qs : ""}`;
+
+  if (location.hash !== next) location.hash = next;
+}
+
 export function initRouter({ onViewChange }) {
-  // initial state from localStorage
-  let view = encodeView(lsGet(KEYS.NAV, { name: "list", selectedId: null, q: "" }));
+  let view = parseHash();
 
-  history.replaceState({ __tinkeroneo: true, view }, "", location.pathname + location.search + location.hash);
+  function setView(next) {
+    view = { ...view, ...next };
 
-  function setView(next, { push = true } = {}) {
-    view = encodeView(next);
-    const state = { __tinkeroneo: true, view };
+    // persist (optional) – keep your existing NAV behavior
+    try { lsSet(KEYS.NAV, view); } catch {}
 
-    if (push) history.pushState(state, "", location.pathname + location.search + location.hash);
-    else history.replaceState(state, "", location.pathname + location.search + location.hash);
-
-    lsSet(KEYS.NAV, view);
+    setHash(view);
     onViewChange(view);
   }
 
-  window.addEventListener("popstate", (e) => {
-    const st = e.state;
-    if (st?.__tinkeroneo && st?.view) {
-      view = encodeView(st.view);
-      lsSet(KEYS.NAV, view);
-      onViewChange(view);
-      return;
-    }
+  function getView() {
+    // keep in sync with hash (e.g. direct typing)
+    view = parseHash();
+    return view;
+  }
 
-    // fallback: stay inside app
-    const saved = lsGet(KEYS.NAV, null);
-    if (saved?.name) {
-      view = encodeView(saved);
-      history.replaceState({ __tinkeroneo: true, view }, "", location.pathname + location.search + location.hash);
-      onViewChange(view);
-      return;
-    }
-
-    view = { name: "list", selectedId: null, q: "" };
-    history.replaceState({ __tinkeroneo: true, view }, "", location.pathname + location.search + location.hash);
+  window.addEventListener("hashchange", () => {
+    view = parseHash();
     onViewChange(view);
   });
 
-  return { getView: () => view, setView };
+  return { getView, setView };
 }
