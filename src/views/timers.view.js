@@ -6,17 +6,10 @@ import {
   getSortedActiveTimers
 } from "../domain/timers.js";
 import { formatTime, escapeHtml, qsa, qs } from "../utils.js";
-
+import { ack } from "../ui/feedback.js";
 let tickHandle = null;
 
-function ack(el) {
-  if (!el) return;
-  el.classList.remove("tap-ack");
-  void el.offsetWidth;
-  el.classList.add("tap-ack");
-  clearTimeout(el._ackT);
-  el._ackT = setTimeout(() => el.classList.remove("tap-ack"), 220);
-}
+
 
 function ensureRoot() {
   let root = document.getElementById("globalTimersRoot");

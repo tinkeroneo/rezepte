@@ -3,7 +3,7 @@ import { splitStepsToCards, stepDoneKey, parseDurationSeconds, formatTime } from
 import { buildMenuStepSections } from "../domain/menu.js";
 import { renderIngredientsHtml } from "./shared.ingredients.js";
 import { createBeep, createTimerManager, renderTimersBarHtml } from "../domain/timers.js";
-
+import { ack } from "../ui/feedback.js";
 export function renderCookView({ appEl, state, recipes, partsByParent, setView }) {
   const r = recipes.find(x => x.id === state.selectedId);
   if (!r) return setView({ name: "list", selectedId: null, q: state.q });
@@ -96,14 +96,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
   const timerRoot = qs(appEl, "#timerRoot");
   const sheetRoot = qs(appEl, "#sheetRoot");
-  function ack(el) {
-  if (!el) return;
-  el.classList.remove("tap-ack");
-  void el.offsetWidth; // restart animation
-  el.classList.add("tap-ack");
-  clearTimeout(el._ackT);
-  el._ackT = setTimeout(() => el.classList.remove("tap-ack"), 220);
-}
+
 
   let timersExpanded = false;
   function flashTimerRootOnce() {
@@ -137,28 +130,28 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
       });
 
       // Stop
-qsa(timerRoot, "[data-timer-stop]").forEach(b => {
-  b.addEventListener("click", (e) => {
-    e.stopPropagation();
-    ack(b.closest(".timer-pill") || b);
-    tm.removeTimer(b.dataset.timerStop);
-    tm.tick();
-  });
-});
+      qsa(timerRoot, "[data-timer-stop]").forEach(b => {
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          ack(b.closest(".timer-pill") || b);
+          tm.removeTimer(b.dataset.timerStop);
+          tm.tick();
+        });
+      });
 
 
       // Extend (+1m / +5m)
-qsa(timerRoot, "[data-timer-ext]").forEach(b => {
-  b.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const id = b.dataset.timerExt;
-    const sec = parseInt(b.dataset.sec, 10) || 0;
-    if (!id || !sec) return;
-    ack(b.closest(".timer-pill") || b);
-    tm.extendTimer(id, sec);
-    tm.tick();
-  });
-});
+      qsa(timerRoot, "[data-timer-ext]").forEach(b => {
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const id = b.dataset.timerExt;
+          const sec = parseInt(b.dataset.sec, 10) || 0;
+          if (!id || !sec) return;
+          ack(b.closest(".timer-pill") || b);
+          tm.extendTimer(id, sec);
+          tm.tick();
+        });
+      });
 
       onFire: () => {
         // fire twice
@@ -210,10 +203,10 @@ qsa(timerRoot, "[data-timer-ext]").forEach(b => {
       const title = btn.dataset.title || "Timer";
       const dur = parseInt(btn.dataset.seconds, 10);
       if (!dur) return;
-audio.prime();
-tm.addTimer(key, title, dur);
-ack(btn);
-tm.tick();
+      audio.prime();
+      tm.addTimer(key, title, dur);
+      ack(btn);
+      tm.tick();
 
 
     });
