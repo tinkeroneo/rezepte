@@ -280,14 +280,7 @@ ul, ol { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
    Klassen: .timer-stack, .timer-card, .timer-card-main
    ========================================================= */
 
-#globalTimersRoot {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: 76px; /* über cookbar; falls keine cookbar da, trotzdem nice */
-  z-index: 75;
-  pointer-events: none; /* nur die eigentliche Karte soll klicken */
-}
+
 
 .timer-stack {
   display: flex;
@@ -365,18 +358,10 @@ ul, ol { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
   animation: overduePulse 1.8s ease-in-out infinite;
 }
 
-/* Mobile Safe-Area (iOS) */
-@supports (padding: max(0px)) {
-  #globalTimersRoot {
-    bottom: calc(76px + env(safe-area-inset-bottom));
-  }
-}
+
 
 @media (min-width: 720px) {
-  #globalTimersRoot {
-    left: 16px;
-    right: 16px;
-  }
+
   .timer-card-main {
     padding: .7rem .85rem;
   }
@@ -508,4 +493,22 @@ ul, ol { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 52vw;
+}
+/* Global overlay positioning: in cook it sits above cookbar, otherwise closer to bottom */
+#globalTimersRoot {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 85;
+  pointer-events: none;
+}
+
+
+#globalTimersRoot.has-cookbar {
+  bottom: calc(76px + env(safe-area-inset-bottom));
+}
+
+#globalTimersRoot .timer-overlay {
+  pointer-events: auto;
 }

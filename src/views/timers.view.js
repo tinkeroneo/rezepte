@@ -12,25 +12,35 @@ let tickHandle = null;
 function ack(el) {
   if (!el) return;
   el.classList.remove("tap-ack");
-  void el.offsetWidth; // restart animation
+  void el.offsetWidth;
   el.classList.add("tap-ack");
   clearTimeout(el._ackT);
   el._ackT = setTimeout(() => el.classList.remove("tap-ack"), 220);
 }
 
-export function renderTimersOverlay({ appEl, state }) {
+function ensureRoot() {
   let root = document.getElementById("globalTimersRoot");
   if (!root) {
     root = document.createElement("div");
     root.id = "globalTimersRoot";
-    appEl.appendChild(root);
+    document.body.appendChild(root);
   }
+  return root;
+}
 
-  // UI state
+export function renderTimersOverlay({ appEl, state }) {
+  const root = ensureRoot();
+
+  const isCook = state?.name === "cook";
   state.ui ||= {};
-  const expanded = !!state.ui.timerExpanded;
 
-  const timers = loadTimers(); // object: { [id]: timer }
+  // In cook allow expand; outside cook always show compact chip
+  const expanded = isCook ? !!state.ui.timerExpanded : false;
+
+  root.classList.toggle("has-cookbar", isCook);
+  root.classList.toggle("compact-mode", !isCook);
+
+  const timers = loadTimers();
   const list = getSortedActiveTimers(timers);
 
   if (!list.length) {
@@ -41,9 +51,35 @@ export function renderTimersOverlay({ appEl, state }) {
 
   startTick(() => renderTimersOverlay({ appEl, state }));
 
-  const visible = expanded ? list : list.slice(0, 1);
+  const top = list[0];
   const total = list.length;
-  const hiddenCount = Math.max(0, total - visible.length);
+  const hiddenCount = Math.max(0, total - 1);
+
+  // --- OUTSIDE COOK: compact chip only ---
+  if (!isCook) {
+    const label = top.remainingSec <= 0 ? "⏰" : "⏱";
+    const time = top.remainingSec <= 0 ? "abgelaufen" : formatTime(top.remainingSec);
+
+    root.innerHTML = `
+      <button type="button" class="timer-chip ${top.remainingSec <= 0 ? "overdue" : ""}"
+              data-timer-chip="1"
+              title="${escapeHtml(top.title)}">
+        <span class="timer-chip-time">${label} ${time}</span>
+        ${hiddenCount > 0 ? `<span class="timer-chip-more">+${hiddenCount}</span>` : ``}
+      </button>
+    `;
+
+    // Optional: tap shows a hint. (No expand outside cook by design)
+    const chip = qs(root, "[data-timer-chip]");
+    if (chip) {
+      chip.addEventListener("click", () => ack(chip));
+    }
+    return;
+  }
+
+  // --- COOK VIEW: full overlay ---
+  const visible = expanded ? list : list.slice(0, 1);
+  const hidden = Math.max(0, total - visible.length);
 
   root.innerHTML = `
     <div class="timer-overlay">
@@ -67,10 +103,7 @@ export function renderTimersOverlay({ appEl, state }) {
         ${visible.map((t, idx) => {
           const offset = expanded ? 0 : Math.min(idx, 2) * 8;
           const isOverdue = t.remainingSec <= 0;
-
-          const label = isOverdue
-            ? "⏰ abgelaufen"
-            : `⏱ ${formatTime(t.remainingSec)}`;
+          const label = isOverdue ? "⏰ abgelaufen" : `⏱ ${formatTime(t.remainingSec)}`;
 
           return `
             <div class="timer-card ${isOverdue ? "overdue" : ""}"
@@ -92,15 +125,14 @@ export function renderTimersOverlay({ appEl, state }) {
         }).join("")}
       </div>
 
-      ${!expanded && hiddenCount > 0 ? `
+      ${!expanded && hidden > 0 ? `
         <div class="timer-more-hint">
-          +${hiddenCount} weitere … tippe „Alle anzeigen“
+          +${hidden} weitere … tippe „Alle anzeigen“
         </div>
       ` : ``}
     </div>
   `;
 
-  // Toggle alle / weniger
   const toggleBtn = qs(root, "[data-timer-toggle]");
   if (toggleBtn) {
     toggleBtn.addEventListener("click", (e) => {
@@ -111,32 +143,25 @@ export function renderTimersOverlay({ appEl, state }) {
     });
   }
 
-  // Extend (+1/+5)
   qsa(root, "[data-ext]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const id = btn.dataset.ext;
       const sec = parseInt(btn.dataset.sec, 10) || 0;
       if (!id || !sec) return;
-
-      // feedback am betroffenen Card-Container
       ack(btn.closest(".timer-card") || btn);
-
       extendTimer(timers, id, sec);
       saveTimers(timers);
       renderTimersOverlay({ appEl, state });
     });
   });
 
-  // Dismiss
   qsa(root, "[data-dismiss]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const id = btn.dataset.dismiss;
       if (!id || !timers[id]) return;
-
       ack(btn.closest(".timer-card") || btn);
-
       timers[id].dismissed = true;
       saveTimers(timers);
       renderTimersOverlay({ appEl, state });
@@ -148,6 +173,7 @@ function startTick(cb) {
   if (tickHandle) return;
   tickHandle = setInterval(cb, 1000);
 }
+
 function stopTick() {
   if (tickHandle) clearInterval(tickHandle);
   tickHandle = null;
