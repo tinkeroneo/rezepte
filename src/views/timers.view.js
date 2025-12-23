@@ -72,36 +72,18 @@ root.innerHTML = `
 `;
 
 
-  const chip = qs(root, "[data-timer-chip]");
+const chip = qs(root, "[data-timer-chip]");
 if (chip) {
-  const handler = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.stopImmediatePropagation();
-
-    chip.addEventListener("click", (e) => {
+  chip.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
     ack(chip);
     chip.classList.toggle("show-title");
   }, true);
-
-    const goCook =
-      (typeof setView === "function")
-        ? setView
-        : (typeof window.__appSetView === "function" ? window.__appSetView : null);
-
-    if (goCook) {
-      goCook({ name: "cook", selectedId: null });
-    }
-  };
-
-  // capture + pointerdown → kein Durchklick
-  chip.addEventListener("pointerdown", handler, true);
-  chip.addEventListener("click", handler, true);
 }
 return;
+
 
 }
 

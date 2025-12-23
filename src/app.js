@@ -66,7 +66,6 @@ async function loadAll() {
 }
 
 function render(view, setView) {
-  window.__appSetView = setView;
   // Keep the screen awake only while cooking
   if (view.name === "cook") {
     Wake.enable();
