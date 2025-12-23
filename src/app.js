@@ -66,15 +66,18 @@ async function loadAll() {
 }
 
 function render(view, setView) {
+  window.__appSetView = setView;
   // Keep the screen awake only while cooking
   if (view.name === "cook") {
     Wake.enable();
   } else {
     Wake.disable();
+
   }
 
+  
   // Global overlay: immer rendern, unabhängig vom View-State
-  renderTimersOverlay({ appEl, state: globalState });
+  renderTimersOverlay({ appEl, state: view, setView });
 
   if (view.name === "list") {
     return renderListView({ appEl, state: view, recipes, setView });

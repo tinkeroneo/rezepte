@@ -20,7 +20,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
   const saveDone = () => localStorage.setItem(doneKey, JSON.stringify(done));
 
   // timers per root recipe
-  const timersKey = `tinkeroneo_timers_${r.id}`;
+  const timersKey = "tinkeroneo_timers_v1";
+
   const audio = createBeep();
 
   appEl.innerHTML = `
