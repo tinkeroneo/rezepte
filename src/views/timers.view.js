@@ -28,11 +28,18 @@ function ensureRoot() {
   return root;
 }
 
-export function renderTimersOverlay({ appEl, state }) {
+export function renderTimersOverlay({ appEl, state, setView }) {
   const root = ensureRoot();
 
   const isCook = state?.name === "cook";
   state.ui ||= {};
+// In cook view we already have the cookbar timer UI -> avoid duplicates
+if (isCook) {
+  const root = ensureRoot();
+  root.innerHTML = "";
+  stopTick();
+  return;
+}
 
   // In cook allow expand; outside cook always show compact chip
   const expanded = isCook ? !!state.ui.timerExpanded : false;
@@ -56,26 +63,55 @@ export function renderTimersOverlay({ appEl, state }) {
   const hiddenCount = Math.max(0, total - 1);
 
   // --- OUTSIDE COOK: compact chip only ---
-  if (!isCook) {
-    const label = top.remainingSec <= 0 ? "⏰" : "⏱";
-    const time = top.remainingSec <= 0 ? "abgelaufen" : formatTime(top.remainingSec);
+if (!isCook) {
+  const label = top.remainingSec <= 0 ? "⏰" : "⏱";
+  const time = top.remainingSec <= 0 ? "abgelaufen" : formatTime(top.remainingSec);
 
-    root.innerHTML = `
-      <button type="button" class="timer-chip ${top.remainingSec <= 0 ? "overdue" : ""}"
-              data-timer-chip="1"
-              title="${escapeHtml(top.title)}">
-        <span class="timer-chip-time">${label} ${time}</span>
-        ${hiddenCount > 0 ? `<span class="timer-chip-more">+${hiddenCount}</span>` : ``}
-      </button>
-    `;
+root.innerHTML = `
+  <button type="button"
+          class="timer-chip ${top.remainingSec <= 0 ? "overdue" : ""}"
+          data-timer-chip="1"
+          title="${escapeHtml(top.title)}">
+    <span class="timer-chip-time">${label} ${time}</span>
+    <span class="timer-chip-title">${escapeHtml(top.title)}</span>
+    ${hiddenCount > 0 ? `<span class="timer-chip-more">+${hiddenCount}</span>` : ``}
+  </button>
+`;
 
-    // Optional: tap shows a hint. (No expand outside cook by design)
-    const chip = qs(root, "[data-timer-chip]");
-    if (chip) {
-      chip.addEventListener("click", () => ack(chip));
+
+  const chip = qs(root, "[data-timer-chip]");
+if (chip) {
+  const handler = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+
+    chip.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    ack(chip);
+    chip.classList.toggle("show-title");
+  }, true);
+
+    const goCook =
+      (typeof setView === "function")
+        ? setView
+        : (typeof window.__appSetView === "function" ? window.__appSetView : null);
+
+    if (goCook) {
+      goCook({ name: "cook", selectedId: null });
     }
-    return;
-  }
+  };
+
+  // capture + pointerdown → kein Durchklick
+  chip.addEventListener("pointerdown", handler, true);
+  chip.addEventListener("click", handler, true);
+}
+return;
+
+}
+
 
   // --- COOK VIEW: full overlay ---
   const visible = expanded ? list : list.slice(0, 1);
@@ -101,11 +137,11 @@ export function renderTimersOverlay({ appEl, state }) {
 
       <div class="timer-stack ${expanded ? "expanded" : ""}" id="timerStack">
         ${visible.map((t, idx) => {
-          const offset = expanded ? 0 : Math.min(idx, 2) * 8;
-          const isOverdue = t.remainingSec <= 0;
-          const label = isOverdue ? "⏰ abgelaufen" : `⏱ ${formatTime(t.remainingSec)}`;
+    const offset = expanded ? 0 : Math.min(idx, 2) * 8;
+    const isOverdue = t.remainingSec <= 0;
+    const label = isOverdue ? "⏰ abgelaufen" : `⏱ ${formatTime(t.remainingSec)}`;
 
-          return `
+    return `
             <div class="timer-card ${isOverdue ? "overdue" : ""}"
                  style="transform: translate(${offset}px, ${offset}px)"
                  data-timer-card="${t.id}">
@@ -122,7 +158,7 @@ export function renderTimersOverlay({ appEl, state }) {
               </div>
             </div>
           `;
-        }).join("")}
+  }).join("")}
       </div>
 
       ${!expanded && hidden > 0 ? `
