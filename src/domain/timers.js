@@ -1,6 +1,7 @@
 // src/domain/timers.js
 
 const DEFAULT_TIMERS_KEY = "tinkeroneo_timers_v1";
+import { formatTime, escapeHtml } from "../utils.js";
 
 /* -------------------- duration normalization -------------------- */
 
@@ -295,13 +296,13 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
       <div class="timer-list">
         ${visible.map(t => {
           const isOverdue = t.remainingSec <= 0;
-          const label = isOverdue ? "⏰ abgelaufen" : `⏱ ${formatTimeLocal(t.remainingSec)}`;
+          const label = isOverdue ? "⏰ abgelaufen" : `⏱ ${formatTime(t.remainingSec)}`;
 
           return `
             <div class="timer-pill ${isOverdue ? "is-overdue" : ""}">
               <div class="timer-pill-left" style="min-width:0;">
-                <div class="timer-pill-title" title="${escapeHtmlLocal(t.title)}">
-                  ${escapeHtmlLocal(t.title)}
+                <div class="timer-pill-title" title="${escapeHtml(t.title)}">
+                  ${escapeHtml(t.title)}
                 </div>
                 <div class="muted">${label}</div>
               </div>
@@ -326,20 +327,4 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
 }
 
 
-/* ---------- local helpers (no imports) ---------- */
 
-function formatTimeLocal(sec) {
-  const s = Math.max(0, Math.floor(sec));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
-}
-
-function escapeHtmlLocal(str) {
-  return String(str ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
