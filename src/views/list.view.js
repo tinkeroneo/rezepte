@@ -35,7 +35,6 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView }
 
           <div class="row" style="gap:.5rem;">
             <button class="btn btn-ghost" id="importBtn">Import</button>
-            <button class="btn btn-ghost" id="exportBtn">Expor</button>
           </div>
 
           <input
@@ -52,16 +51,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView }
     </div>
   `;
   ;
-  const exportBtn = appEl.querySelector("#exportPdfBtn");
-  if (exportBtn) {
-    exportBtn.addEventListener("click", () => {
-      exportRecipesToPdfViaPrint({
-        recipes,
-        partsByParent,
-        includeImages: true
-      });
-    });
-  }
+
 const exportOpenBtn = qs(appEl, "#exportOpenBtn");
 if (exportOpenBtn) {
   exportOpenBtn.addEventListener("click", () => {
@@ -166,15 +156,15 @@ if (exportOpenBtn) {
   });
 
   // Export
-  qs(appEl, "#exportBtn").addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(recipes, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "rezepte-export.json";
-    a.click();
-    URL.revokeObjectURL(url);
-  });
+//  qs(appEl, "#exportBtn").addEventListener("click", () => {
+//    const blob = new Blob([JSON.stringify(recipes, null, 2)], { type: "application/json" });
+//    const url = URL.createObjectURL(blob);
+//    const a = document.createElement("a");
+//    a.href = url;
+//    a.download = "rezepte-export.json";
+//    a.click();
+//    URL.revokeObjectURL(url);
+//  });
 function openExportSheet({ appEl, recipes, partsByParent }) {
   // backdrop + sheet
   const backdrop = document.createElement("div");

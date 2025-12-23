@@ -6,37 +6,41 @@ export function isIngredientHeader(line) {
 
 export function renderIngredientsHtml(lines, escapeHtml) {
   let html = "";
-  let openList = false;
 
-  const openUl = () => {
-    if (!openList) {
+  let ulOpen = false;
+
+  function openUl() {
+    if (!ulOpen) {
       html += "<ul>";
-      openList = true;
+      ulOpen = true;
     }
-  };
+  }
 
-  const closeUl = () => {
-    if (openList) {
+  function closeUl() {
+    if (ulOpen) {
       html += "</ul>";
-      openList = false;
+      ulOpen = false;
     }
-  };
+  }
+
 
   for (const raw of (lines ?? [])) {
     const line = (raw ?? "").trim();
     if (!line) continue;
 
     if (isIngredientHeader(line)) {
-      closeUl();
+      // Header als <li> rendern (valide innerhalb <ul>) – aber ohne Bullet
+      openUl();
       html += `
-        <div class="muted" style="margin-top:.75rem; font-weight:800;">
-          ${escapeHtml(line.replace(/:$/, ""))}
-        </div>
-      `;
+    <li class="ingredient-header">
+      ${escapeHtml(line.replace(/:$/, ""))}
+    </li>
+  `;
     } else {
       openUl();
       html += `<li>${escapeHtml(line)}</li>`;
     }
+
   }
 
   closeUl();

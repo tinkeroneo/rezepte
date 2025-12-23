@@ -21,7 +21,10 @@ export function renderDetailView({
   appEl.innerHTML = `
     <div class="container">
       <div class="card">
+      <div class="row" style="justify-content:space-between; gap:.5rem;">
         <button class="btn btn-ghost" id="backBtn">← Zurück</button>
+        <button class="btn btn-ghost" id="cookBtn">Kochen</button>
+        </div>
         <h2>${escapeHtml(r.title)}</h2>
         <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
         ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
@@ -97,7 +100,6 @@ export function renderDetailView({
         <hr />
         <div class="row" style="justify-content:space-between; gap:.5rem;">
           <button class="btn btn-ghost" id="deleteBtn">Löschen</button>
-          <button class="btn btn-ghost" id="cookBtn">Kochen</button>
           <button class="btn btn-primary" id="editBtn">Bearbeiten</button>
         </div>
 

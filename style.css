@@ -95,6 +95,9 @@ textarea { min-height: 120px; resize: vertical; }
 hr { border: 0; border-top: 1px solid #eee; margin: 1rem 0; }
 h2, h3 { margin: .25rem 0 .5rem; }
 ul, ol { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
+ul li.muted {
+  list-style: none;
+}
 
 .thumb {
   width: 54px;
@@ -539,3 +542,26 @@ ul, ol { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
 .timer-chip.show-title .timer-chip-title {
   display: inline;
 }
+
+/* ingredient section headers inside ul without bullets */
+.ingredient-header {
+  list-style: none;
+  padding-left: 0;
+  margin-left: 0;
+  margin-top: .75rem;
+  font-weight: 800;
+  color: #666; /* wie .muted */
+}
+
+/*.ingredient-header {
+  font-weight: 800;
+  margin: .6rem 0 .25rem; 
+}*/
+.ingredient-header:first-child {
+  margin-top: 0;
+}
+.ingredients-ul {
+  padding-left: 1.2rem;
+}
+
+
