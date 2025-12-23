@@ -47,12 +47,12 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
               ${isMenu ? `<div class="muted" style="font-weight:850; margin-bottom:.25rem;">${escapeHtml(sec.title)}</div>` : ""}
               <ol class="steps-checklist">
                 ${sec.cards.map((c, idx) => {
-                  const combined = [c.title, ...(c.body ?? [])].join(" ");
-                  const dur = parseDurationSeconds(combined);
-                  const key = stepDoneKey(sec.recipeId, idx);
-                  const title = `${sec.title}: ${c.title}`.slice(0, 80);
+    const combined = [c.title, ...(c.body ?? [])].join(" ");
+    const dur = parseDurationSeconds(combined);
+    const key = stepDoneKey(sec.recipeId, idx);
+    const title = `${sec.title}: ${c.title}`.slice(0, 80);
 
-                  return `
+    return `
                     <li>
                       <div style="font-weight:800; margin-bottom:.25rem;">${escapeHtml(c.title)}</div>
 
@@ -75,7 +75,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
                       ` : ""}
                     </li>
                   `;
-                }).join("")}
+  }).join("")}
               </ol>
             </div>
           `).join("")}
@@ -95,23 +95,74 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
   const timerRoot = qs(appEl, "#timerRoot");
   const sheetRoot = qs(appEl, "#sheetRoot");
+  function ack(el) {
+  if (!el) return;
+  el.classList.remove("tap-ack");
+  void el.offsetWidth; // restart animation
+  el.classList.add("tap-ack");
+  clearTimeout(el._ackT);
+  el._ackT = setTimeout(() => el.classList.remove("tap-ack"), 220);
+}
+
+  let timersExpanded = false;
+  function flashTimerRootOnce() {
+    // nur kurz sichtbar, dann wieder aus
+    timerRoot.classList.remove("timer-flash");
+    // reflow, damit Animation neu startet
+    void timerRoot.offsetWidth;
+    timerRoot.classList.add("timer-flash");
+    window.clearTimeout(timerRoot._flashT);
+    timerRoot._flashT = window.setTimeout(() => {
+      timerRoot.classList.remove("timer-flash");
+    }, 220);
+  }
 
   const tm = createTimerManager({
     storageKey: timersKey,
     onRender: (snap) => {
-      timerRoot.innerHTML = renderTimersBarHtml(snap);
+      timerRoot.innerHTML = renderTimersBarHtml(snap, {
+        expanded: timersExpanded,
+        maxCollapsed: 1
+      });
 
-      // bind timer controls
-      qsa(timerRoot, "[data-timer-stop]").forEach(b => {
-        b.addEventListener("click", () => tm.removeTimer(b.dataset.timerStop));
+      // Toggle alle / weniger
+      qsa(timerRoot, "[data-timer-toggle]").forEach(b => {
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          timersExpanded = !timersExpanded;
+          flashTimerRootOnce();
+          tm.tick(); // sofort neu rendern
+        });
       });
-      qsa(timerRoot, "[data-timer-plus]").forEach(b => {
-        b.addEventListener("click", () => tm.addTime(b.dataset.timerPlus, 60));
-      });
-    },
-    onFire: () => {
-      // fire twice
-      audio.beep(); audio.beep();
+
+      // Stop
+qsa(timerRoot, "[data-timer-stop]").forEach(b => {
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    ack(b.closest(".timer-pill") || b);
+    tm.removeTimer(b.dataset.timerStop);
+    tm.tick();
+  });
+});
+
+
+      // Extend (+1m / +5m)
+qsa(timerRoot, "[data-timer-ext]").forEach(b => {
+  b.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const id = b.dataset.timerExt;
+    const sec = parseInt(b.dataset.sec, 10) || 0;
+    if (!id || !sec) return;
+    ack(b.closest(".timer-pill") || b);
+    tm.extendTimer(id, sec);
+    tm.tick();
+  });
+});
+
+      onFire: () => {
+        // fire twice
+        audio.beep(); audio.beep();
+      }
     }
   });
 
@@ -158,8 +209,12 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
       const title = btn.dataset.title || "Timer";
       const dur = parseInt(btn.dataset.seconds, 10);
       if (!dur) return;
-      audio.prime();
-      tm.addTimer(key, title, dur);
+audio.prime();
+tm.addTimer(key, title, dur);
+ack(btn);
+tm.tick();
+
+
     });
   });
 
