@@ -79,7 +79,7 @@ function render(view, setView) {
   renderTimersOverlay({ appEl, state: view, setView });
 
   if (view.name === "list") {
-    return renderListView({ appEl, state: view, recipes, setView });
+    return renderListView({ appEl, state: view, recipes, partsByParent, setView });
   }
   if (view.name === "detail") {
     return renderDetailView({
