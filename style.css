@@ -356,9 +356,9 @@ ul, ol { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
 
 /* Sehr dezenter "alive" Hinweis bei overdue */
 @keyframes overduePulse {
-  0% { box-shadow: 0 10px 22px rgba(0,0,0,0.14); }
-  50% { box-shadow: 0 14px 28px rgba(185,28,28,0.22); }
-  100% { box-shadow: 0 10px 22px rgba(0,0,0,0.14); }
+  0% { box-shadow: 0 0 0 rgba(185,28,28,0); }
+  50% { box-shadow: 0 0 0 3px rgba(185,28,28,0.12); }
+  100% { box-shadow: 0 0 0 rgba(185,28,28,0); }
 }
 
 .timer-card.overdue {
@@ -380,4 +380,132 @@ ul, ol { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
   .timer-card-main {
     padding: .7rem .85rem;
   }
+}
+/* --- Timerbar UX upgrades --- */
+
+.timer-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #e9f5ee;
+  color: #1f6a44;
+  font-weight: 800;
+  font-size: .82rem;
+  border: 1px solid #bfe2cf;
+}
+
+.timer-toggle {
+  border: 1px solid #ddd;
+  background: white;
+  border-radius: 12px;
+  padding: .45rem .6rem;
+  cursor: pointer;
+}
+
+.timer-toggle:hover {
+  border-color: #bfe2cf;
+  background: #e9f5ee;
+  color: #1f6a44;
+}
+
+.timer-list {
+  margin-top: .55rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.timer-pill {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  align-items: center;
+  padding: .55rem .65rem;
+  border: 1px solid #e6e6e6;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.96);
+}
+
+.timer-pill.is-overdue {
+  border-color: #f1c7c7;
+}
+
+.timer-pill.is-overdue .muted {
+  color: #b91c1c;
+  font-weight: 800;
+}
+
+.timer-pill-title {
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42vw;
+}
+
+.timer-actions button:active {
+  transform: translateY(1px);
+}
+
+.timer-more-hint {
+  margin-top: .4rem;
+  font-size: .9rem;
+  color: #666;
+}
+
+/* Visible feedback on re-render */
+.timer-flash {
+  animation: timerFlash 160ms ease-out 1;
+}
+@keyframes timerFlash {
+  0% { filter: brightness(1); }
+  50% { filter: brightness(1.12); }
+  100% { filter: brightness(1); }
+}
+/* click feedback: nur kurz auf dem geklickten Element */
+.tap-ack {
+  animation: tapAck 160ms ease-out 1;
+}
+@keyframes tapAck {
+  0% { transform: translateY(0); filter: brightness(1); }
+  50% { transform: translateY(1px); filter: brightness(1.12); }
+  100% { transform: translateY(0); filter: brightness(1); }
+}
+
+/* overdue pulse auf der ZEILE (stoppt automatisch, wenn is-overdue weg ist) */
+.timer-pill.is-overdue {
+  animation: overduePulse 1.8s ease-in-out infinite;
+}
+
+/* --- Global timers overlay header --- */
+
+.timer-overlay {
+  pointer-events: auto;
+}
+
+.timer-overlay-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  margin-bottom: .5rem;
+}
+
+.timer-overlay-title {
+  display: inline-flex;
+  gap: .5rem;
+  align-items: center;
+  min-width: 0;
+}
+
+.timer-card-title {
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 52vw;
 }
