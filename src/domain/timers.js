@@ -267,32 +267,46 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
   const list = snap?.list ?? [];
   if (!list.length) return "";
 
+  const total = list.length;
+  const showToggle = total > 1;
+
   const visible = expanded ? list : list.slice(0, Math.max(1, maxCollapsed));
 
   return `
-    <div class="timerbar">
+    <div class="timerbar" data-timerbar>
       <div class="row" style="justify-content: space-between;">
-        <div style="font-weight:800;">Timer</div>
-        <div class="muted" style="font-size:.9rem;">
-          ${expanded ? "alle" : "top"}
+        <div style="font-weight:800; display:flex; gap:.5rem; align-items:center;">
+          <span>Timer</span>
+          <span class="timer-count" title="${total} Timer aktiv">${total}</span>
         </div>
+
+        ${showToggle ? `
+          <button type="button"
+                  class="timer-toggle"
+                  data-timer-toggle="1"
+                  aria-expanded="${expanded ? "true" : "false"}">
+            ${expanded ? "Weniger" : "Alle anzeigen"}
+          </button>
+        ` : `
+          <div class="muted" style="font-size:.9rem;">top</div>
+        `}
       </div>
 
-      <div style="margin-top:.55rem; display:flex; flex-direction:column; gap:.5rem;">
+      <div class="timer-list">
         ${visible.map(t => {
           const isOverdue = t.remainingSec <= 0;
           const label = isOverdue ? "⏰ abgelaufen" : `⏱ ${formatTimeLocal(t.remainingSec)}`;
 
           return `
-            <div class="timer-pill" style="display:flex; justify-content:space-between; gap:.75rem;">
-              <div style="min-width:0;">
-                <div style="font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            <div class="timer-pill ${isOverdue ? "is-overdue" : ""}">
+              <div class="timer-pill-left" style="min-width:0;">
+                <div class="timer-pill-title" title="${escapeHtmlLocal(t.title)}">
                   ${escapeHtmlLocal(t.title)}
                 </div>
                 <div class="muted">${label}</div>
               </div>
 
-              <div class="row" style="gap:.35rem; flex:0 0 auto;">
+              <div class="row timer-actions" style="gap:.35rem; flex:0 0 auto;">
                 <button type="button" data-timer-ext="${t.id}" data-sec="60">+1m</button>
                 <button type="button" data-timer-ext="${t.id}" data-sec="300">+5m</button>
                 <button type="button" data-timer-stop="${t.id}" aria-label="Stop timer">✕</button>
@@ -301,9 +315,16 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
           `;
         }).join("")}
       </div>
+
+      ${!expanded && total > visible.length ? `
+        <div class="timer-more-hint">
+          +${total - visible.length} weitere … tippe „Alle anzeigen“
+        </div>
+      ` : ``}
     </div>
   `;
 }
+
 
 /* ---------- local helpers (no imports) ---------- */
 
