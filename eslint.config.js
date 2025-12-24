@@ -5,35 +5,47 @@ export default [
   {
     files: ["**/*.js"],
     languageOptions: {
-      ecmaVersion: 2022,
+      ecmaVersion: "latest",
       sourceType: "module",
       globals: {
+        // Browser/Web APIs
         window: "readonly",
         document: "readonly",
         navigator: "readonly",
         location: "readonly",
-        localStorage: "readonly",
-        console: "readonly",
-        setTimeout: "readonly",
-        clearTimeout: "readonly",
-        setInterval: "readonly",
-        clearInterval: "readonly",
+        URL: "readonly",
+        URLSearchParams: "readonly",
+        Blob: "readonly",
+        File: "readonly",
+        Response: "readonly",
         fetch: "readonly",
+        alert: "readonly",
+        confirm: "readonly",
+        prompt: "readonly",
+        requestAnimationFrame: "readonly",
+        performance: "readonly",
+        crypto: "readonly",
+        CSS: "readonly",
+
+        // Service Worker APIs
+        self: "readonly",
+        caches: "readonly",
       },
     },
     rules: {
-      "no-shadow": "error",
-      "no-unused-vars": ["error", { args: "none" }],
       eqeqeq: ["error", "always"],
     },
   },
   {
-    ignores: [
-      "dist/**",
-      "build/**",
-      "node_modules/**",
-      ".github/**",
-      "**/*.min.js",
-    ],
+    files: ["sw.js"],
+    languageOptions: {
+      globals: {
+        self: "readonly",
+        caches: "readonly",
+        Response: "readonly",
+        URL: "readonly",
+        fetch: "readonly",
+      },
+    },
   },
 ];

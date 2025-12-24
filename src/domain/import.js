@@ -24,7 +24,7 @@ export async function importRecipesIntoApp({
   const incoming = Array.isArray(items) ? items : [];
   if (!incoming.length) return;
 
-  const hasText = (v) => (typeof v === "string" ? v.trim().length > 0 : v != null);
+  const hasText = (v) => (typeof v === "string" ? v.trim().length > 0 : v !== null);
 
   const uniqMergeLines = (a, b) => {
     const A = Array.isArray(a) ? a : [];

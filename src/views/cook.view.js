@@ -1,6 +1,6 @@
 import { escapeHtml, qs, qsa } from "../utils.js";
 import { splitStepsToCards, stepDoneKey, parseDurationSeconds, formatTime } from "../domain/steps.js";
-import { buildMenuStepSections } from "../domain/menu.js";
+import { buildMenuStepSections, buildMenuIngredients } from "../domain/menu.js";
 import { renderIngredientsHtml } from "./shared.ingredients.js";
 import { createBeep, createTimerManager, renderTimersBarHtml } from "../domain/timers.js";
 import { ack } from "../ui/feedback.js";
@@ -341,8 +341,19 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
           <button class="btn btn-ghost" id="closeSheet">Schließen</button>
         </div>
         <div style="margin-top:.75rem;">
-          ${renderIngredientsHtml(r.ingredients ?? [])}
+          ${isMenu
+            ? buildMenuIngredients(r, recipes, partsByParent).map(section => `
+                <div style="margin-bottom:1rem;">
+                  <div class="muted" style="font-weight:800; margin-bottom:.25rem;">
+                    ${escapeHtml(section.title)}
+                  </div>
+                  ${renderIngredientsHtml(section.items)}
+                </div>
+              `).join("")
+            : renderIngredientsHtml(r.ingredients ?? [])
+          }
         </div>
+
       </div>
     `;
     qs(sheetRoot, "#backdrop").addEventListener("click", () => sheetRoot.innerHTML = "");
