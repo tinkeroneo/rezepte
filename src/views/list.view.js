@@ -2,7 +2,6 @@ import { escapeHtml, norm, qs, qsa } from "../utils.js";
 import { KEYS, lsGetStr, lsSetStr, lsSet } from "../storage.js";
 import { exportRecipesToPdfViaPrint } from "../services/pdfExport.js";
 import { downloadJson } from "../services/exportDownload.js";
-import { saveRecipesLocal, toLocalShape } from "../domain/recipes.js";
 import { buildCookStatsByRecipeId } from "../domain/cooklog.js";
 
 
@@ -65,17 +64,19 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   `;
   ;
 
-  const importBtn = qs(appEl, "#importBtn");
-  if (importBtn) {
-    importBtn.addEventListener("click", () => {
-      openImportSheet({
-        appEl,
-        recipesFiltered: getFiltered(qEl.value), // Import ist unabhängig von Filter, aber wir können UI zeigen
-        useBackend,
-        onImportRecipes
-      });
+const qEl = qs(appEl, "#q");
+
+const importBtn = qs(appEl, "#importBtn");
+if (importBtn) {
+  importBtn.addEventListener("click", () => {
+    openImportSheet({
+      appEl,
+      useBackend,
+      onImportRecipes
     });
-  }
+  });
+}
+
 
   const exportOpenBtn = qs(appEl, "#exportOpenBtn");
   if (exportOpenBtn) {
@@ -84,7 +85,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     });
   }
 
-  const qEl = qs(appEl, "#q");
+ 
   const resultsEl = qs(appEl, "#results");
   const countEl = qs(appEl, "#count");
   const modeListBtn = qs(appEl, "#modeList");
@@ -114,16 +115,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   ${cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}
 `;
   catEl.value = cat;
-  /* const getFiltered = (q) => {
-    const qq = norm(q);
-    const sorted = recipes.slice().sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
-    return sorted.filter(r => {
-      if (!qq) return true;
-      const hay = [r.title, r.category, r.time, r.source, ...(r.ingredients ?? []), ...(r.steps ?? [])]
-        .map(norm).join(" ");
-      return hay.includes(qq);
-    });
-  }; */
+
   function parseMinutes(timeStr) {
     const s = String(timeStr ?? "").toLowerCase();
 
@@ -437,7 +429,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   function openImportSheet({ appEl, useBackend, onImportRecipes }) {
     const backdrop = document.createElement("div");
     backdrop.className = "sheet-backdrop";
-    backdrop.addEventListener("click", () => backdrop.remove());
+   
 
     const sheet = document.createElement("div");
     sheet.className = "sheet";
@@ -494,7 +486,12 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     document.body.appendChild(backdrop);
     document.body.appendChild(sheet);
 
+    
     const close = () => { sheet.remove(); backdrop.remove(); };
+
+backdrop.addEventListener("click", close);
+qs(sheet, "#impClose").addEventListener("click", close);
+
     qs(sheet, "#impClose").addEventListener("click", close);
 
     const fileBtn = qs(sheet, "#impPickFile");
@@ -548,8 +545,9 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
         doBtn.textContent = "Importiere…";
         await onImportRecipes?.({ items, mode });
         alert(`Import ok: ${items.length} Einträge verarbeitet.`);
-        close();
-        location.reload();
+close();
+setView?.({ name: "list", selectedId: null, q: state.q });
+
       } catch (e) {
         console.error(e);
         alert("Import fehlgeschlagen. Details siehe Konsole.");
