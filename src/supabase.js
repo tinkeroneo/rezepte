@@ -2,6 +2,10 @@
 // Nutzt: Project URL + anon key aus Supabase
 import { getClientId } from "./domain/clientId.js";
 
+// Upload limits (client-side). Server-side rules should also exist (Supabase Storage policies).
+const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg","image/png","image/webp"]);
+const MAX_UPLOAD_BYTES = 3 * 1024 * 1024; // 3 MB
+
 const SUPABASE_URL = "https://iwpqodzaedprukqotckb.supabase.co";
 
 // ⛔ HIER deinen anon public key einsetzen (nicht service_role!)
@@ -19,6 +23,26 @@ function sbHeaders() {
 }
 
 // Helper für Fehlertexte
+
+const DEFAULT_TIMEOUT_MS = 12000;
+const UPLOAD_TIMEOUT_MS = 45000;
+
+async function sbFetch(url, { timeoutMs = DEFAULT_TIMEOUT_MS, ...opts } = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    return res;
+  } catch (e) {
+    if (e?.name === "AbortError") {
+      throw new Error("Timeout: Backend antwortet nicht rechtzeitig.");
+    }
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function sbJson(res) {
   const text = await res.text();
   try { return text ? JSON.parse(text) : null; } catch { return text; }
@@ -28,32 +52,51 @@ async function sbJson(res) {
 
 export async function listRecipes() {
   const url = `${SUPABASE_URL}/rest/v1/recipes?space_id=eq.${encodeURIComponent(SPACE_ID)}&order=created_at.desc`;
-  const res = await fetch(url, { headers: sbHeaders() });
+  const res = await sbFetch(url, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`Supabase list failed: ${res.status} ${await sbJson(res)}`);
   return await res.json();
 }
 
 export async function upsertRecipe(recipe) {
   // upsert über Primary Key id
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/recipes`, {
-    method: "POST",
-    headers: { ...sbHeaders(), "Prefer": "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify([{
-      id: recipe.id,
-      space_id: SPACE_ID,
-      title: recipe.title,
-      category: recipe.category ?? "",
-      time: recipe.time ?? "",
-      ingredients: recipe.ingredients ?? [],
-      steps: recipe.steps ?? [],
-      image_url: recipe.image_url ?? null,
-      source: recipe.source ?? ""
-    }])
-  });
+  const baseRow = {
+    id: recipe.id,
+    space_id: SPACE_ID,
+    title: recipe.title,
+    category: recipe.category ?? "",
+    time: recipe.time ?? "",
+    ingredients: recipe.ingredients ?? [],
+    steps: recipe.steps ?? [],
+    image_url: recipe.image_url ?? null,
+    source: recipe.source ?? ""
+  };
 
-  if (!res.ok) throw new Error(`Supabase upsert failed: ${res.status} ${await sbJson(res)}`);
-  const data = await res.json();
-  return data?.[0] ?? null;
+  // tags are optional (may not exist yet in DB schema)
+  const tryRows = [
+    { ...baseRow, tags: recipe.tags ?? [] },
+    baseRow
+  ];
+
+  let lastErr = null;
+  for (const row of tryRows) {
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipes`, {
+      method: "POST",
+      headers: { ...sbHeaders(), "Prefer": "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify([row])
+    });
+
+    if (res.ok) return (await sbJson(res))[0];
+
+    const body = await sbJson(res);
+    const msg = typeof body === "string" ? body : JSON.stringify(body);
+    lastErr = new Error(`Supabase upsert failed: ${res.status} ${msg}`);
+
+    // If schema doesn't have 'tags', retry without it (second attempt)
+    if (row.tags !== undefined && /column\s+"tags"/i.test(msg)) continue;
+
+    break;
+  }
+  throw lastErr ?? new Error("Supabase upsert failed.");
 }
 
 export async function deleteRecipe(id) {
@@ -66,6 +109,12 @@ const BUCKET = "recipe-images";
 
 export async function uploadRecipeImage(file, recipeId) {
   if (!file) throw new Error("Kein File ausgewählt.");
+  if (file.type && !ALLOWED_IMAGE_TYPES.has(file.type)) {
+    throw new Error("Ungültiger Bildtyp. Erlaubt: JPG, PNG, WEBP.");
+  }
+  if (typeof file.size === "number" && file.size > MAX_UPLOAD_BYTES) {
+    throw new Error("Bild ist zu groß (max. 3 MB). Bitte kleiner exportieren.");
+  }
 
   const extFromName = (file.name?.split(".").pop() || "").toLowerCase();
   const ext =
@@ -80,7 +129,7 @@ const path = `${SPACE_ID}/${recipeId}-${ts}.${ext}`;
 
   // 1) Signed Upload URL holen (Edge Function)
   const fnUrl = `${SUPABASE_URL}/functions/v1/sign-upload`;
-  const signRes = await fetch(fnUrl, {
+  const signRes = await sbFetch(fnUrl, {
     method: "POST",
     headers: {
       apikey: SUPABASE_ANON_KEY,
@@ -100,8 +149,7 @@ const path = `${SPACE_ID}/${recipeId}-${ts}.${ext}`;
   const signedUrl = signed.signedUrl;
 
   // 2) Upload an signed URL (PUT)
-  const upRes = await fetch(signedUrl, {
-    method: "PUT",
+  const upRes = await sbFetch(signedUrl, { timeoutMs: UPLOAD_TIMEOUT_MS, method: "PUT",
     headers: {
       "Content-Type": file.type || "application/octet-stream",
     },
@@ -120,13 +168,13 @@ const path = `${SPACE_ID}/${recipeId}-${ts}.${ext}`;
 
 export async function listAllRecipeParts() {
   const url = `${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(SPACE_ID)}&order=sort_order.asc`;
-  const res = await fetch(url, { headers: sbHeaders() });
+  const res = await sbFetch(url, { headers: sbHeaders() });
   if (!res.ok) throw new Error(`parts list failed: ${res.status} ${await sbJson(res)}`);
   return await res.json();
 }
 
 export async function addRecipePart(parentId, childId, sortOrder = 0) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/recipe_parts`, {
+  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipe_parts`, {
     method: "POST",
     headers: { ...sbHeaders(), "Prefer": "resolution=merge-duplicates" },
     body: JSON.stringify([{
@@ -188,4 +236,25 @@ export async function deleteCookEventSb(id) {
     .eq("id", id);
 
   if (error) throw error;
+}
+
+// Client logs (optional)
+export async function logClientEvent(evt) {
+  const payload = {
+    ...evt,
+    client_id: evt.client_id ?? getClientId(),
+    space_id: SPACE_ID,
+  };
+  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/client_logs`, {
+    method: "POST",
+    headers: { ...sbHeaders(), "Prefer": "return=minimal" },
+    body: JSON.stringify([payload]),
+    timeoutMs: 8000,
+  });
+  // Ignore failures; do not crash app
+  if (!res.ok) {
+    const body = await sbJson(res);
+    throw new Error(`Supabase log failed: ${res.status} ${typeof body === 'string' ? body : JSON.stringify(body)}`);
+  }
+  return true;
 }

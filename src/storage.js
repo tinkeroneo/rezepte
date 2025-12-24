@@ -16,14 +16,21 @@ export function lsGet(key, fallback = null) {
 }
 
 export function lsSet(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // ignore quota / privacy-mode errors
+  }
 }
-
 export function lsGetStr(key, fallback = "") {
   const v = localStorage.getItem(key);
   return v == null ? fallback : v;
 }
 
 export function lsSetStr(key, value) {
-  localStorage.setItem(key, String(value ?? ""));
+  try {
+    localStorage.setItem(key, String(value ?? ""));
+  } catch {
+    // ignore quota / privacy-mode errors
+  }
 }

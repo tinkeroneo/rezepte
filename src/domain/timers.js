@@ -2,6 +2,7 @@
 
 const DEFAULT_TIMERS_KEY = "tinkeroneo_timers_v1";
 import { formatTime, escapeHtml } from "../utils.js";
+import { generateId } from "./id.js";
 
 /* -------------------- duration normalization -------------------- */
 
@@ -48,7 +49,7 @@ export function createTimer({ title, durationSec, key = null }) {
     (typeof title === "string" && title.trim()) ? title.trim() : "Timer";
 
   return {
-    id: crypto.randomUUID(),
+    id: generateId(),
     key, // optional: recipe step key or any identifier
     title: safeTitle,
     createdAt: now,
@@ -371,6 +372,5 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
     </div>
   `;
 }
-
 
 
