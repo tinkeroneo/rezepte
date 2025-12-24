@@ -1,5 +1,6 @@
 import { escapeHtml, qs } from "../utils.js";
 import { compressImageFile } from "../domain/images.js";
+import { generateId } from "../domain/id.js";
 
 export function renderAddView({
   appEl, state, recipes, setView,
@@ -12,6 +13,22 @@ export function renderAddView({
   let uploadDone = false;
   let previewUrl = null;
 
+// dirty tracking (unsaved changes)
+let dirty = false;
+const setDirty = (v) => { dirty = v; };
+
+// ensure we don’t register multiple handlers across renders
+if (window.__tinkeroneo_beforeunload_add) {
+  window.removeEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
+}
+window.__tinkeroneo_beforeunload_add = (e) => {
+  if (!dirty) return;
+  e.preventDefault();
+  e.returnValue = "";
+};
+window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
+
+
   const r = existing ? {
     id: existing.id,
     title: existing.title ?? "",
@@ -23,7 +40,7 @@ export function renderAddView({
     createdAt: existing.createdAt ?? Date.now(),
     source: existing.source ?? ""
   } : {
-    id: crypto.randomUUID(),
+    id: generateId(),
     title: "",
     category: "",
     time: "",
@@ -60,13 +77,17 @@ export function renderAddView({
               placeholder="z. B. Ottolenghi – Simple, S. 123 / Oma / Eigenkreation"
               value="${escapeHtml(r.source ?? "")}" />
           </div>
+
+          <div class="field">
+            <label class="muted">Tags (kommagetrennt)</label>
+            <input id="tags" type="text" placeholder="z.B. schnell, vegan, mealprep" value="${escapeHtml((r.tags || []).join(', '))}" />
+          </div>
         </div>
 
         <label class="muted">Foto</label>
         <div class="row">
           <input id="image_url" type="text" placeholder="https://... oder per Upload setzen" value="${escapeHtml(r.image_url ?? "")}" />
-          <button class="btn btn-ghost" id="uploadBtn" type="button">Upload</button>
-        </div>
+</div>
 
         <input id="image_file" type="file" accept="image/*" />
         <div class="muted" id="uploadStatus" style="margin-top:.35rem;"></div>
@@ -95,6 +116,22 @@ export function renderAddView({
   const imageUrlEl = qs(appEl, "#image_url");
   const statusEl = qs(appEl, "#uploadStatus");
   const previewWrap = qs(appEl, "#imgPreviewWrap");
+
+
+const tagsEl = qs(appEl, "#tags");
+
+const markDirty = () => setDirty(true);
+["#title","#category","#time","#source","#image_url","#ingredients","#steps","#tags"].forEach((sel) => {
+  const el = qs(appEl, sel);
+  el.addEventListener("input", markDirty);
+});
+fileEl.addEventListener("change", () => {
+  pendingFile = fileEl.files?.[0] || null;
+  uploadDone = false;
+  markDirty();
+});
+
+
 
   const cleanupPreviewUrl = () => {
     if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
@@ -125,31 +162,8 @@ export function renderAddView({
     renderPreview();
   });
 
-  qs(appEl, "#uploadBtn").addEventListener("click", async () => {
-    let file = fileEl.files?.[0];
-    if (!file) return alert("Bitte zuerst ein Bild auswählen.");
-    if (!useBackend) return alert("Upload braucht Backend (Supabase).");
-
-    try {
-      statusEl.textContent = `Komprimiere… (${Math.round(file.size / 1024)} KB)`;
-      file = await compressImageFile(file, { maxSide: 1600, quality: 0.82, mime: "image/jpeg" });
-      statusEl.textContent = `Uploading… (${Math.round(file.size / 1024)} KB)`;
-      const url = await uploadRecipeImage(file, r.id);
-
-      imageUrlEl.value = url;
-      uploadDone = true;
-      pendingFile = null;
-
-      cleanupPreviewUrl();
-      renderPreview();
-      statusEl.textContent = "Upload fertig ✅ (URL gesetzt)";
-    } catch (e) {
-      statusEl.textContent = "";
-      alert(`Upload fehlgeschlagen: ${e?.message ?? e}`);
-    }
-  });
-
   qs(appEl, "#backBtn").addEventListener("click", () => {
+    if (dirty && !confirm("Ungespeicherte Änderungen verwerfen?")) return;
     cleanupPreviewUrl();
     if (isEdit) setView({ name: "detail", selectedId: r.id, q: state.q });
     else setView({ name: "list", selectedId: null, q: state.q });
@@ -161,13 +175,43 @@ export function renderAddView({
 
     const category = qs(appEl, "#category").value.trim();
     const time = qs(appEl, "#time").value.trim();
-    const image_url = qs(appEl, "#image_url").value.trim();
+    let image_url = qs(appEl, "#image_url").value.trim();
     const source = qs(appEl, "#source").value.trim();
+
+const tags = String(qs(appEl, "#tags").value || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+
+image_url = imageUrlEl.value.trim();
+
+// Upload selected image on save (no separate upload button)
+if (useBackend && pendingFile) {
+  try {
+    let file = pendingFile;
+    statusEl.textContent = `Komprimiere… (${Math.round(file.size / 1024)} KB)`;
+    file = await compressImageFile(file, { maxSide: 1600, quality: 0.82, mime: "image/jpeg" });
+    statusEl.textContent = `Uploading… (${Math.round(file.size / 1024)} KB)`;
+    const uploadedUrl = await uploadRecipeImage(file, r.id);
+    image_url = uploadedUrl;
+    pendingFile = null;
+    uploadDone = true;
+    cleanupPreviewUrl();
+    previewUrl = null;
+    statusEl.textContent = "Upload fertig.";
+  } catch (e) {
+    statusEl.textContent = "";
+    alert(`Bild-Upload fehlgeschlagen.\nFehler: ${e?.message ?? e}`);
+  }
+}
+
 
     const ingredients = qs(appEl, "#ingredients").value.split("\n").map(s => s.trim()).filter(Boolean);
     const steps = qs(appEl, "#steps").value.split("\n").map(s => s.trim()).filter(Boolean);
 
-    const updated = { ...r, title, category, time, source, ingredients, steps, image_url: image_url || "" };
+    const updated = { ...r, title, category, time, source, tags, ingredients, steps, image_url: image_url || "" };
+
+    setDirty(false);
 
     // optimistic navigate
     cleanupPreviewUrl();

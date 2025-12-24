@@ -18,5 +18,15 @@
   <main id="app"></main>
 
   <script type="module" src="./src/app.js"></script>
+
+<script>
+  // Offline app-shell cache (optional)
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    });
+  }
+</script>
+
 </body>
 </html>

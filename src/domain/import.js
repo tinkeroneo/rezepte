@@ -1,16 +1,19 @@
-// src/domain/import.js
-// Import recipes into app (local + optional backend), honoring conflict mode.
-//
-// modes:
-// - backendWins: existing recipes keep their content; only new IDs are added
-// - jsonWins: JSON overwrites existing
-// - mergePreferBackend: merge, keeping existing fields if present
-// - mergePreferJson: merge, preferring JSON fields if present
+import { ensureUniqueId } from "./id.js";
+
+/**
+ * Import recipes into the app (local or backend).
+ *
+ * modes:
+ *  - backendWins: keep existing, only add new
+ *  - jsonWins: overwrite existing with imported
+ *  - mergePreferBackend: merge arrays, prefer existing scalar fields
+ *  - mergePreferJson: merge arrays, prefer imported scalar fields
+ */
 
 export async function importRecipesIntoApp({
   items,
-  mode = "backendWins",
-  useBackend = false,
+  mode,
+  useBackend,
   listRecipes,
   upsertRecipe,
   toLocalShape,
@@ -18,123 +21,127 @@ export async function importRecipesIntoApp({
   loadRecipesLocal,
   setRecipes,
 }) {
-  const incomingRaw = Array.isArray(items) ? items : [];
-  if (!incomingRaw.length) return { imported: 0, skipped: 0, total: 0 };
+  const incoming = Array.isArray(items) ? items : [];
+  if (!incoming.length) return;
 
-  const now = Date.now();
+  const hasText = (v) => (typeof v === "string" ? v.trim().length > 0 : v != null);
 
-  const normalize = (x) => {
-    const id = x?.id || crypto.randomUUID();
+  const uniqMergeLines = (a, b) => {
+    const A = Array.isArray(a) ? a : [];
+    const B = Array.isArray(b) ? b : [];
+    const seen = new Set();
+    const out = [];
+    for (const x of [...A, ...B]) {
+      const s = String(x ?? "").trim();
+      if (!s) continue;
+      const k = s.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(s);
+    }
+    return out;
+  };
+
+  const mergeRecipe = (base, patch, prefer) => {
+    const preferJson = prefer === "json";
+
+    const pick = (k) => {
+      const bv = base?.[k];
+      const pv = patch?.[k];
+      if (preferJson) return hasText(pv) ? pv : bv;
+      return hasText(bv) ? bv : pv;
+    };
+
+    const pickArr = (k) => {
+      const ba = Array.isArray(base?.[k]) ? base[k] : [];
+      const pa = Array.isArray(patch?.[k]) ? patch[k] : [];
+      if (!ba.length && pa.length) return pa;
+      if (!pa.length && ba.length) return ba;
+      return uniqMergeLines(ba, pa);
+    };
+
     return {
-      id,
-      title: String(x?.title ?? "Ohne Titel"),
-      category: String(x?.category ?? ""),
-      time: String(x?.time ?? ""),
-      source: String(x?.source ?? ""),
-      image_url: x?.image_url ?? x?.imageUrl ?? null,
-      ingredients: Array.isArray(x?.ingredients) ? x.ingredients : [],
-      steps: Array.isArray(x?.steps) ? x.steps : [],
-      createdAt: x?.createdAt ?? now,
-      updatedAt: now,
+      ...base,
+      ...patch,
+      id: base?.id ?? patch?.id,
+      title: pick("title") ?? base?.title ?? patch?.title,
+      category: pick("category"),
+      time: pick("time"),
+      source: pick("source"),
+      description: pick("description"),
+      image_url: pick("image_url") ?? pick("imageUrl"),
+      ingredients: pickArr("ingredients"),
+      steps: pickArr("steps"),
+      createdAt: base?.createdAt ?? patch?.createdAt ?? Date.now(),
     };
   };
 
-  const incoming = incomingRaw
-    .filter(x => x && (x.id || x.title))
-    .map(normalize);
+  // ---- Local only ----
+  if (!useBackend) {
+    const current = (loadRecipesLocal?.() ?? []).map(toLocalShape);
+    const byId = new Map(current.map((r) => [r.id, r]));
 
-  // IMPORTANT: use your existing local store (KEYS.LOCAL_RECIPES via loadRecipesLocal)
-  const current = Array.isArray(loadRecipesLocal?.()) ? loadRecipesLocal() : [];
-  const byId = new Map(current.map(r => [r.id, r]));
+    for (const raw of incoming) {
+      const patch = toLocalShape(raw);
+      patch.id = ensureUniqueId(patch.id, byId);
+      const existing = byId.get(patch.id);
 
-  const pickStr = (b, i, preferInc) => {
-    const bs = (b ?? "").trim();
-    const is = (i ?? "").trim();
-    return preferInc ? (is || bs) : (bs || is);
-  };
-  const pickVal = (b, i, preferInc) => (preferInc ? (i ?? b) : (b ?? i));
-  const pickArr = (b, i, preferInc) => {
-    const ba = Array.isArray(b) ? b : [];
-    const ia = Array.isArray(i) ? i : [];
-    return preferInc ? (ia.length ? ia : ba) : (ba.length ? ba : ia);
-  };
+      if (!existing) {
+        byId.set(patch.id, patch);
+        continue;
+      }
 
-  const merge = (base, inc, preferInc) => ({
-    ...base,
-    id: base.id,
-    title: pickStr(base.title, inc.title, preferInc),
-    category: pickStr(base.category, inc.category, preferInc),
-    time: pickStr(base.time, inc.time, preferInc),
-    source: pickStr(base.source, inc.source, preferInc),
-    image_url: pickVal(base.image_url, inc.image_url, preferInc),
-    ingredients: pickArr(base.ingredients, inc.ingredients, preferInc),
-    steps: pickArr(base.steps, inc.steps, preferInc),
-    createdAt: base.createdAt ?? inc.createdAt ?? now,
-    updatedAt: now,
-  });
+      if (mode === "backendWins") continue;
+      if (mode === "jsonWins") byId.set(patch.id, patch);
+      if (mode === "mergePreferBackend") byId.set(patch.id, mergeRecipe(existing, patch, "backend"));
+      if (mode === "mergePreferJson") byId.set(patch.id, mergeRecipe(existing, patch, "json"));
+    }
 
-  let imported = 0;
-  let skipped = 0;
+    const merged = Array.from(byId.values()).map(toLocalShape);
+    saveRecipesLocal(merged);
+    setRecipes?.(merged);
+    return;
+  }
 
-  for (const inc of incoming) {
-    const ex = byId.get(inc.id);
+  // ---- Backend ----
+  // Always compare against the backend state (not the in-memory list)
+  const backendNow = (await listRecipes()).map(toLocalShape);
+  const byId = new Map(backendNow.map((r) => [r.id, r]));
 
-    if (!ex) {
-      byId.set(inc.id, inc);
-      imported++;
+  const toUpsert = [];
+  for (const raw of incoming) {
+      const patch = toLocalShape(raw);
+      patch.id = ensureUniqueId(patch.id, byId);
+    const existing = byId.get(patch.id);
+
+    if (!existing) {
+      toUpsert.push(patch);
       continue;
     }
 
-    if (mode === "backendWins") {
-      skipped++;
-      continue;
-    }
+    if (mode === "backendWins") continue;
     if (mode === "jsonWins") {
-      byId.set(inc.id, inc);
-      imported++;
+      toUpsert.push({ ...existing, ...patch, id: existing.id });
       continue;
     }
     if (mode === "mergePreferBackend") {
-      byId.set(inc.id, merge(ex, inc, false));
-      imported++;
+      toUpsert.push(mergeRecipe(existing, patch, "backend"));
       continue;
     }
     if (mode === "mergePreferJson") {
-      byId.set(inc.id, merge(ex, inc, true));
-      imported++;
+      toUpsert.push(mergeRecipe(existing, patch, "json"));
       continue;
     }
-
-    skipped++;
   }
 
-  const nextLocal = Array.from(byId.values());
-
-  // local persist + in-memory update
-  saveRecipesLocal(nextLocal);
-  setRecipes?.(nextLocal);
-
-  if (!useBackend) {
-    return { imported, skipped, total: incoming.length };
+  // Concurrency limit: prevents hammering / rate limits
+  const limit = 5;
+  for (let i = 0; i < toUpsert.length; i += limit) {
+    const chunk = toUpsert.slice(i, i + limit);
+    await Promise.all(chunk.map((r) => upsertRecipe(r)));
   }
 
-  // backend sync (based on merged result)
-  const ids = new Set(incoming.map(r => r.id));
-  const existingIds = new Set(current.map(r => r.id));
-
-  for (const id of ids) {
-    if (mode === "backendWins" && existingIds.has(id)) continue; // don't overwrite
-    const rec = byId.get(id);
-    if (!rec) continue;
-    await upsertRecipe(rec);
-  }
-
-  // reload from backend and mirror locally (source of truth)
-  const fromBackend = await listRecipes();
-  const fresh = fromBackend.map(toLocalShape);
-
-  saveRecipesLocal(fresh);
-  setRecipes?.(fresh);
-
-  return { imported, skipped, total: incoming.length };
+  const refreshed = (await listRecipes()).map(toLocalShape);
+  saveRecipesLocal(refreshed);
+  setRecipes?.(refreshed);
 }

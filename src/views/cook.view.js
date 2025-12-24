@@ -356,7 +356,11 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
       saveDone();
 
       const body = qs(appEl, `[data-stepbody="${CSS.escape(key)}"]`);
-      if (body) body.classList.toggle("step-done", cb.checked);
+      if (body) {
+        body.classList.toggle("step-done", cb.checked);
+        // auto-collapse step text when done
+        body.style.display = cb.checked ? "none" : "";
+      }
     });
   });
 

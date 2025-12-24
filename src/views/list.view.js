@@ -2,6 +2,7 @@ import { escapeHtml, norm, qs, qsa } from "../utils.js";
 import { KEYS, lsGetStr, lsSetStr, lsSet } from "../storage.js";
 import { exportRecipesToPdfViaPrint } from "../services/pdfExport.js";
 import { downloadJson } from "../services/exportDownload.js";
+import { saveRecipesLocal, toLocalShape } from "../domain/recipes.js";
 import { buildCookStatsByRecipeId } from "../domain/cooklog.js";
 
 
@@ -36,10 +37,13 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
                 <option value="new">Neueste zuerst</option>
                 <option value="az">A–Z</option>
                 <option value="time">Dauer (kurz → lang)</option>
+                <option value="mealAsc">Mahlzeit (Früh → Spät)</option>
+                <option value="mealDesc">Mahlzeit (Spät → Früh)</option>
                 <option value="lastCooked">Zuletzt gekocht</option>
                 <option value="bestRated">Best bewertet</option>
 
               </select>
+              <button class="btn btn-ghost" id="resetFilters" type="button" title="Filter zurücksetzen">↺</button>
             </div>
 
           </div>
@@ -64,19 +68,17 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   `;
   ;
 
-const qEl = qs(appEl, "#q");
-
-const importBtn = qs(appEl, "#importBtn");
-if (importBtn) {
-  importBtn.addEventListener("click", () => {
-    openImportSheet({
-      appEl,
-      useBackend,
-      onImportRecipes
+  const importBtn = qs(appEl, "#importBtn");
+  if (importBtn) {
+    importBtn.addEventListener("click", () => {
+      openImportSheet({
+        appEl,
+        recipesFiltered: getFiltered(qEl.value), // Import ist unabhängig von Filter, aber wir können UI zeigen
+        useBackend,
+        onImportRecipes
+      });
     });
-  });
-}
-
+  }
 
   const exportOpenBtn = qs(appEl, "#exportOpenBtn");
   if (exportOpenBtn) {
@@ -85,7 +87,7 @@ if (importBtn) {
     });
   }
 
- 
+  const qEl = qs(appEl, "#q");
   const resultsEl = qs(appEl, "#results");
   const countEl = qs(appEl, "#count");
   const modeListBtn = qs(appEl, "#modeList");
@@ -97,6 +99,7 @@ if (importBtn) {
   };
   const catEl = qs(appEl, "#catFilter");
   const sortEl = qs(appEl, "#sortSelect");
+  const resetEl = qs(appEl, "#resetFilters");
 
   // persisted settings
   let cat = lsGetStr(KEYS.LIST_CAT, "");
@@ -115,7 +118,16 @@ if (importBtn) {
   ${cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}
 `;
   catEl.value = cat;
-
+  /* const getFiltered = (q) => {
+    const qq = norm(q);
+    const sorted = recipes.slice().sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+    return sorted.filter(r => {
+      if (!qq) return true;
+      const hay = [r.title, r.category, r.time, r.source, ...(r.ingredients ?? []), ...(r.steps ?? [])]
+        .map(norm).join(" ");
+      return hay.includes(qq);
+    });
+  }; */
   function parseMinutes(timeStr) {
     const s = String(timeStr ?? "").toLowerCase();
 
@@ -157,11 +169,60 @@ if (importBtn) {
 
     const stats = buildCookStatsByRecipeId(list.map(r => r.id));
 
+
+const sortTitle = (v) => {
+  const s = String(v ?? "");
+  // strip emojis / pictographs so they don't dominate sorting
+  try {
+    return s.replace(/[\p{Extended_Pictographic}\u200D\uFE0F]/gu, "").trim().toLowerCase();
+  } catch {
+    // fallback for older engines
+    return s.replace(/[\u{1F300}-\u{1FAFF}]/gu, "").trim().toLowerCase();
+  }
+};
+
+const mealOrder = (r) => {
+  const raw = String(r.category ?? "");
+  const first = raw.split("/")[0] ?? raw;
+  const key = sortTitle(first).replace(/\s+/g, " ").trim();
+
+  const map = new Map([
+    ["frühstück", 10],
+    ["brunch", 12],
+    ["mittagessen", 20],
+    ["vorspeise", 22],
+    ["suppe", 24],
+    ["salat", 26],
+    ["beilage", 28],
+    ["hauptgericht", 30],
+    ["hauptspeise", 30],
+    ["abendessen", 32],
+    ["snack", 40],
+    ["dip", 42],
+    ["mezze", 44],
+    ["kuchen", 50],
+    ["dessert", 52],
+    ["getränk", 60],
+    ["menü", 80],
+  ]);
+
+  // try direct match; else take first word
+  const direct = map.get(key);
+  if (direct != null) return direct;
+
+  const firstWord = key.split(" ")[0];
+  return map.get(firstWord) ?? 999;
+};
+
     // 2) sortieren
     if (sort === "az") {
-      list.sort((a, b) => String(a.title ?? "").localeCompare(String(b.title ?? ""), "de"));
+      list.sort((a, b) => sortTitle(a.title).localeCompare(sortTitle(b.title), "de"));
     } else if (sort === "time") {
       list.sort((a, b) => parseMinutes(a.time) - parseMinutes(b.time));
+    } else if (sort === "mealAsc") {
+      list.sort((a, b) => (mealOrder(a) - mealOrder(b)) || sortTitle(a.title).localeCompare(sortTitle(b.title), "de"));
+    } else if (sort === "mealDesc") {
+      list.sort((a, b) => (mealOrder(b) - mealOrder(a)) || sortTitle(a.title).localeCompare(sortTitle(b.title), "de"));
     } else if (sort === "lastCooked") {
       list.sort((a, b) => (stats.get(b.id)?.lastAt ?? 0) - (stats.get(a.id)?.lastAt ?? 0));
     } else if (sort === "bestRated") {
@@ -187,57 +248,134 @@ if (importBtn) {
     return "rgba(0,0,0,0.10)";
   }
 
-  function renderResults() {
+  
+  function renderChunked(containerEl, items, renderer, { chunkSize = 60 } = {}) {
+    containerEl.innerHTML = "";
+    const frag = document.createDocumentFragment();
+    let i = 0;
+
+    const pump = () => {
+      const end = Math.min(i + chunkSize, items.length);
+      for (; i < end; i++) {
+        const node = renderer(items[i]);
+        if (node) frag.appendChild(node);
+      }
+      containerEl.appendChild(frag);
+
+      if (i < items.length) {
+        requestAnimationFrame(pump);
+      }
+    };
+
+    pump();
+  }
+
+function renderResults() {
     const filtered = getFiltered(qEl.value);
-
-
     countEl.textContent = `${filtered.length} von ${recipes.length}`;
 
-
+    // Large lists: render in chunks to keep UI responsive (mobile)
+    const useChunking = filtered.length > 220;
 
     if (viewMode === "grid") {
-      resultsEl.innerHTML = `
-        <div class="grid">
-          ${filtered.map(r => `
-            <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
-              ${r.image_url
-          ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-          : `<div class="grid-img" aria-hidden="true"></div>`
-        }
-              <div class="grid-body">
-                <div class="grid-title">${escapeHtml(r.title)}</div>
-                <div class="grid-meta">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
+      if (!useChunking) {
+        resultsEl.innerHTML = `
+          <div class="grid">
+            ${filtered.map(r => `
+              <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
+                ${r.image_url
+                  ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+                  : `<div class="grid-img" aria-hidden="true"></div>`
+                }
+                <div class="grid-body">
+                  <div class="grid-title">${escapeHtml(r.title)}</div>
+                  <div class="grid-meta">
+                    ${r.category ? `<span class="pill">${escapeHtml(r.category)}</span>` : ``}
+                    ${r.time ? `<span class="pill pill-ghost">${escapeHtml(r.time)}</span>` : ``}
+                  </div>
+                </div>
               </div>
-            </div>
-          `).join("")}
-        </div>
-      `;
-      qsa(resultsEl, ".grid-card").forEach(el => {
-        el.addEventListener("click", () => setView({ name: "detail", selectedId: el.dataset.id, q: qEl.value }));
-      });
-    } else {
-      resultsEl.innerHTML = filtered.map(r => `
-        <div class="card" style="--cat-accent:${catAccent(r.category)}">
-          <div class="list-item" data-id="${escapeHtml(r.id)}">
-            <div class="list-item-left">
-              ${r.image_url
-          ? `<img class="thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-          : `<div class="thumb-placeholder" aria-hidden="true"></div>`
-        }
-              <div>
-                <div style="font-weight:700;">${escapeHtml(r.title)}</div>
-                <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
-              </div>
-            </div>
-            <div class="muted">›</div>
+            `).join("")}
           </div>
-        </div>
-      `).join("");
-
-      qsa(resultsEl, ".list-item").forEach(el => {
-        el.addEventListener("click", () => setView({ name: "detail", selectedId: el.dataset.id, q: qEl.value }));
-      });
+        `;
+      } else {
+        resultsEl.innerHTML = `<div class="grid" id="gridRoot"></div>`;
+        const root = qs(resultsEl, "#gridRoot");
+        renderChunked(root, filtered, (r) => {
+          const card = document.createElement("div");
+          card.className = "grid-card";
+          card.dataset.id = r.id;
+          card.style.setProperty("--cat-accent", catAccent(r.category));
+          card.innerHTML = `
+            ${r.image_url
+              ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+              : `<div class="grid-img" aria-hidden="true"></div>`
+            }
+            <div class="grid-body">
+              <div class="grid-title">${escapeHtml(r.title)}</div>
+              <div class="grid-meta">
+                ${r.category ? `<span class="pill">${escapeHtml(r.category)}</span>` : ``}
+                ${r.time ? `<span class="pill pill-ghost">${escapeHtml(r.time)}</span>` : ``}
+              </div>
+            </div>
+          `;
+          return card;
+        });
+      }
+    } else {
+      // list view
+      if (!useChunking) {
+        resultsEl.innerHTML = `
+          <div class="list">
+            ${filtered.map(r => `
+              <div class="list-item" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
+                <div class="li-left">
+                  ${r.image_url
+                    ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+                    : `<div class="li-thumb li-thumb--empty" aria-hidden="true"></div>`
+                  }
+                  <div class="li-body">
+                    <div class="li-title">${escapeHtml(r.title)}</div>
+                    <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
+                  </div>
+                </div>
+                <div class="li-chev" aria-hidden="true">›</div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      } else {
+        resultsEl.innerHTML = `<div class="list" id="listRoot"></div>`;
+        const root = qs(resultsEl, "#listRoot");
+        renderChunked(root, filtered, (r) => {
+          const item = document.createElement("div");
+          item.className = "list-item";
+          item.dataset.id = r.id;
+          item.style.setProperty("--cat-accent", catAccent(r.category));
+          item.innerHTML = `
+            <div class="li-left">
+              ${r.image_url
+                ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+                : `<div class="li-thumb li-thumb--empty" aria-hidden="true"></div>`
+              }
+              <div class="li-body">
+                <div class="li-title">${escapeHtml(r.title)}</div>
+                <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
+              </div>
+            </div>
+            <div class="li-chev" aria-hidden="true">›</div>
+          `;
+          return item;
+        });
+      }
     }
+
+    // Click handlers (delegation)
+    resultsEl.onclick = (ev) => {
+      const card = ev.target?.closest?.("[data-id]");
+      const id = card?.dataset?.id;
+      if (id) setView({ name: "detail", selectedId: id });
+    };
   }
 
   applyModeButtons();
@@ -279,6 +417,19 @@ if (importBtn) {
     lsSet(KEYS.NAV, { ...state, q: qEl.value });
     renderResults();
   });
+
+  resetEl.addEventListener("click", () => {
+    cat = "";
+    sort = "new";
+    catEl.value = cat;
+    sortEl.value = sort;
+    lsSetStr(KEYS.LIST_CAT, cat);
+    lsSetStr(KEYS.LIST_SORT, sort);
+    // also reset search
+    setView({ name: "list", selectedId: null, q: "" });
+    renderResults();
+  });
+
   // Export
 
   function openExportSheet({ appEl, filtered, partsByParent }) {
@@ -429,7 +580,7 @@ if (importBtn) {
   function openImportSheet({ appEl, useBackend, onImportRecipes }) {
     const backdrop = document.createElement("div");
     backdrop.className = "sheet-backdrop";
-   
+    backdrop.addEventListener("click", () => backdrop.remove());
 
     const sheet = document.createElement("div");
     sheet.className = "sheet";
@@ -486,12 +637,7 @@ if (importBtn) {
     document.body.appendChild(backdrop);
     document.body.appendChild(sheet);
 
-    
     const close = () => { sheet.remove(); backdrop.remove(); };
-
-backdrop.addEventListener("click", close);
-qs(sheet, "#impClose").addEventListener("click", close);
-
     qs(sheet, "#impClose").addEventListener("click", close);
 
     const fileBtn = qs(sheet, "#impPickFile");
@@ -545,9 +691,8 @@ qs(sheet, "#impClose").addEventListener("click", close);
         doBtn.textContent = "Importiere…";
         await onImportRecipes?.({ items, mode });
         alert(`Import ok: ${items.length} Einträge verarbeitet.`);
-close();
-setView?.({ name: "list", selectedId: null, q: state.q });
-
+        close();
+        location.reload();
       } catch (e) {
         console.error(e);
         alert("Import fehlgeschlagen. Details siehe Konsole.");
