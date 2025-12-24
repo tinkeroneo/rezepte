@@ -28,6 +28,31 @@ import { installGlobalErrorHandler } from "./services/errors.js";
 import { getRecentErrors, clearRecentErrors } from "./services/errors.js";
 import { runExclusive } from "./services/locks.js";
 
+// ===== Winter Mode =====
+const ENABLE_WINTER = true; // 🔴 hier EIN/AUS
+
+if (ENABLE_WINTER) {
+  document.body.classList.add("winter");
+
+  const snow = document.createElement("div");
+  snow.className = "winter-snow";
+
+  const flakes = 30;
+  for (let i = 0; i < flakes; i++) {
+    const s = document.createElement("span");
+    s.textContent = "❄";
+    s.style.left = Math.random() * 100 + "%";
+    s.style.animationDuration = 6 + Math.random() * 10 + "s";
+    s.style.animationDelay = Math.random() * 5 + "s";
+    s.style.fontSize = 0.6 + Math.random() * 1.2 + "rem";
+    snow.appendChild(s);
+  }
+
+  document.body.appendChild(snow);
+}
+
+
+
 const USE_BACKEND = true;
 
 const appEl = document.getElementById("app");

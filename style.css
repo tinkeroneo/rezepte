@@ -3,13 +3,13 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f7f7f7;
+  background: #5f6f82;/*#f7f7f7;*/
 }
 
 header {
   padding: 1rem;
   background: #2f855a;
-  color: white;
+  color: #5f6f82;white;
   font-size: 1.1rem;
   text-align: center;
 }
@@ -789,3 +789,68 @@ select {
 
 .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
 .tag{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid rgba(0,0,0,0.12);background:rgba(0,0,0,0.03);}
+
+
+/* ===== Winter Overlay ===== */
+body.winter {
+  position: relative;
+}
+
+/* Schneeflocken */
+.winter-snow {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 9999;
+}
+
+.winter-snow span {
+  position: absolute;
+  top: -10%;
+  color: rgba(255,255,255,.85);
+  font-size: 1.2rem;
+  animation: snow-fall linear infinite;
+}
+
+@keyframes snow-fall {
+  to {
+    transform: translateY(110vh);
+  }
+}
+
+/* Vereister Titel */
+.winter h1,
+.winter h2 {
+  text-shadow:
+    0 0 6px rgba(180,220,255,.6),
+    0 0 12px rgba(180,220,255,.4);
+}
+
+.winter h2::after {
+  content: " ❄️";
+}
+/* ===== Winter Background ===== */
+body.winter {
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(200,230,255,.35), transparent 60%),
+    radial-gradient(1000px 500px at 80% 0%, rgba(180,210,255,.25), transparent 55%),
+    linear-gradient(180deg, #f4f8fc 0%, #eef3f9 100%);
+}
+
+/* Cards leicht kälter */
+body.winter .card {
+  background: rgba(255,255,255,.96);
+  backdrop-filter: blur(2px);
+}
+
+/* Muted Text minimal kühler */
+body.winter .muted {
+  color: #5f6f82;
+}
+
+body.winter h2 {
+  background: linear-gradient(90deg, #1e3c72, #2a5298);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
