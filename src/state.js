@@ -1,5 +1,5 @@
 // src/state.js
-import { KEYS, lsGet, lsSet } from "./storage.js";
+import { KEYS, lsSet } from "./storage.js";
 
 // Parse: #cook?id=123&q=abc
 function parseHash() {
