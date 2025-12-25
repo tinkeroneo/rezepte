@@ -164,9 +164,9 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
   if (sync) {
     sync.hidden = !syncing && !syncError && navigator.onLine;
     if (!navigator.onLine) {
-      sync.textContent = "OFFLINE";
-      sync.classList.add("badge--warn");
-      sync.classList.remove("badge--ok", "badge--bad");
+      // sync.textContent = "OFFLINE";
+      // sync.classList.add("badge--warn");
+      // sync.classList.remove("badge--ok", "badge--bad");
     } else if (syncError) {
       sync.textContent = "SYNC";
       sync.classList.add("badge--bad");
@@ -427,7 +427,7 @@ async function boot() {
   initRadioDock();
 
   window.addEventListener("online", () => updateHeaderBadges());
-  window.addEventListener("offline", () => updateHeaderBadges());
+  // window.addEventListener("offline", () => updateHeaderBadges());
   window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", () => applyThemeAndOverlay());
 
   // expose for other modules that want to trigger a quick refresh of badges
