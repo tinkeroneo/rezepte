@@ -23,15 +23,15 @@ function ensureRoot() {
   return root;
 }
 
-export function renderTimersOverlay({ appEl, state, setView }) {
+export function renderTimersOverlay({ appEl: _appEl, state, setView: _setView }) {
   const root = ensureRoot();
 
   const isCook = state?.name === "cook";
   state.ui ||= {};
   // In cook view we already have the cookbar timer UI -> avoid duplicates
   if (isCook) {
-    const root = ensureRoot();
-    root.innerHTML = "";
+    const rootEl = ensureRoot();
+    rootEl.innerHTML = "";
     stopTick();
     return;
   }
@@ -67,7 +67,7 @@ if (changed) saveTimers(timers);
     return;
   }
 
-  startTick(() => renderTimersOverlay({ appEl, state }));
+  startTick(() => renderTimersOverlay({ appEl: _appEl, state }));
 
   const top = list[0];
   const total = list.length;
@@ -85,6 +85,7 @@ if (changed) saveTimers(timers);
           title="${escapeHtml(top.title)}">
     <span class="timer-chip-time">${label} ${time}</span>
     <span class="timer-chip-title">${escapeHtml(top.title)}</span>
+    ${top.recipeId ? `<span class="timer-chip-open" data-open-recipe="${escapeHtml(top.recipeId)}" title="Zum Rezept">🍳</span>` : ``}
     ${hiddenCount > 0 ? `<span class="timer-chip-more">+${hiddenCount}</span>` : ``}
   </button>
 `;
@@ -98,6 +99,25 @@ if (changed) saveTimers(timers);
         e.stopImmediatePropagation();
         ack(chip);
         chip.classList.toggle("show-title");
+      }, true);
+    }
+
+    // jump back to recipe (outside cook view)
+    const open = qs(root, "[data-open-recipe]");
+    if (open) {
+      open.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        const id = open.getAttribute("data-open-recipe");
+        if (!id) return;
+
+        // Prefer router/setView if available; otherwise fall back to hash
+        if (typeof _setView === "function") {
+          _setView({ name: "cook", selectedId: id, q: state?.q || "" });
+        } else {
+          location.hash = `#cook?id=${encodeURIComponent(id)}&q=${encodeURIComponent(state?.q || "")}`;
+        }
       }, true);
     }
     return;
@@ -168,7 +188,7 @@ if (changed) saveTimers(timers);
       e.stopPropagation();
       state.ui.timerExpanded = !expanded;
       ack(toggleBtn);
-      renderTimersOverlay({ appEl, state });
+      renderTimersOverlay({ appEl: _appEl, state });
     });
   }
 
@@ -181,7 +201,7 @@ if (changed) saveTimers(timers);
       ack(btn.closest(".timer-card") || btn);
       extendTimer(timers, id, sec);
       saveTimers(timers);
-      renderTimersOverlay({ appEl, state });
+      renderTimersOverlay({ appEl: _appEl, state });
     });
   });
 
@@ -193,7 +213,7 @@ if (changed) saveTimers(timers);
       ack(btn.closest(".timer-card") || btn);
       timers[id].dismissed = true;
       saveTimers(timers);
-      renderTimersOverlay({ appEl, state });
+      renderTimersOverlay({ appEl: _appEl, state });
     });
   });
 }

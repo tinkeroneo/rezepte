@@ -199,43 +199,84 @@ export async function removeRecipePart(parentId, childId) {
 }
 
 
-// Cook Events (client-scoped via client_id)
+// Cook Events (client-scoped via client_id) – REST (kein supabase-js)
 export async function listCookEventsSb(recipeId) {
   const clientId = getClientId();
-  const { data, error } = await sb
-    .from("cook_events")
-    .select("*")
-    .eq("client_id", clientId)
-    .eq("recipe_id", recipeId)
-    .order("at", { ascending: false });
+  const urlWithClient =
+    `${SUPABASE_URL}/rest/v1/cook_events?space_id=eq.${encodeURIComponent(SPACE_ID)}` +
+    `&client_id=eq.${encodeURIComponent(clientId)}` +
+    `&recipe_id=eq.${encodeURIComponent(recipeId)}` +
+    `&order=at.desc`;
 
-  if (error) throw error;
-  return data || [];
+  const urlNoClient =
+    `${SUPABASE_URL}/rest/v1/cook_events?space_id=eq.${encodeURIComponent(SPACE_ID)}` +
+    `&recipe_id=eq.${encodeURIComponent(recipeId)}` +
+    `&order=at.desc`;
+
+  let res = await sbFetch(urlWithClient, { headers: sbHeaders(), timeoutMs: 12000 });
+  if (!res.ok) {
+    // Some setups don't have a client_id column in cook_events. If that happens, fall back.
+    if (res.status === 400) {
+      res = await sbFetch(urlNoClient, { headers: sbHeaders(), timeoutMs: 12000 });
+    }
+  }
+  if (!res.ok) throw new Error(`cook_events list failed: ${res.status} ${await sbJson(res)}`);
+  return await res.json();
 }
 
 export async function upsertCookEventSb(ev) {
   const clientId = getClientId();
-  const payload = { ...ev, client_id: clientId };
+  const payloadWithClient = { ...ev, client_id: clientId, space_id: SPACE_ID };
+  const payloadNoClient = { ...ev, space_id: SPACE_ID };
 
-  const { data, error } = await sb
-    .from("cook_events")
-    .upsert(payload, { onConflict: "id" })
-    .select()
-    .single();
+  let res = await sbFetch(`${SUPABASE_URL}/rest/v1/cook_events`, {
+    method: "POST",
+    headers: { ...sbHeaders(), "Prefer": "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify([payloadWithClient]),
+    timeoutMs: 12000,
+  });
 
-  if (error) throw error;
-  return data;
+  if (!res.ok && res.status === 400) {
+    // fallback if client_id column doesn't exist
+    res = await sbFetch(`${SUPABASE_URL}/rest/v1/cook_events`, {
+      method: "POST",
+      headers: { ...sbHeaders(), "Prefer": "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([payloadNoClient]),
+      timeoutMs: 12000,
+    });
+  }
+
+  if (!res.ok) throw new Error(`cook_events upsert failed: ${res.status} ${await sbJson(res)}`);
+  return true;
 }
 
 export async function deleteCookEventSb(id) {
   const clientId = getClientId();
-  const { error } = await sb
-    .from("cook_events")
-    .delete()
-    .eq("client_id", clientId)
-    .eq("id", id);
+  const urlWithClient =
+    `${SUPABASE_URL}/rest/v1/cook_events?space_id=eq.${encodeURIComponent(SPACE_ID)}` +
+    `&client_id=eq.${encodeURIComponent(clientId)}` +
+    `&id=eq.${encodeURIComponent(id)}`;
 
-  if (error) throw error;
+  const urlNoClient =
+    `${SUPABASE_URL}/rest/v1/cook_events?space_id=eq.${encodeURIComponent(SPACE_ID)}` +
+    `&id=eq.${encodeURIComponent(id)}`;
+
+  let res = await sbFetch(urlWithClient, {
+    method: "DELETE",
+    headers: sbHeaders(),
+    timeoutMs: 12000,
+  });
+
+  if (!res.ok && res.status === 400) {
+    res = await sbFetch(urlNoClient, {
+      method: "DELETE",
+      headers: sbHeaders(),
+      timeoutMs: 12000,
+    });
+  }
+
+  if (!res.ok) throw new Error(`cook_events delete failed: ${res.status} ${await sbJson(res)}`);
+  return true;
 }
 
 // Client logs (optional)

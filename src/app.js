@@ -23,42 +23,164 @@ import { renderAdminView } from "./views/admin.view.js";
 import { renderSelftestView } from "./views/selftest.view.js";
 import { renderDiagnosticsView } from "./views/diagnostics.view.js";
 import { renderTimersOverlay } from "./views/timers.view.js";
+import { initRadioDock } from "./ui/radioDock.js";
 import { Wake } from "./services/wakeLock.js";
+import { KEYS, lsGetStr, lsSetStr } from "./storage.js";
 import { installGlobalErrorHandler } from "./services/errors.js";
 import { getRecentErrors, clearRecentErrors } from "./services/errors.js";
 import { runExclusive } from "./services/locks.js";
+import { ensureRadioDock } from "./services/radio.js"; // oder wo es liegt
 
-// ===== Winter Mode =====
-const ENABLE_WINTER = true; // 🔴 hier EIN/AUS
 
-if (ENABLE_WINTER) {
-  document.body.classList.add("winter");
+const DEFAULT_USE_BACKEND = true;
+//
 
-  const snow = document.createElement("div");
-  snow.className = "winter-snow";
+ensureRadioDock();
 
-  const flakes = 30;
-  for (let i = 0; i < flakes; i++) {
-    const s = document.createElement("span");
-    s.textContent = "❄";
-    s.style.left = Math.random() * 100 + "%";
-    s.style.animationDuration = 6 + Math.random() * 10 + "s";
-    s.style.animationDelay = Math.random() * 5 + "s";
-    s.style.fontSize = 0.6 + Math.random() * 1.2 + "rem";
-    snow.appendChild(s);
-  }
-
-  document.body.appendChild(snow);
+function readUseBackend() {
+  const v = lsGetStr(KEYS.USE_BACKEND, "");
+  if (v === "0") return false;
+  if (v === "1") return true;
+  return DEFAULT_USE_BACKEND;
 }
 
+function setUseBackend(next) {
+  lsSetStr(KEYS.USE_BACKEND, next ? "1" : "0");
+}
 
+function readTheme() {
+  const v = lsGetStr(KEYS.THEME, "");
+  return v || "system"; // system | light | dark
+}
 
-const USE_BACKEND = true;
+function setTheme(v) {
+  lsSetStr(KEYS.THEME, v || "system");
+}
+
+function readWinter() {
+  const v = lsGetStr(KEYS.WINTER, "");
+  if (v === "1") return true;
+  if (v === "0") return false;
+  return false;
+}
+
+function setWinter(on) {
+  lsSetStr(KEYS.WINTER, on ? "1" : "0");
+}
+
+// Timer settings (ring + step highlight)
+function readTimerRingIntervalMs() {
+  const raw = lsGetStr(KEYS.TIMER_RING_INTERVAL_MS, "");
+  const n = Number(raw);
+  // Default: 125ms (short beep interval); keep within sensible bounds
+  if (!Number.isFinite(n)) return 125;
+  return Math.max(125, Math.min(5000, Math.round(n)));
+}
+
+function setTimerRingIntervalMs(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n)) return;
+  const clamped = Math.max(125, Math.min(5000, Math.round(n)));
+  lsSetStr(KEYS.TIMER_RING_INTERVAL_MS, String(clamped));
+}
+
+function readTimerMaxRingSeconds() {
+  const raw = lsGetStr(KEYS.TIMER_MAX_RING_SECONDS, "");
+  const n = Number(raw);
+  // Default: 120s; keep within sensible bounds
+  if (!Number.isFinite(n)) return 120;
+  return Math.max(10, Math.min(600, Math.round(n)));
+}
+
+function setTimerMaxRingSeconds(sec) {
+  const n = Number(sec);
+  if (!Number.isFinite(n)) return;
+  const clamped = Math.max(10, Math.min(600, Math.round(n)));
+  lsSetStr(KEYS.TIMER_MAX_RING_SECONDS, String(clamped));
+}
+
+function readTimerStepHighlight() {
+  const v = lsGetStr(KEYS.TIMER_STEP_HIGHLIGHT, "");
+  if (v === "0") return false;
+  if (v === "1") return true;
+  return true; // default on
+}
+
+function setTimerStepHighlight(on) {
+  lsSetStr(KEYS.TIMER_STEP_HIGHLIGHT, on ? "1" : "0");
+}
+
+let useBackend = readUseBackend();
+
+// Allow admin view to change simple settings without circular imports
+window.__tinkeroneoSettings = {
+  readUseBackend,
+  setUseBackend: (v) => setUseBackend(v),
+  readTheme,
+  setTheme: (v) => setTheme(v),
+  readWinter,
+  setWinter: (on) => setWinter(on),
+
+  readTimerRingIntervalMs,
+  setTimerRingIntervalMs,
+  readTimerMaxRingSeconds,
+  setTimerMaxRingSeconds,
+  readTimerStepHighlight,
+  setTimerStepHighlight,
+};
+
+// Admin access: URL param (?admin=1) OR hidden "easter egg" flag in localStorage
+const ADMIN_FLAG_KEY = "tinkeroneo_admin_enabled_v1";
+
+function isAdminEnabled() {
+  const url = new URL(location.href);
+  const byParam = url.searchParams.get("admin") === "1";
+  let byFlag = false;
+  try { byFlag = localStorage.getItem(ADMIN_FLAG_KEY) === "1"; } catch { byFlag = false; }
+  return byParam || byFlag;
+}
+
+function setAdminEnabled(v) {
+  try { localStorage.setItem(ADMIN_FLAG_KEY, v ? "1" : "0"); } catch { /* ignore */ }
+}
 
 const appEl = document.getElementById("app");
 
+function applyThemeAndOverlay() {
+  const theme = readTheme();
+  const wantsDark = theme === "dark" || (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
+  document.body.classList.toggle("dark", !!wantsDark);
+  document.body.classList.toggle("winter", readWinter());
+}
+
+function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
+  const mode = document.getElementById("modeBadge");
+  if (mode) {
+    mode.textContent = useBackend ? "CLOUD" : "LOCAL";
+    mode.classList.toggle("badge--ok", useBackend);
+    mode.classList.toggle("badge--warn", !useBackend);
+  }
+  const sync = document.getElementById("syncBadge");
+  if (sync) {
+    sync.hidden = !syncing && !syncError && navigator.onLine;
+    if (!navigator.onLine) {
+      sync.textContent = "OFFLINE";
+      sync.classList.add("badge--warn");
+      sync.classList.remove("badge--ok", "badge--bad");
+    } else if (syncError) {
+      sync.textContent = "SYNC";
+      sync.classList.add("badge--bad");
+      sync.classList.remove("badge--ok", "badge--warn");
+    } else {
+      sync.textContent = "⟳";
+      sync.classList.add("badge--ok");
+      sync.classList.remove("badge--warn", "badge--bad");
+    }
+  }
+}
+
 const recipeRepo = createRecipeRepo({
-  useBackend: USE_BACKEND,
+  useBackend,
   listRecipes,
   upsertRecipe,
   deleteRecipe: sbDelete,
@@ -79,7 +201,7 @@ function setParts(newParts) {
 async function loadAll() {
   recipes = await recipeRepo.getAll();
 
-  if (!USE_BACKEND) {
+  if (!useBackend) {
     setParts([]);
     return;
   }
@@ -94,33 +216,47 @@ async function loadAll() {
 
 
 function installAdminCorner() {
-  // Hidden unless ?admin=1
-  const isEnabled = new URLSearchParams(location.search).get("admin") === "1";
-  if (!isEnabled) return;
+  // Hidden unless enabled (param or easter-egg)
+  const mount = () => {
+    document.getElementById("admin-corner")?.remove();
+    if (!isAdminEnabled()) return;
 
-  const el = document.createElement("div");
-  el.id = "admin-corner";
-  el.innerHTML = `
-    <button class="admin-btn" type="button" title="Admin">🛠️</button>
-    <div class="admin-menu" hidden>
-      <a href="#admin">Admin</a>
-      <a href="#selftest">Selftest</a>
-      <a href="#diagnostics">Diagnostics</a>
-    </div>
-  `;
-  document.body.appendChild(el);
+    const el = document.createElement("div");
+    el.id = "admin-corner";
+    el.innerHTML = `
+      <button class="admin-btn" type="button" title="Admin">🛠️</button>
+    `;
+    document.body.appendChild(el);
 
-  const btn = el.querySelector(".admin-btn");
-  const menu = el.querySelector(".admin-menu");
+    const btn = el.querySelector(".admin-btn");
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Direct jump to admin; Selftest/Diagnostics are accessible there.
+      location.hash = "admin";
+    });
+  };
 
-  btn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    menu.hidden = !menu.hidden;
-  });
+  // Easter egg: 7 taps on header toggles admin flag.
+  const header = document.querySelector("header");
+  if (header && !header.__adminEggInstalled) {
+    header.__adminEggInstalled = true;
+    let taps = 0;
+    let t0 = 0;
+    header.addEventListener("click", () => {
+      const now = Date.now();
+      if (!t0 || now - t0 > 2000) { t0 = now; taps = 0; }
+      taps++;
+      if (taps >= 7) {
+        taps = 0;
+        const next = !isAdminEnabled();
+        setAdminEnabled(next);
+        mount();
+      }
+    });
+  }
 
-  document.addEventListener("click", (e) => {
-    if (!el.contains(e.target)) menu.hidden = true;
-  });
+  mount();
 }
 
 async function render(view, setView) {
@@ -148,7 +284,7 @@ async function render(view, setView) {
     }
 
     // 2) Backend reachable (only if enabled)
-    if (USE_BACKEND) {
+    if (useBackend) {
       try {
         await listRecipes(); // supabase.js has timeouts/abort
         results.push({ name: "Backend erreichbar (listRecipes)", ok: true });
@@ -156,7 +292,7 @@ async function render(view, setView) {
         results.push({ name: "Backend erreichbar (listRecipes)", ok: false, detail: String(e?.message || e) });
       }
     } else {
-      results.push({ name: "Backend erreichbar (übersprungen)", ok: true, detail: "USE_BACKEND=false" });
+      results.push({ name: "Backend erreichbar (übersprungen)", ok: true, detail: "useBackend=false" });
     }
 
     // 3) Import function present
@@ -181,7 +317,7 @@ async function render(view, setView) {
 
     let backendOk = true;
     let backendMs = null;
-    if (USE_BACKEND) {
+    if (useBackend) {
       const t0 = performance.now();
       try {
         await listRecipes();
@@ -195,9 +331,9 @@ async function render(view, setView) {
     }
 
     const info = {
-      useBackend: USE_BACKEND,
+      useBackend,
       storageOk,
-      backendOk: USE_BACKEND ? backendOk : true,
+      backendOk: useBackend ? backendOk : true,
       backendMs,
       importOk: typeof importRecipesIntoApp === "function",
       recentErrors: getRecentErrors(),
@@ -214,13 +350,13 @@ async function render(view, setView) {
       recipes,
       partsByParent,
       setView,
-      useBackend: USE_BACKEND,
+      useBackend,
       onImportRecipes: async ({ items, mode }) =>
         runExclusive("importRecipes", async () => {
           await importRecipesIntoApp({
             items,
             mode,
-            useBackend: USE_BACKEND,
+            useBackend,
             listRecipes,
             upsertRecipe,
             toLocalShape,
@@ -241,7 +377,7 @@ async function render(view, setView) {
       partsByParent,
       recipeParts,
       setView,
-      useBackend: USE_BACKEND,
+      useBackend,
       sbDelete: async (id) => {
         recipes = await recipeRepo.remove(id);
       },
@@ -261,10 +397,10 @@ async function render(view, setView) {
       state: view,
       recipes,
       setView,
-      useBackend: USE_BACKEND,
+      useBackend,
       upsertRecipe: async (rec) => {
         return runExclusive(`upsert:${rec.id}`, async () => {
-          recipes = await recipeRepo.upsert(rec, { refresh: USE_BACKEND });
+          recipes = await recipeRepo.upsert(rec, { refresh: useBackend });
         });
       },
       uploadRecipeImage,
@@ -284,7 +420,23 @@ async function render(view, setView) {
 async function boot() {
   installGlobalErrorHandler();
   installAdminCorner();
+  applyThemeAndOverlay();
+  updateHeaderBadges();
+
+  // persistent mini radio (does not reset on route changes)
+  initRadioDock();
+
+  window.addEventListener("online", () => updateHeaderBadges());
+  window.addEventListener("offline", () => updateHeaderBadges());
+  window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", () => applyThemeAndOverlay());
+
+  // expose for other modules that want to trigger a quick refresh of badges
+  window.__tinkeroneoUpdateBadges = () => updateHeaderBadges();
+
+  // show syncing badge while initial load runs
+  updateHeaderBadges({ syncing: true });
   await runExclusive("loadAll", () => loadAll());
+  updateHeaderBadges({ syncing: false });
 
   const router = initRouter({
     onViewChange: (view) => render(view, router.setView)

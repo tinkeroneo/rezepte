@@ -41,7 +41,7 @@ export function saveTimers(timers, storageKey = DEFAULT_TIMERS_KEY) {
   saveTimersRaw(timers, storageKey);
 }
 
-export function createTimer({ title, durationSec, key = null }) {
+export function createTimer({ title, durationSec, key = null, recipeId = null }) {
   const now = Date.now();
   const dur = normalizeDurationSecFromAny(durationSec);
 
@@ -51,11 +51,14 @@ export function createTimer({ title, durationSec, key = null }) {
   return {
     id: generateId(),
     key, // optional: recipe step key or any identifier
+    recipeId, // optional: root recipe id (for jumping back from global timer chip)
     title: safeTitle,
     createdAt: now,
     endsAt: now + dur * 1000,
     dismissed: false,
-    beeped: false,
+    // ringing state (for overdue timers)
+    ringStartedAt: null,
+    lastRingAt: 0,
   };
 }
 
@@ -68,7 +71,9 @@ export function extendTimer(timers, timerId, seconds) {
   const now = Date.now();
   t.endsAt = Math.max(now, t.endsAt) + addSec * 1000;
   t.dismissed = false;
-  t.beeped = false;
+  // reset ringing state
+  t.ringStartedAt = null;
+  t.lastRingAt = 0;
 
   return timers;
 }
@@ -79,6 +84,7 @@ export function getSortedActiveTimers(timers) {
     .map(t => ({
       ...t,
       remainingSec: Math.ceil((t.endsAt - Date.now()) / 1000),
+      overdueSec: Math.max(0, Math.floor((Date.now() - t.endsAt) / 1000)),
     }))
     .sort((a, b) => a.remainingSec - b.remainingSec);
 }
@@ -200,8 +206,10 @@ export function createBeep() {
 export function createTimerManager({
   storageKey = DEFAULT_TIMERS_KEY,
   onRender = null,
-  beep = null,
+  onFire = null,
   tickMs = 1000,
+  ringIntervalMs = 5000,
+  maxRingSeconds = 120,
 } = {}) {
   let interval = null;
 
@@ -222,23 +230,26 @@ export function createTimerManager({
    * - addTimer({ key, title, durationSec })
    * - addTimer(key, title, durationSec)  <-- cook.view.js uses this
    */
-  function addTimer(a, b, c) {
+  function addTimer(a, b, c, d) {
     let key = null;
     let title = "Timer";
     let durationSec = 60;
+    let recipeId = null;
 
     if (a && typeof a === "object") {
       key = a.key ?? null;
       title = a.title ?? "Timer";
       durationSec = a.durationSec ?? a.seconds ?? a.sec ?? 60;
+      recipeId = a.recipeId ?? null;
     } else {
       key = a ?? null;
       title = b ?? "Timer";
       durationSec = c ?? 60;
+      recipeId = d ?? null;
     }
 
     const timers = loadTimersRaw(storageKey);
-    const t = createTimer({ key, title, durationSec });
+    const t = createTimer({ key, title, durationSec, recipeId });
     timers[t.id] = t;
     saveTimersRaw(timers, storageKey);
     renderNow();
@@ -268,13 +279,32 @@ export function createTimerManager({
     const list = getSortedActiveTimers(timers);
 
     let changed = false;
+    const now = Date.now();
+
     for (const t of list) {
-      if (t.remainingSec <= 0) {
-        const raw = timers[t.id];
-        if (raw && !raw.beeped) {
-          raw.beeped = true;
-          changed = true;
-          try { beep?.play?.(); } catch {}
+      if (t.remainingSec > 0) continue;
+
+      const raw = timers[t.id];
+      if (!raw || raw.dismissed) continue;
+
+      // start ringing window
+      if (!raw.ringStartedAt) {
+        raw.ringStartedAt = now;
+        raw.lastRingAt = 0;
+        changed = true;
+      }
+
+      const ringAgeMs = now - raw.ringStartedAt;
+      const withinWindow = ringAgeMs <= maxRingSeconds * 1000;
+      const due = (now - (raw.lastRingAt || 0)) >= ringIntervalMs;
+
+      if (withinWindow && due) {
+        raw.lastRingAt = now;
+        changed = true;
+        try {
+          onFire?.(t);
+        } catch {
+          // ignore (audio may be blocked)
         }
       }
     }
@@ -282,7 +312,7 @@ export function createTimerManager({
     if (changed) saveTimersRaw(timers, storageKey);
 
     if (typeof onRender === "function") {
-      onRender({ timers, list, now: Date.now() });
+      onRender({ timers, list, now });
     }
   }
 
@@ -343,7 +373,10 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
       <div class="timer-list">
         ${visible.map(t => {
           const isOverdue = t.remainingSec <= 0;
-          const label = isOverdue ? "⏰ abgelaufen" : `⏱ ${formatTime(t.remainingSec)}`;
+          const over = Math.max(0, t.overdueSec || 0);
+          const label = isOverdue
+            ? `⏰ abgelaufen · +${formatTime(over)}`
+            : `⏱ ${formatTime(t.remainingSec)}`;
 
           return `
             <div class="timer-pill ${isOverdue ? "is-overdue" : ""}">

@@ -4,7 +4,7 @@
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Vegane Rezeptsammlung</title>
+  <title>Rezeptwerk</title>
 
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="style.css" />
@@ -14,19 +14,125 @@
 
 </head>
 <body>
-  <header>🌱 Meine Rezepte</header>
+  <header>
+    <span id="appTitle">🌱 Rezeptwerk</span>
+    <span class="header-badges">
+      <span id="modeBadge" class="badge" title="Speicher-Modus">—</span>
+      <span id="syncBadge" class="badge" title="Sync-Status" hidden>⟳</span>
+      <span id="offlineBadge" class="badge" title="Offline" hidden>Offline</span>
+    </span>
+  </header>
   <main id="app"></main>
+  <div id="radioDockRoot"></div>
 
+  <div id="globalTimersRoot" class="compact-mode"></div>
+  <div id="updateToast" class="toast" ...></div>
   <script type="module" src="./src/app.js"></script>
 
 <script>
-  // Offline app-shell cache (optional)
+  // Service Worker: App-Shell Cache + Update-Toast (priorisiert, kein Reload während aktiver Timer)
   if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
+    window.addEventListener("load", async () => {
+      const toast = document.getElementById("updateToast");
+      const btnLater = document.getElementById("toastLater");
+      const btnReload = document.getElementById("toastReload");
+
+      const hasActiveTimers = () => {
+        try {
+          // Timer-Store wird von domain/timers.js genutzt
+          const raw = localStorage.getItem("tinkeroneo_timers_v1") || "[]";
+          const timers = JSON.parse(raw);
+          return Array.isArray(timers) && timers.some(t => (t?.remainingSec ?? 0) > 0 || (t?.endAt ?? 0) > Date.now());
+        } catch {
+          return false;
+        }
+      };
+
+      const inCookView = () => {
+        try { return (location.hash || "").startsWith("#cook"); } catch { return false; }
+      };
+
+      const showToast = () => {
+        if (!toast) return;
+        // Priorisierung: kein Update-Toast während aktiver Timer oder im Kochmodus
+        if (hasActiveTimers() || inCookView()) {
+          // retry später
+          window.clearTimeout(window.__updateToastRetry);
+          window.__updateToastRetry = window.setTimeout(showToast, 2500);
+          return;
+        }
+        toast.classList.add("toast--show");
+        toast.setAttribute("aria-hidden", "false");
+      };
+      const hideToast = () => {
+        if (!toast) return;
+        toast.classList.remove("toast--show");
+        toast.setAttribute("aria-hidden", "true");
+      };
+
+      try {
+        const reg = await navigator.serviceWorker.register("./sw.js");
+
+        const requestSkipWaiting = () => {
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: "SKIP_WAITING" });
+          }
+        };
+
+        // Buttons
+        btnLater?.addEventListener("click", hideToast);
+        btnReload?.addEventListener("click", () => {
+          hideToast();
+          requestSkipWaiting();
+        });
+
+        // Wenn ein Update gefunden & installiert wird: Toast anzeigen (statt sofort reload)
+        reg.addEventListener("updatefound", () => {
+          const sw = reg.installing;
+          if (!sw) return;
+          sw.addEventListener("statechange", () => {
+            if (sw.state === "installed") {
+              // installed + controller vorhanden => Update bereit
+              if (navigator.serviceWorker.controller) {
+                showToast();
+              }
+            }
+          });
+        });
+
+        // Falls schon waiting (z.B. Tab lange offen)
+        if (reg.waiting && navigator.serviceWorker.controller) {
+          showToast();
+        }
+
+        // Sobald der neue SW die Kontrolle übernimmt: reload
+        let reloaded = false;
+        navigator.serviceWorker.addEventListener("controllerchange", () => {
+          if (reloaded) return;
+          reloaded = true;
+          window.location.reload();
+        });
+
+        // optional: gelegentlich nach Updates schauen
+        setInterval(() => reg.update(), 60 * 60 * 1000);
+      } catch {
+        // offline/blocked => ok
+      }
     });
   }
 </script>
+
+
+  <div id="updateToast" class="toast" role="status" aria-live="polite" aria-hidden="true">
+    <div class="toast__text">
+      <div class="toast__title">Update verfügbar</div>
+      <div class="toast__msg">Neue Version ist bereit. Neu laden?</div>
+    </div>
+    <div class="toast__actions">
+      <button id="toastLater" class="btn btn-ghost" type="button">Später</button>
+      <button id="toastReload" class="btn btn-primary" type="button">Neu laden</button>
+    </div>
+  </div>
 
 </body>
 </html>

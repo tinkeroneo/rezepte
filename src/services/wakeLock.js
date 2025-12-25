@@ -34,7 +34,7 @@ export const Wake = {
 
   async disable() {
     enabled = false;
-    try { await wakeLock?.release?.(); } catch {}
+    try { await wakeLock?.release?.(); } catch { /* ignore */ }
     wakeLock = null;
   },
 

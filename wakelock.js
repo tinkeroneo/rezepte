@@ -18,7 +18,7 @@ async function request() {
 async function release() {
   try {
     await lock?.release();
-  } catch {}
+  } catch { /* ignore */ }
   lock = null;
 }
 

@@ -54,6 +54,13 @@ self.addEventListener("activate", (event) => {
   })());
 });
 
+// Allow the page to trigger immediate activation on deploy
+self.addEventListener("message", (event) => {
+  if (event && event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
