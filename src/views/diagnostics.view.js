@@ -1,6 +1,6 @@
 import { escapeHtml, qs } from "../utils.js";
 
-export function renderDiagnosticsView({ appEl, state, info, setView }) {
+export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
   const errors = info?.recentErrors ?? [];
   appEl.innerHTML = `
     <div class="container">
@@ -15,7 +15,7 @@ export function renderDiagnosticsView({ appEl, state, info, setView }) {
       <div class="panel">
         <h3>Status</h3>
         <div class="kv"><span>Mode</span><span>${info?.useBackend ? "Backend (Supabase)" : "Local"}</span></div>
-        <div class="kv"><span>Backend Latenz</span><span>${info?.backendMs !== null ? escapeHtml(String(info.backendMs)) + " ms" : "—"}</span></div>
+        <div class="kv"><span>Backend Latenz</span><span>${(info?.backendMs !== null && info?.backendMs !== undefined) ? escapeHtml(String(info.backendMs)) + " ms" : "—"}</span></div>
         <div class="kv"><span>Backend</span><span>${info?.backendOk ? "OK" : "FAIL"}</span></div>
         <div class="kv"><span>LocalStorage</span><span>${info?.storageOk ? "OK" : "FAIL"}</span></div>
         <div class="kv"><span>Import-Funktion</span><span>${info?.importOk ? "OK" : "FAIL"}</span></div>

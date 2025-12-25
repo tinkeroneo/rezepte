@@ -1,11 +1,37 @@
 import { splitStepsToCards } from "./steps.js";
 
+// Menü-/Teilrezept-Vererbung: rekursiv, mit Cycle-Schutz und Max-Tiefe.
+// partsByParent: Map<parentId, childIds[]> (Sortierung = Reihenfolge im Menü)
+
+const DEFAULT_MAX_DEPTH = 5;
+
+function collectDescendants(rootId, partsByParent, { maxDepth = DEFAULT_MAX_DEPTH } = {}) {
+  const out = [];
+  const visited = new Set([rootId]);
+
+  function walk(parentId, depth) {
+    if (depth > maxDepth) return;
+    const kids = partsByParent.get(parentId) ?? [];
+    for (const cid of kids) {
+      if (!cid) continue;
+      if (visited.has(cid)) continue; // cycle guard
+      visited.add(cid);
+      out.push(cid);
+      walk(cid, depth + 1);
+    }
+  }
+
+  walk(rootId, 1);
+  return out;
+}
+
 export function buildMenuIngredients(menuRecipe, recipes, partsByParent) {
   const sections = [];
   if ((menuRecipe.ingredients ?? []).length) {
     sections.push({ title: menuRecipe.title, items: menuRecipe.ingredients });
   }
-  const childIds = partsByParent.get(menuRecipe.id) ?? [];
+
+  const childIds = collectDescendants(menuRecipe.id, partsByParent);
   for (const cid of childIds) {
     const child = recipes.find(r => r.id === cid);
     if (!child) continue;
@@ -22,7 +48,7 @@ export function buildMenuStepSections(menuRecipe, recipes, partsByParent) {
     sections.push({ recipeId: menuRecipe.id, title: menuRecipe.title, cards: ownCards });
   }
 
-  const childIds = partsByParent.get(menuRecipe.id) ?? [];
+  const childIds = collectDescendants(menuRecipe.id, partsByParent);
   for (const cid of childIds) {
     const child = recipes.find(r => r.id === cid);
     if (!child) continue;
@@ -32,4 +58,8 @@ export function buildMenuStepSections(menuRecipe, recipes, partsByParent) {
   }
 
   return sections;
+}
+
+export function isMenuRecipe(recipe, partsByParent) {
+  return (partsByParent?.get?.(recipe?.id)?.length ?? 0) > 0;
 }
