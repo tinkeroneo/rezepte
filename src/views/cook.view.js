@@ -99,7 +99,6 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
       <div class="cookbar">
         <div class="row">
           <button class="btn btn-ghost" id="ingredientsBtn">Zutaten</button>
-          <button class="btn btn-ghost" id="detailsBtn">Details</button>
           <button class="btn btn-ghost" id="resetBtn">Reset Steps</button>
         </div>
       </div>

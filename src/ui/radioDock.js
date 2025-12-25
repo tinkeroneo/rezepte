@@ -91,16 +91,7 @@ export function initRadioDock() {
   const renderBody = () => {
     consent = hasConsent();
 
-    // Winter toggle (always shown)
-    winterRow.innerHTML = `
-      <label class="row" style="justify-content:space-between; align-items:center; gap:.6rem; margin:.35rem 0;">
-        <span class="muted">Winter Overlay</span>
-        <input id="winterToggle" type="checkbox" ${getWinterEnabled() ? "checked" : ""} />
-      </label>
-    `;
-    qs(winterRow, "#winterToggle")?.addEventListener("change", (e) => {
-      setWinterEnabled(e.target.checked);
-    });
+
 
     // Consent vs player
     if (!consent) {

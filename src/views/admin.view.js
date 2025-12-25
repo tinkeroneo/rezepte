@@ -56,12 +56,12 @@ export function renderAdminView({ appEl, recipes, setView }) {
         <div style="font-weight:800; margin-bottom:.4rem;">Features</div>
 
         <label style="display:flex; align-items:center; justify-content:space-between; gap:1rem; cursor:pointer;">
-          <span>🎵 Radio im Kochmodus anzeigen</span>
+          <span>🎵 Radio anzeigen</span>
           <input id="radioFeatureToggle" type="checkbox" />
         </label>
 
         <div class="muted" style="margin-top:.35rem;">
-          Lädt Drittanbieter-Inhalte erst nach Consent im Kochmodus.
+          Lädt Drittanbieter-Inhalte erst nach Consent.
         </div>
 
         <div class="row" style="margin-top:.6rem; gap:.5rem; flex-wrap:wrap;">

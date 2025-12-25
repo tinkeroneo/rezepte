@@ -1,10 +1,28 @@
 import { KEYS, lsGet, lsSet } from "../storage.js";
 import { norm } from "../utils.js";
+
+// export function loadShoppingUI() {
+//   const SHOPPING_UI_KEY = "tinkeroneo_shopping_ui_v1";
+//   try { return JSON.parse(localStorage.getItem(SHOPPING_UI_KEY) || "{}"); }
+//   catch { return {}; }
+// }
+
+
 export function loadShoppingUI() {
   const SHOPPING_UI_KEY = "tinkeroneo_shopping_ui_v1";
-  try { return JSON.parse(localStorage.getItem(SHOPPING_UI_KEY) || "{}"); }
-  catch { return {}; }
+  let ui;
+
+  try {
+    ui = JSON.parse(localStorage.getItem(SHOPPING_UI_KEY) || "{}");
+  } catch {
+    ui = {};
+    ui.collapsedCats[cat] = true;
+  }
+
+
+  return ui;
 }
+
 export function saveShoppingUI(ui) {
   const SHOPPING_UI_KEY = "tinkeroneo_shopping_ui_v1";
   localStorage.setItem(SHOPPING_UI_KEY, JSON.stringify(ui));
@@ -13,6 +31,7 @@ export function saveShoppingUI(ui) {
 export function loadShopping() {
   return lsGet(KEYS.SHOPPING, {});
 }
+
 export function saveShopping(list) {
   lsSet(KEYS.SHOPPING, list || {});
 }
