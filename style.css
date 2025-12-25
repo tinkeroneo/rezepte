@@ -959,6 +959,13 @@ select {
   left: 14px;
   bottom: 14px;
   z-index: 9999;
+  pointer-events: none; /* <-- wichtig: Container blockiert nichts */
+}
+
+/* Nur die echten Bedienelemente sollen klickbar sein */
+.radio-dock-btn,
+.radio-dock-panel {
+  pointer-events: auto;
 }
 
 .radio-dock-btn {
