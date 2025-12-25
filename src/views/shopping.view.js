@@ -131,10 +131,10 @@ export function renderShoppingView({ appEl, state, setView }) {
   document.querySelectorAll("[data-toggle-done]").forEach(btn => {
     btn.addEventListener("click", () => {
       const cat = btn.getAttribute("data-toggle-done");
-      const ui = loadShoppingUI();
-      ui.collapsedCats = ui.collapsedCats || {};
-      ui.collapsedCats[cat] = !ui.collapsedCats[cat];
-      saveShoppingUI(ui);
+      const uiState = loadShoppingUI();
+      uiState.collapsedCats = uiState.collapsedCats || {};
+      uiState.collapsedCats[cat] = !uiState.collapsedCats[cat];
+      saveShoppingUI(uiState);
       renderShoppingView({ appEl, state, setView });
     });
   });

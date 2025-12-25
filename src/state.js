@@ -33,7 +33,7 @@ export function initRouter({ onViewChange }) {
     view = { ...view, ...next };
 
     // persist (optional) – keep your existing NAV behavior
-    try { lsSet(KEYS.NAV, view); } catch {}
+    try { lsSet(KEYS.NAV, view); } catch { /* ignore */ }
 
     setHash(view);
     onViewChange(view);

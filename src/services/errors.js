@@ -1,6 +1,9 @@
 // src/services/errors.js
 // Global error banner for runtime errors & unhandled promise rejections.
 
+import { logClientEvent } from "../supabase.js";
+import { getClientId } from "../domain/clientId.js";
+
 let installed = false;
 
 const recentErrors = []; // newest first via accessor
@@ -42,6 +45,17 @@ function showError(err) {
 
   const msg = normalizeErr(err);
 
+  // Best-effort: also persist to backend (do not crash app).
+  sendToBackend({
+    type: "error",
+    message: msg,
+    stack: String(err?.stack || ""),
+    href: String(location?.href || ""),
+    ua: String(navigator?.userAgent || ""),
+    ts: Date.now(),
+    clientId: getClientId(),
+  });
+
   let el = document.getElementById("globalErrorBanner");
   if (!el) {
     el = document.createElement("div");
@@ -66,12 +80,21 @@ function showError(err) {
 }
 
 function normalizeErr(e) {
-  if (e == null) return "Unbekannter Fehler";
+  if (e === null || e === undefined) return "Unbekannter Fehler";
   if (typeof e === "string") return e;
   if (e instanceof Error) return e.message || String(e);
   try { return JSON.stringify(e); } catch { return String(e); }
 }
+let __lastSendAt = 0;
+let __sentInWindow = 0;
+
 async function sendToBackend(entry) {
+  // simple rate limit to avoid loops
+  const now = Date.now();
+  if (now - __lastSendAt > 30_000) { __lastSendAt = now; __sentInWindow = 0; }
+  __sentInWindow++;
+  if (__sentInWindow > 4) return;
+
   try {
     await logClientEvent({
       type: entry.type,

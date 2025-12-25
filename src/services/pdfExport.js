@@ -1,13 +1,15 @@
 // src/services/pdfExport.js
 import { escapeHtml } from "../utils.js";
+import { buildMenuIngredients, buildMenuStepSections, isMenuRecipe } from "../domain/menu.js";
 
 export function exportRecipesToPdfViaPrint({
   recipes,
   partsByParent,
+  allRecipes = null,
   includeImages = true,
   title = "Rezepte Export",
 }) {
-  const html = buildPrintHtml({ recipes, partsByParent, includeImages, title });
+  const html = buildPrintHtml({ recipes, partsByParent, allRecipes, includeImages, title });
   if (!html || html.trim().length < 50) {
     alert("PDF Export: keine Inhalte (0 Rezepte ausgewählt?)");
     return;
@@ -20,7 +22,7 @@ export function exportRecipesToPdfViaPrint({
   }
 
   // security: detach opener after opening
-  try { w.opener = null; } catch {}
+  try { w.opener = null; } catch { /* ignore */ }
 
   // document.write ist zwar deprecated, aber für Print-Windows ok.
   w.document.open();
@@ -71,15 +73,42 @@ function getRecipeImageUrl(r) {
   return r?.image_url || r?.imageUrl || r?.img || "";
 }
 
-function buildPrintHtml({ recipes, partsByParent, includeImages, title }) {
+function buildPrintHtml({ recipes, partsByParent, allRecipes, includeImages, title }) {
+  const pool = allRecipes && Array.isArray(allRecipes) ? allRecipes : (recipes ?? []);
     const now = new Date();
 const stamp = now.toLocaleString();
 const count = (recipes ?? []).length;
 
   const items = (recipes ?? []).map((r) => {
+    const isMenu = isMenuRecipe(r, partsByParent);
+
     // ✅ Primär aus dem Rezept selbst (dein Standardmodell)
     let ingredients = normalizeLines(r.ingredients);
     let steps = normalizeLines(r.steps);
+
+    // ✅ Menü: Zutaten/Schritte aus verlinkten Teilrezepten mit übernehmen
+    if (isMenu) {
+      const ingSections = buildMenuIngredients(r, pool, partsByParent);
+      ingredients = ingSections
+        .flatMap(sec => [
+          `## ${sec.title}`,
+          ...(sec.items ?? []).map(x => `- ${x}`),
+        ])
+        .map(s => String(s).trim())
+        .filter(Boolean);
+
+      const stepSections = buildMenuStepSections(r, pool, partsByParent);
+      steps = stepSections
+        .flatMap(sec => [
+          `## ${sec.title}`,
+          ...(sec.cards ?? []).flatMap(card => [
+            `- ${card.title}`,
+            ...((card.body ?? []).map(x => `  ${x}`)),
+          ]),
+        ])
+        .map(s => String(s).trim())
+        .filter(Boolean);
+    }
 
     // Optionaler Fallback, falls in Zukunft Parts wirklich gebraucht werden
     // (derzeit ist partsByParent in deinem Modell parent_id -> [child_id] und enthält keinen Text)
@@ -95,6 +124,8 @@ const count = (recipes ?? []).length;
 
     const desc = r.description || r.desc || r.notes || "";
 
+    const tags = Array.isArray(r.tags) ? r.tags.filter(Boolean) : [];
+
     return `
       <article class="recipe">
         <header>
@@ -103,6 +134,7 @@ const count = (recipes ?? []).length;
             ${r.category ? `<span>🏷 ${escapeHtml(r.category)}</span>` : ``}
             ${r.time ? `<span>⏱ ${escapeHtml(r.time)}</span>` : ``}
             ${r.source ? `<span>🔗 ${escapeHtml(r.source)}</span>` : ``}
+            ${tags.length ? `<span>🏷️ ${escapeHtml(tags.join(", "))}</span>` : ``}
           </div>
         </header>
 
@@ -112,12 +144,12 @@ const count = (recipes ?? []).length;
 
         ${ingredients.length ? `
           <h2>Zutaten</h2>
-          <ul>${ingredients.map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ul>
+          ${renderMaybeSections(ingredients)}
         ` : ``}
 
         ${steps.length ? `
           <h2>Zubereitung</h2>
-          <ol>${steps.map(x => `<li>${escapeHtml(x)}</li>`).join("")}</ol>
+          ${renderMaybeSections(steps, { ordered: true })}
         ` : ``}
       </article>
       <div class="pagebreak"></div>
@@ -169,4 +201,43 @@ const count = (recipes ?? []).length;
 </body>
 </html>
 `;
+}
+
+function renderMaybeSections(lines, { ordered = false } = {}) {
+  // Menü-Export nutzt "## Section" + "- item". Für normale Rezepte sind es simple Lines.
+  const out = [];
+
+  let currentTitle = null;
+  let buf = [];
+
+  const flush = () => {
+    if (!buf.length) return;
+    const li = buf
+      .map(s => String(s))
+      .filter(Boolean)
+      .map(s => s.replace(/^[-*•]\s*/, ""));
+    const listTag = ordered ? "ol" : "ul";
+
+    out.push(`
+      ${currentTitle ? `<h3 class="section">${escapeHtml(currentTitle)}</h3>` : ""}
+      <${listTag}>${li.map(x => `<li>${escapeHtml(x)}</li>`).join("")}</${listTag}>
+    `);
+
+    buf = [];
+  };
+
+  for (const raw of (lines ?? [])) {
+    const s = String(raw ?? "").trim();
+    if (!s) continue;
+    if (s.startsWith("## ")) {
+      flush();
+      currentTitle = s.slice(3).trim();
+      continue;
+    }
+    // remove optional indentation in steps
+    buf.push(s.replace(/^\s{2}/, ""));
+  }
+  flush();
+
+  return out.join("\n");
 }

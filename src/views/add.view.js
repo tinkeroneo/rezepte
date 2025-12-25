@@ -10,7 +10,6 @@ export function renderAddView({
   const isEdit = !!existing;
 
   let pendingFile = null;
-  let uploadDone = false;
   let previewUrl = null;
 
 // dirty tracking (unsaved changes)
@@ -38,7 +37,8 @@ window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
     ingredients: existing.ingredients ?? [],
     steps: existing.steps ?? [],
     createdAt: existing.createdAt ?? Date.now(),
-    source: existing.source ?? ""
+    source: existing.source ?? "",
+    tags: existing.tags ?? []
   } : {
     id: generateId(),
     title: "",
@@ -48,7 +48,8 @@ window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
     ingredients: [],
     steps: [],
     createdAt: Date.now(),
-    source: ""
+    source: "",
+    tags: []
   };
 
   const ingredientsText = (r.ingredients ?? []).join("\n");
@@ -118,7 +119,7 @@ window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
   const previewWrap = qs(appEl, "#imgPreviewWrap");
 
 
-const tagsEl = qs(appEl, "#tags");
+// tags are read via form on save
 
 const markDirty = () => setDirty(true);
 ["#title","#category","#time","#source","#image_url","#ingredients","#steps","#tags"].forEach((sel) => {
@@ -127,7 +128,7 @@ const markDirty = () => setDirty(true);
 });
 fileEl.addEventListener("change", () => {
   pendingFile = fileEl.files?.[0] || null;
-  uploadDone = false;
+  // upload status is handled via UI feedback
   markDirty();
 });
 
@@ -143,7 +144,7 @@ fileEl.addEventListener("change", () => {
     if (!showUrl) { previewWrap.innerHTML = ""; return; }
     previewWrap.innerHTML = `
       <img src="${escapeHtml(showUrl)}" alt="Preview"
-        style="width:100%; max-height:220px; object-fit:cover; border-radius:12px; display:block;" />
+        style="width:100%; max-height:220px; object-fit:contain; background:linear-gradient(135deg,#eef2ff,#f8fafc); border-radius:12px; display:block;" />
     `;
   };
 
@@ -151,7 +152,7 @@ fileEl.addEventListener("change", () => {
 
   fileEl.addEventListener("change", () => {
     pendingFile = fileEl.files?.[0] ?? null;
-    uploadDone = false;
+    // upload status is handled via UI feedback
     cleanupPreviewUrl();
     if (pendingFile) previewUrl = URL.createObjectURL(pendingFile);
     renderPreview();
@@ -175,15 +176,14 @@ fileEl.addEventListener("change", () => {
 
     const category = qs(appEl, "#category").value.trim();
     const time = qs(appEl, "#time").value.trim();
-    let image_url = qs(appEl, "#image_url").value.trim();
     const source = qs(appEl, "#source").value.trim();
 
-const tags = String(qs(appEl, "#tags").value || "")
-  .split(",")
-  .map(s => s.trim())
-  .filter(Boolean);
+    const tags = String(qs(appEl, "#tags").value || "")
+      .split(",")
+      .map(s => s.trim())
+      .filter(Boolean);
 
-image_url = imageUrlEl.value.trim();
+    let image_url = (imageUrlEl.value || "").trim();
 
 // Upload selected image on save (no separate upload button)
 if (useBackend && pendingFile) {
@@ -195,7 +195,7 @@ if (useBackend && pendingFile) {
     const uploadedUrl = await uploadRecipeImage(file, r.id);
     image_url = uploadedUrl;
     pendingFile = null;
-    uploadDone = true;
+    // upload status is handled via UI feedback
     cleanupPreviewUrl();
     previewUrl = null;
     statusEl.textContent = "Upload fertig.";
