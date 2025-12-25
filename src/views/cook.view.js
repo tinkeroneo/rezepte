@@ -1,23 +1,12 @@
 import { escapeHtml, qs, qsa } from "../utils.js";
 import { splitStepsToCards, stepDoneKey, parseDurationSeconds, formatTime } from "../domain/steps.js";
-import { buildMenuStepSections, buildMenuIngredients } from "../domain/menu.js";
+import { buildMenuIngredients, buildMenuStepSections } from "../domain/menu.js";
 import { renderIngredientsHtml } from "./shared.ingredients.js";
 import { createBeep, createTimerManager, renderTimersBarHtml } from "../domain/timers.js";
 import { ack } from "../ui/feedback.js";
 
-import {
-  addCookEvent,
-  getLastCooked,
-  getAvgRating,
-  getRatingCount,
-  listCookEvents,
-  updateCookEvent,
-  deleteCookEvent,
-  pullCookEventsFromBackend,
-  pushCookEventToBackend,
-  removeCookEventFromBackend
-} from "../domain/cooklog.js";
-const __pulledCookEvents = new Set(); // recipeId
+// Kochverlauf/Bewertung ist in der Detail-View (nicht hier),
+// damit Steps/Timer nicht verdeckt werden.
 const audio = createBeep()
 let __audioPrimedOnce = false;
 
@@ -26,24 +15,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
   const r = recipes.find(x => x.id === state.selectedId);
    if (!r) return setView({ name: "list", selectedId: null, q: state.q });
 
-  // pull cook events once per recipe (best effort)
-  if (!__pulledCookEvents.has(r.id)) {
-    __pulledCookEvents.add(r.id);
-    pullCookEventsFromBackend(r.id)
-      .then(() => renderCookView({ appEl, state, recipes, partsByParent, setView }))
-      .catch(() => { }); // offline ok
-  }
-
-  const last = getLastCooked(r.id);
-  const avg = getAvgRating(r.id);
-  const avgCount = getRatingCount(r.id);
-
-  const avgRounded = avg ? Math.round(avg) : 0; // für Sterne (0..5)
-  const avgLabel = avg ? avg.toFixed(1) : "—";
-
-  const lastStr = last
-    ? new Date(last.at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })
-    : "—";
+  // Cook-View soll möglichst „koch-fokussiert“ sein (Steps + Timer).
+  // Kochverlauf/Bewertung ist in der Detail-View.
 
  
   const isMenu = (partsByParent.get(r.id)?.length ?? 0) > 0;
@@ -60,38 +33,13 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
   // timers per root recipe
   const timersKey = "tinkeroneo_timers_v1";
 
-  const events = listCookEvents(r.id).slice(0, 8);
+  // (keine Events hier – in Detailview)
 
   appEl.innerHTML = `
     <div class="container">
       <div class="card">
         <button class="btn btn-ghost" id="backBtn">← Zurück</button>
         <h2>👩‍🍳 ${escapeHtml(r.title)}</h2>
-        <div class="row" style="justify-content:space-between; gap:.75rem; flex-wrap:wrap; margin:.35rem 0 .75rem;">
-          <div class="muted">Zuletzt gekocht: <b>${escapeHtml(lastStr)}</b></div>
-
-          <div class="row" style="gap:.35rem; align-items:center; flex-wrap:wrap;">
-            <button class="btn btn-ghost" id="cookLogNowBtn" type="button" title="Heute gekocht">✅</button>
-
-           <div class="row" id="cookStars" style="gap:.15rem; align-items:center;">
-              ${[1, 2, 3, 4, 5].map(n => `
-                <button type="button"
-                        class="btn btn-ghost"
-                        data-cook-rate="${n}"
-                        title="${n} Sterne"
-                        style="padding:.35rem .5rem;">
-                  ${n <= avgRounded ? "★" : "☆"}
-                </button>
-              `).join("")}
-
-              <span class="muted" style="margin-left:.35rem;" title="Durchschnitt aus ${avgCount} Bewertungen">
-                Ø ${escapeHtml(avgLabel)}
-              </span>
-            </div>
-            
-
-          </div>
-        </div>
 
 
         <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
@@ -119,7 +67,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
     const title = `${sec.title}: ${c.title}`.slice(0, 80);
 
     return `
-                    <li>
+                    <li data-stepwrap="${escapeHtml(key)}">
                       <div style="font-weight:800; margin-bottom:.25rem;">${escapeHtml(c.title)}</div>
 
                       ${c.body.length ? `
@@ -151,36 +99,9 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
       <div class="cookbar">
         <div class="row">
           <button class="btn btn-ghost" id="ingredientsBtn">Zutaten</button>
+          <button class="btn btn-ghost" id="detailsBtn">Details</button>
           <button class="btn btn-ghost" id="resetBtn">Reset Steps</button>
         </div>
-        <div class="card">
-              <div class="toolbar">
-                <div>
-                  <h3 style="margin:0;">Kochverlauf</h3>
-                  <div class="muted">Letzte ${events.length} Einträge</div>
-                </div>
-              </div>
-
-              ${events.length ? `
-                <div style="margin-top:.5rem;">
-                  ${events.map(ev => `
-                    <div class="row" style="justify-content:space-between; align-items:flex-start; padding:.45rem 0; border-top:1px solid #eee;">
-                      <div style="min-width:0;">
-                        <div style="font-weight:650;">
-                          ${new Date(ev.at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}
-                          ${ev.rating ? `<span class="muted" style="margin-left:.35rem;">(${ev.rating}/5)</span>` : ``}
-                        </div>
-                        ${ev.note ? `<div class="muted" style="margin-top:.2rem; white-space:pre-wrap;">${escapeHtml(ev.note)}</div>` : ``}
-                      </div>
-                      <div class="row" style="gap:.35rem;">
-                        <button class="btn btn-ghost" data-ev-edit="${escapeHtml(ev.id)}">✎</button>
-                        <button class="btn btn-ghost" data-ev-del="${escapeHtml(ev.id)}">🗑</button>
-                      </div>
-                    </div>
-                  `).join("")}
-                </div>
-              ` : `<div class="muted">Noch nichts geloggt.</div>`}
-            </div>
       </div>
 
       <div id="sheetRoot"></div>
@@ -192,69 +113,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
 
 
-  const cookLogNowBtn = qs(appEl, "#cookLogNowBtn");
-  if (cookLogNowBtn) {
-    cookLogNowBtn.addEventListener("click", () => {
-      // Schnell-Log ohne Rating/Notiz
-      const ev = addCookEvent(r.id, { at: Date.now() });
-      if (ev) pushCookEventToBackend(r.id, ev).catch(() => { });
-
-      renderCookView({ appEl, state, recipes, partsByParent, setView });
-    });
-  }
-
-  qsa(appEl, "[data-cook-rate]").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const rating = parseInt(btn.dataset.cookRate, 10);
-      openCookRatingDialog({ recipeId: r.id, rating, onDone: () => renderCookView({ appEl, state, recipes, partsByParent, setView }) });
-    });
-
-  });
-
-  // delete event
-  qsa(appEl, "[data-ev-del]").forEach(b => {
-    b.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const id = b.getAttribute("data-ev-del"); // robuster als dataset bei manchen edge cases
-      if (!id) return;
-
-      // UI sofort reagieren lassen (fühlt sich schneller an)
-      const row = b.closest(".row");
-      if (row) row.remove();
-
-      deleteCookEvent(r.id, id);
-
-      // kleiner Tick, dann re-render (damit count/avg sauber ist)
-      requestAnimationFrame(() => {
-        renderCookView({ appEl, state, recipes, partsByParent, setView });
-      });
-    });
-  });
-
-
-  // edit event
-  qsa(appEl, "[data-ev-edit]").forEach(b => {
-    b.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const id = b.dataset.evEdit;
-      const ev = listCookEvents(r.id).find(x => x.id === id);
-      if (!ev) return;
-
-      openEditCookEventDialog({
-        ev,
-        onSave: (patch) => {
-          updateCookEvent(r.id, id, patch);
-          renderCookView({ appEl, state, recipes, partsByParent, setView });
-        }
-      });
-    });
-  });
+  // Kochverlauf / Bewertung ist in der Detail-View
 
   let timersExpanded = false;
   function flashTimerRootOnce() {
@@ -269,14 +128,42 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
     }, 220);
   }
 
+  const s = window.__tinkeroneoSettings || {};
+  const ringIntervalMs = s.readTimerRingIntervalMs?.() ?? 5000;
+  const maxRingSeconds = s.readTimerMaxRingSeconds?.() ?? 120;
+  const stepHighlightEnabled = s.readTimerStepHighlight?.() ?? true;
+
   const tm = createTimerManager({
     storageKey: timersKey,
-    
+    ringIntervalMs,
+    maxRingSeconds,
+
     onRender: (snap) => {
       timerRoot.innerHTML = renderTimersBarHtml(snap, {
         expanded: timersExpanded,
         maxCollapsed: 1
       });
+
+      // Highlight steps whose timers are overdue (soft pulse) until the timer is stopped/dismissed.
+      if (stepHighlightEnabled) {
+        try {
+          const overdueKeys = new Set(
+            (snap?.list ?? [])
+              .filter(t => (t.remainingSec ?? 1) <= 0 && t.key)
+              .map(t => String(t.key))
+          );
+
+          qsa(appEl, "li[data-stepwrap]").forEach(li => {
+            const k = li.getAttribute("data-stepwrap") || "";
+            li.classList.toggle("step-overdue", overdueKeys.has(k));
+          });
+        } catch {
+          // ignore
+        }
+      } else {
+        // ensure clean UI when disabled
+        qsa(appEl, "li.step-overdue").forEach(li => li.classList.remove("step-overdue"));
+      }
 
       // Toggle alle / weniger
       qsa(timerRoot, "[data-timer-toggle]").forEach(b => {
@@ -344,20 +231,99 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
           ${isMenu
             ? buildMenuIngredients(r, recipes, partsByParent).map(section => `
                 <div style="margin-bottom:1rem;">
-                  <div class="muted" style="font-weight:800; margin-bottom:.25rem;">
-                    ${escapeHtml(section.title)}
-                  </div>
+                  <div class="muted" style="font-weight:800; margin-bottom:.25rem;">${escapeHtml(section.title)}</div>
                   ${renderIngredientsHtml(section.items)}
                 </div>
               `).join("")
             : renderIngredientsHtml(r.ingredients ?? [])
           }
         </div>
-
       </div>
     `;
     qs(sheetRoot, "#backdrop").addEventListener("click", () => sheetRoot.innerHTML = "");
     qs(sheetRoot, "#closeSheet").addEventListener("click", () => sheetRoot.innerHTML = "");
+  });
+
+  // Optional: Radio (e.g. egoFM) – only load iframe after explicit consent.
+  // This avoids loading third-party content without a user action.
+  const RADIO_CONSENT_KEY = "tinkeroneo_radio_consent_v1";
+
+  const hasRadioConsent = () => {
+    try { return localStorage.getItem(RADIO_CONSENT_KEY) === "1"; } catch { return false; }
+  };
+  const setRadioConsent = (v) => {
+    try {
+      if (v) localStorage.setItem(RADIO_CONSENT_KEY, "1");
+      else localStorage.removeItem(RADIO_CONSENT_KEY);
+    } catch { /* ignore */ }
+  };
+
+  function openRadioSheet() {
+    const consent = hasRadioConsent();
+    sheetRoot.innerHTML = `
+      <div class="sheet-backdrop" id="radioBackdrop"></div>
+      <div class="sheet" role="dialog" aria-modal="true">
+        <div class="sheet-handle"></div>
+        <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
+          <h3 style="margin:0;">Radio</h3>
+          <button class="btn btn-ghost" id="closeRadio">Schließen</button>
+        </div>
+
+        ${consent ? `
+          <div style="margin-top:.75rem;">
+            <iframe
+              src="https://player.egofm.de/radioplayer/?stream=egofm"
+              width="100%"
+              height="140"
+              style="border:0; border-radius:12px;"
+              loading="lazy"
+              allow="autoplay"
+              title="egoFM Radio Player"
+            ></iframe>
+
+            <div class="row" style="justify-content:space-between; align-items:center; margin-top:.65rem; gap:.5rem;">
+              <div class="muted">Drittanbieter-Inhalt wurde geladen (egoFM).</div>
+              <button class="btn btn-ghost" id="revokeRadio" type="button">Consent widerrufen</button>
+            </div>
+          </div>
+        ` : `
+          <div class="card" style="margin-top:.75rem;">
+            <div style="font-weight:800; margin-bottom:.25rem;">Datenschutz / Consent</div>
+            <div class="muted" style="line-height:1.4;">
+              Wenn du den Player lädst, wird ein Drittanbieter-Inhalt (egoFM) eingebunden.
+              Dabei können Verbindungsdaten (z.B. IP-Adresse, User-Agent) an den Drittanbieter übertragen werden.
+              Der Player wird erst nach deiner Zustimmung geladen.
+            </div>
+
+            <div class="row" style="margin-top:.75rem; justify-content:flex-end; gap:.5rem;">
+              <button class="btn btn-ghost" id="radioCancel" type="button">Abbrechen</button>
+              <button class="btn btn-primary" id="radioAllow" type="button">Ja, laden</button>
+            </div>
+          </div>
+        `}
+      </div>
+    `;
+
+    const close = () => (sheetRoot.innerHTML = "");
+    qs(sheetRoot, "#radioBackdrop")?.addEventListener("click", close);
+    qs(sheetRoot, "#closeRadio")?.addEventListener("click", close);
+
+    if (!consent) {
+      qs(sheetRoot, "#radioCancel")?.addEventListener("click", close);
+      qs(sheetRoot, "#radioAllow")?.addEventListener("click", () => {
+        setRadioConsent(true);
+        openRadioSheet();
+      });
+    } else {
+      qs(sheetRoot, "#revokeRadio")?.addEventListener("click", () => {
+        setRadioConsent(false);
+        openRadioSheet();
+      });
+    }
+  }
+
+  qs(appEl, "#radioBtn")?.addEventListener("click", () => {
+    openRadioSheet();
   });
 
   qsa(appEl, 'input[type="checkbox"][data-stepkey]').forEach(cb => {
@@ -372,8 +338,23 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
         // auto-collapse step text when done
         body.style.display = cb.checked ? "none" : "";
       }
+
+      // re-highlight current step (first open checkbox)
+      highlightCurrentStep();
     });
   });
+
+  function highlightCurrentStep() {
+    // remove old markers
+    qsa(appEl, ".step-current").forEach(el => el.classList.remove("step-current"));
+
+    const next = qsa(appEl, 'input[type="checkbox"][data-stepkey]').find(x => !x.checked);
+    const li = next?.closest?.("li");
+    if (li) li.classList.add("step-current");
+  }
+
+  // initial highlighting
+  highlightCurrentStep();
 
   qsa(appEl, "[data-start-timer]").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -388,7 +369,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
         try { await audio.prime(); } catch { /* ignore */ }
       }
 
-      tm.addTimer(key, title, dur);
+      // store recipeId so the global timer chip can jump back to the right recipe
+      tm.addTimer(key, title, dur, r.id);
       ack(btn);
 
       // IMPORTANT: no manual tick here; global overlay tick handles updates
@@ -403,193 +385,5 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
     saveDone();
     renderCookView({ appEl, state, recipes, partsByParent, setView });
   });
-}
-
-let __cookRatingDialogOpen = false;
-let __cookRatingLastOpenAt = 0;
-
-function openCookRatingDialog({ recipeId, rating, onDone }) {
-  // debounce gegen Doppelklick / Touch-Events
-  const now = Date.now();
-  if (now - __cookRatingLastOpenAt < 350) return;
-  __cookRatingLastOpenAt = now;
-
-  // nur ein Dialog gleichzeitig
-  if (__cookRatingDialogOpen) return;
-  __cookRatingDialogOpen = true;
-
-  // falls doch noch Reste da sind: wegräumen
-  document.getElementById("cookRatingBackdrop")?.remove();
-  document.getElementById("cookRatingSheet")?.remove();
-
-  const backdrop = document.createElement("div");
-  backdrop.id = "cookRatingBackdrop";
-  backdrop.className = "sheet-backdrop";
-
-  const sheet = document.createElement("div");
-  sheet.id = "cookRatingSheet";
-  sheet.className = "sheet";
-  sheet.style.maxHeight = "55vh";
-  sheet.addEventListener("click", (e) => e.stopPropagation());
-
-  const close = () => {
-    sheet.remove();
-    backdrop.remove();
-    __cookRatingDialogOpen = false;
-  };
-
-  // Backdrop klick schließt ALLES (nicht nur backdrop)
-  backdrop.addEventListener("click", close);
-
-  sheet.innerHTML = `
-    <div class="toolbar">
-      <div>
-        <h3 style="margin:0;">Bewertung</h3>
-        <div class="muted">${"⭐".repeat(rating)} (${rating}/5)</div>
-      </div>
-      <button class="btn btn-ghost" id="cookRateCancel" type="button" title="Abbrechen">✕</button>
-    </div>
-
-    <div class="card" style="padding:.85rem; margin-top:.75rem;">
-      <div class="muted" style="margin-bottom:.35rem;">Optional: kurze Notiz</div>
-      <textarea id="cookRateNote" placeholder="z.B. mehr Zitrone, weniger Salz, statt Reis: Bulgur"></textarea>
-      <div class="row" style="justify-content:space-between; margin-top:.6rem;">
-        <div class="muted" id="cookRateHint">Enter = speichern (ohne Text)</div>
-        <button class="btn btn-primary" id="cookRateSave" type="button" title="Speichern">💾 Speichern</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(backdrop);
-  document.body.appendChild(sheet);
-
-  sheet.querySelector("#cookRateCancel").addEventListener("click", close);
-
-  const noteEl = sheet.querySelector("#cookRateNote");
-  const hintEl = sheet.querySelector("#cookRateHint");
-  const saveBtn = sheet.querySelector("#cookRateSave");
-
-  const updateHint = () => {
-    const hasText = (noteEl.value || "").trim().length > 0;
-    hintEl.textContent = hasText ? "Speichern nur über 💾" : "Enter = speichern (ohne Text)";
-  };
-
-  const doSave = () => {
-    const note = (noteEl.value || "").trim();
-    const ev = addCookEvent(recipeId, { at: Date.now(), rating, note });
-    if (ev) pushCookEventToBackend(recipeId, ev).catch(() => { });
-
-    close();
-    onDone?.();
-  };
-
-  updateHint();
-  noteEl.addEventListener("input", updateHint);
-  saveBtn.addEventListener("click", doSave);
-
-  // Esc schließt immer
-  sheet.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-    }
-  });
-
-  // Enter speichert nur wenn KEIN Text (sonst newline)
-  noteEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      const hasText = (noteEl.value || "").trim().length > 0;
-      if (hasText) return;
-      e.preventDefault();
-      doSave();
-    }
-  });
-
-  // focus
-  requestAnimationFrame(() => noteEl.focus());
-}
-function openEditCookEventDialog({ ev, onSave }) {
-  // avoid stacking
-  document.getElementById("cookEditBackdrop")?.remove();
-  document.getElementById("cookEditSheet")?.remove();
-
-  const backdrop = document.createElement("div");
-  backdrop.id = "cookEditBackdrop";
-  backdrop.className = "sheet-backdrop";
-
-  const sheet = document.createElement("div");
-  sheet.id = "cookEditSheet";
-  sheet.className = "sheet";
-  sheet.addEventListener("click", (e) => e.stopPropagation());
-
-  const close = () => { sheet.remove(); backdrop.remove(); };
-  backdrop.addEventListener("click", close);
-
-  // datetime-local expects local time without timezone
-  const dt = new Date(ev.at);
-  const isoLocal = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
-
-  sheet.innerHTML = `
-    <div class="toolbar">
-      <div>
-        <h3 style="margin:0;">Eintrag bearbeiten</h3>
-        <div class="muted">${new Date(ev.at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>
-      </div>
-      <button class="btn btn-ghost" id="ceClose" type="button" title="Schließen">✕</button>
-    </div>
-
-    <hr />
-
-    <div class="card" style="padding:.85rem;">
-      <div class="muted" style="margin-bottom:.35rem;">Zeit</div>
-      <input id="ceAt" type="datetime-local" value="${isoLocal}" />
-    </div>
-
-    <div class="card" style="padding:.85rem;">
-      <div class="muted" style="margin-bottom:.35rem;">Rating</div>
-      <select id="ceRating">
-        <option value="">—</option>
-        ${[1, 2, 3, 4, 5].map(n => `<option value="${n}" ${ev.rating === n ? "selected" : ""}>${n}</option>`).join("")}
-      </select>
-    </div>
-
-    <div class="card" style="padding:.85rem;">
-      <div class="muted" style="margin-bottom:.35rem;">Notiz</div>
-      <textarea id="ceNote" placeholder="…">${escapeHtml(ev.note ?? "")}</textarea>
-      <div class="row" style="justify-content:space-between; margin-top:.6rem;">
-        <div class="muted">Enter macht Zeilenumbruch</div>
-        <button class="btn btn-primary" id="ceSave" type="button">💾 Speichern</button>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(backdrop);
-  document.body.appendChild(sheet);
-
-  sheet.querySelector("#ceClose").addEventListener("click", close);
-  sheet.querySelector("#ceSave").addEventListener("click", () => {
-    const atStr = sheet.querySelector("#ceAt").value;
-    const at = atStr ? new Date(atStr).getTime() : ev.at;
-
-    const ratingStr = sheet.querySelector("#ceRating").value;
-    const rating = ratingStr ? parseInt(ratingStr, 10) : null;
-
-    const note = sheet.querySelector("#ceNote").value || "";
-
-    onSave?.({ at, rating, note });
-    close();
-  });
-
-  // Esc closes
-  sheet.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      close();
-    }
-  });
-
-  requestAnimationFrame(() => sheet.querySelector("#ceNote")?.focus());
 }
 

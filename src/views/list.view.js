@@ -2,12 +2,39 @@ import { escapeHtml, norm, qs, qsa } from "../utils.js";
 import { KEYS, lsGetStr, lsSetStr, lsSet } from "../storage.js";
 import { exportRecipesToPdfViaPrint } from "../services/pdfExport.js";
 import { downloadJson } from "../services/exportDownload.js";
-import { saveRecipesLocal, toLocalShape } from "../domain/recipes.js";
 import { buildCookStatsByRecipeId } from "../domain/cooklog.js";
+import { isFavorite, toggleFavorite } from "../domain/favorites.js";
+import { getTagColors } from "../domain/tagColors.js";
 
 
 
 export function renderListView({ appEl, state, recipes, partsByParent, setView, useBackend, onImportRecipes }) {
+
+  const tagColors = getTagColors();
+
+  const tagChip = (t) => {
+    const col = tagColors[t];
+    const style = col ? `style="border-color:${escapeHtml(col)}; background:${escapeHtml(col)}22; color:${escapeHtml(col)}"` : "";
+    return `<span class="chip tag-chip" ${style}>#${escapeHtml(t)}</span>`;
+  };
+
+  const coverEmoji = (r) => {
+    const c = (r.category || "").toLowerCase();
+    if (c.includes("früh")) return "☀️";
+    if (c.includes("drink") || c.includes("getränk")) return "🥤";
+    if (c.includes("dessert") || c.includes("kuchen") || c.includes("süß")) return "🍰";
+    if (c.includes("salat")) return "🥗";
+    if (c.includes("suppe")) return "🥣";
+    return "🍲";
+  };
+
+  const coverFallbackHtml = (r, cls) => `
+    <div class="${cls} cover-fallback" aria-hidden="true">
+      <div class="cover-fallback-emoji">${coverEmoji(r)}</div>
+    </div>
+  `;
+
+
 
   let viewMode = lsGetStr(KEYS.VIEWMODE, "grid");
 
@@ -31,6 +58,10 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
             <div class="row" style="justify-content:space-between; gap:.5rem; margin-top:.65rem; flex-wrap:wrap;">
               <select id="catFilter">
                 <option value="">Alle Kategorien</option>
+              </select>
+
+              <select id="tagFilter">
+                <option value="">Alle Tags</option>
               </select>
 
               <select id="sortSelect">
@@ -72,8 +103,6 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   if (importBtn) {
     importBtn.addEventListener("click", () => {
       openImportSheet({
-        appEl,
-        recipesFiltered: getFiltered(qEl.value), // Import ist unabhängig von Filter, aber wir können UI zeigen
         useBackend,
         onImportRecipes
       });
@@ -83,7 +112,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   const exportOpenBtn = qs(appEl, "#exportOpenBtn");
   if (exportOpenBtn) {
     exportOpenBtn.addEventListener("click", () => {
-      openExportSheet({ appEl, filtered: getFiltered(qEl.value), partsByParent });
+      openExportSheet({ list: getFiltered(qEl.value), partsByParent });
     });
   }
 
@@ -98,16 +127,34 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     modeGridBtn.classList.toggle("active", viewMode === "grid");
   };
   const catEl = qs(appEl, "#catFilter");
+  const tagEl = qs(appEl, "#tagFilter");
   const sortEl = qs(appEl, "#sortSelect");
   const resetEl = qs(appEl, "#resetFilters");
 
   // persisted settings
   let cat = lsGetStr(KEYS.LIST_CAT, "");
+  let tag = lsGetStr(KEYS.LIST_TAG, "");
   let sort = lsGetStr(KEYS.LIST_SORT, "new");
 
   // init UI state
   catEl.value = cat;
+  tagEl.value = tag;
   sortEl.value = sort;
+
+  // build tag options
+  const tags = Array.from(
+    new Set(
+      recipes
+        .flatMap(r => Array.isArray(r.tags) ? r.tags : [])
+        .map(t => String(t || "").trim())
+        .filter(Boolean)
+    )
+  ).sort((a, b) => a.localeCompare(b, "de"));
+
+  tagEl.innerHTML = `
+    <option value="">Alle Tags</option>
+    ${tags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("")}
+  `;
 
   // build category options
   const cats = Array.from(new Set(recipes.map(r => (r.category ?? "").trim()).filter(Boolean)))
@@ -155,11 +202,16 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     // 1) filtern
     let list = recipes.filter(r => {
       if (cat && (r.category ?? "") !== cat) return false;
+      if (tag) {
+        const rt = Array.isArray(r.tags) ? r.tags : [];
+        if (!rt.includes(tag)) return false;
+      }
 
       if (!qq) return true;
 
       const hay = [
         r.title, r.category, r.time, r.source,
+        ...(Array.isArray(r.tags) ? r.tags : []),
         ...(r.ingredients ?? []),
         ...(r.steps ?? [])
       ].map(norm).join(" ");
@@ -174,7 +226,13 @@ const sortTitle = (v) => {
   const s = String(v ?? "");
   // strip emojis / pictographs so they don't dominate sorting
   try {
-    return s.replace(/[\p{Extended_Pictographic}\u200D\uFE0F]/gu, "").trim().toLowerCase();
+    // Avoid misleading character classes: remove in separate passes.
+    return s
+      .replace(/\p{Extended_Pictographic}/gu, "")
+      .replace(/\u200D/g, "")
+      .replace(/\uFE0F/g, "")
+      .trim()
+      .toLowerCase();
   } catch {
     // fallback for older engines
     return s.replace(/[\u{1F300}-\u{1FAFF}]/gu, "").trim().toLowerCase();
@@ -208,7 +266,7 @@ const mealOrder = (r) => {
 
   // try direct match; else take first word
   const direct = map.get(key);
-  if (direct != null) return direct;
+  if (direct !== undefined) return direct;
 
   const firstWord = key.split(" ")[0];
   return map.get(firstWord) ?? 999;
@@ -285,10 +343,13 @@ function renderResults() {
               <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
                 ${r.image_url
                   ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-                  : `<div class="grid-img" aria-hidden="true"></div>`
+                  : coverFallbackHtml(r, "grid-img")
                 }
                 <div class="grid-body">
-                  <div class="grid-title">${escapeHtml(r.title)}</div>
+                  <div class="grid-title" style="display:flex; justify-content:space-between; gap:.5rem;">
+                    <span>${escapeHtml(r.title)}</span>
+                    <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
+                  </div>
                   <div class="grid-meta">
                     ${r.category ? `<span class="pill">${escapeHtml(r.category)}</span>` : ``}
                     ${r.time ? `<span class="pill pill-ghost">${escapeHtml(r.time)}</span>` : ``}
@@ -309,10 +370,13 @@ function renderResults() {
           card.innerHTML = `
             ${r.image_url
               ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-              : `<div class="grid-img" aria-hidden="true"></div>`
+              : coverFallbackHtml(r, "grid-img")
             }
             <div class="grid-body">
-              <div class="grid-title">${escapeHtml(r.title)}</div>
+              <div class="grid-title" style="display:flex; justify-content:space-between; gap:.5rem;">
+                <span>${escapeHtml(r.title)}</span>
+                <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
+              </div>
               <div class="grid-meta">
                 ${r.category ? `<span class="pill">${escapeHtml(r.category)}</span>` : ``}
                 ${r.time ? `<span class="pill pill-ghost">${escapeHtml(r.time)}</span>` : ``}
@@ -332,14 +396,20 @@ function renderResults() {
                 <div class="li-left">
                   ${r.image_url
                     ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-                    : `<div class="li-thumb li-thumb--empty" aria-hidden="true"></div>`
+                    : coverFallbackHtml(r, "li-thumb li-thumb--empty")
                   }
                   <div class="li-body">
                     <div class="li-title">${escapeHtml(r.title)}</div>
                     <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
+                    ${(Array.isArray(r.tags) && r.tags.length)
+                      ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
+                      : ""}
                   </div>
                 </div>
-                <div class="li-chev" aria-hidden="true">›</div>
+                <div class="li-actions">
+                  <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
+                  <div class="li-chev" aria-hidden="true">›</div>
+                </div>
               </div>
             `).join("")}
           </div>
@@ -356,14 +426,20 @@ function renderResults() {
             <div class="li-left">
               ${r.image_url
                 ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-                : `<div class="li-thumb li-thumb--empty" aria-hidden="true"></div>`
+                : coverFallbackHtml(r, "li-thumb li-thumb--empty")
               }
               <div class="li-body">
                 <div class="li-title">${escapeHtml(r.title)}</div>
                 <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
+                ${(Array.isArray(r.tags) && r.tags.length)
+                  ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
+                  : ""}
               </div>
             </div>
-            <div class="li-chev" aria-hidden="true">›</div>
+            <div class="li-actions">
+              <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
+              <div class="li-chev" aria-hidden="true">›</div>
+            </div>
           `;
           return item;
         });
@@ -372,6 +448,17 @@ function renderResults() {
 
     // Click handlers (delegation)
     resultsEl.onclick = (ev) => {
+      const fav = ev.target?.closest?.("[data-fav]");
+      if (fav) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const id = fav.getAttribute("data-fav");
+        if (id) {
+          toggleFavorite(id);
+          renderResults();
+        }
+        return;
+      }
       const card = ev.target?.closest?.("[data-id]");
       const id = card?.dataset?.id;
       if (id) setView({ name: "detail", selectedId: id });
@@ -411,6 +498,13 @@ function renderResults() {
     renderResults();
   });
 
+  tagEl.addEventListener("change", () => {
+    tag = tagEl.value;
+    lsSetStr(KEYS.LIST_TAG, tag);
+    lsSet(KEYS.NAV, { ...state, q: qEl.value });
+    renderResults();
+  });
+
   sortEl.addEventListener("change", () => {
     sort = sortEl.value;
     lsSetStr(KEYS.LIST_SORT, sort);
@@ -420,10 +514,13 @@ function renderResults() {
 
   resetEl.addEventListener("click", () => {
     cat = "";
+    tag = "";
     sort = "new";
     catEl.value = cat;
+    tagEl.value = tag;
     sortEl.value = sort;
     lsSetStr(KEYS.LIST_CAT, cat);
+    lsSetStr(KEYS.LIST_TAG, tag);
     lsSetStr(KEYS.LIST_SORT, sort);
     // also reset search
     setView({ name: "list", selectedId: null, q: "" });
@@ -432,34 +529,22 @@ function renderResults() {
 
   // Export
 
-  function openExportSheet({ appEl, filtered, partsByParent }) {
-    const list = Array.isArray(filtered) ? filtered : [];
+  function openExportSheet({ list, partsByParent: partsIndex }) {
+    const safeList = Array.isArray(list) ? list : [];
     // backdrop + sheet
     const backdrop = document.createElement("div");
     backdrop.className = "sheet-backdrop";
-    backdrop.addEventListener("click", () => backdrop.remove());
 
     const sheet = document.createElement("div");
     sheet.className = "sheet";
     sheet.addEventListener("click", (e) => e.stopPropagation());
 
+    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener("click", close);
+
     // default: all selected
-    const selected = new Set(list.map(r => r.id));
-    const filteredIds = new Set((filtered ?? []).map(r => r.id));
-    const useFilteredEl = qs(sheet, "#exportUseFiltered");
-    const filteredHintEl = qs(sheet, "#exportFilteredHint");
-
-    if (filteredHintEl) {
-      filteredHintEl.textContent = filtered && filtered.length !== list.length
-        ? `${filtered.length} Treffer`
-        : "";
-    }
-
-    function syncCheckboxesFromSelected() {
-      qsa(sheet, "[data-exp-id]").forEach(cb => {
-        cb.checked = selected.has(cb.dataset.expId);
-      });
-    }
+    // default: all selected
+    const selected = new Set(safeList.map(r => r.id));
 
 
     sheet.innerHTML = `
@@ -468,7 +553,7 @@ function renderResults() {
       <div>
         <h3 style="margin:0;">Export</h3>
         <div class="muted">Wähle Rezepte & Format</div>
-        <div class="muted">Basis: ${list.length} sichtbare Rezepte</div>
+        <div class="muted">Basis: ${safeList.length} sichtbare Rezepte</div>
       </div>
       <button class="btn btn-ghost" id="exportCloseBtn">Schließen</button>
     </div>
@@ -486,7 +571,7 @@ function renderResults() {
       
 
       <div style="margin-top:.6rem; max-height: 38vh; overflow:auto; padding-right:.25rem;">
-        ${list.map(r => `
+        ${safeList.map(r => `
           <label class="row" style="justify-content:space-between; padding:.35rem 0;">
             <span style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
               ${escapeHtml(r.title || "Rezept")}
@@ -510,15 +595,14 @@ function renderResults() {
     </div>
 
     <div class="row" style="justify-content:space-between;">
-      <div class="muted" id="exportCountHint">${list.length} ausgewählt</div>
+      <div class="muted" id="exportCountHint">${safeList.length} ausgewählt</div>
       <button class="btn btn-primary" id="exportDoBtn">Export starten</button>
     </div>
   `;
 
     document.body.appendChild(backdrop);
     document.body.appendChild(sheet);
-
-    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener("click", close);
 
     qs(sheet, "#exportCloseBtn").addEventListener("click", close);
 
@@ -541,7 +625,7 @@ function renderResults() {
     // select all/none
     qs(sheet, "#exportSelectAllBtn").addEventListener("click", () => {
       selected.clear();
-      list.forEach(r => selected.add(r.id));
+      safeList.forEach(r => selected.add(r.id));
       qsa(sheet, "[data-exp-id]").forEach(cb => { cb.checked = true; });
 
       updateCount();
@@ -558,7 +642,7 @@ function renderResults() {
     // do export
     qs(sheet, "#exportDoBtn").addEventListener("click", () => {
       const fmt = qs(sheet, 'input[name="exportFmt"]:checked')?.value || "pdf";
-      const subset = list.filter(r => selected.has(r.id));
+      const subset = safeList.filter(r => selected.has(r.id));
 
       if (fmt === "json") {
         downloadJson(`rezepte-export-${new Date().toISOString().slice(0, 10)}.json`, subset);
@@ -569,7 +653,8 @@ function renderResults() {
       // PDF via print
       exportRecipesToPdfViaPrint({
         recipes: subset,
-        partsByParent,
+        allRecipes: safeList,
+        partsByParent: partsIndex,
         includeImages: true
       });
       close();
@@ -577,14 +662,17 @@ function renderResults() {
 
     updateCount();
   }
-  function openImportSheet({ appEl, useBackend, onImportRecipes }) {
+  function openImportSheet({ useBackend: useBackendFlag, onImportRecipes: onImportFn }) {
     const backdrop = document.createElement("div");
     backdrop.className = "sheet-backdrop";
-    backdrop.addEventListener("click", () => backdrop.remove());
+    
 
     const sheet = document.createElement("div");
     sheet.className = "sheet";
     sheet.addEventListener("click", (e) => e.stopPropagation());
+
+    const close = () => { sheet.remove(); backdrop.remove(); };
+    backdrop.addEventListener("click", close);
 
     sheet.innerHTML = `
     <div class="sheet-handle"></div>
@@ -592,7 +680,7 @@ function renderResults() {
     <div class="toolbar">
       <div>
         <h3 style="margin:0;">Import</h3>
-        <div class="muted">${useBackend ? "Ziel: Supabase (Backend) + Local Cache" : "Ziel: nur Local Storage"}</div>
+        <div class="muted">${useBackendFlag ? "Ziel: Supabase (Backend) + Local Cache" : "Ziel: nur Local Storage"}</div>
       </div>
       <button class="btn btn-ghost" id="impClose">Schließen</button>
     </div>
@@ -636,8 +724,6 @@ function renderResults() {
 
     document.body.appendChild(backdrop);
     document.body.appendChild(sheet);
-
-    const close = () => { sheet.remove(); backdrop.remove(); };
     qs(sheet, "#impClose").addEventListener("click", close);
 
     const fileBtn = qs(sheet, "#impPickFile");
@@ -689,7 +775,7 @@ function renderResults() {
       try {
         doBtn.disabled = true;
         doBtn.textContent = "Importiere…";
-        await onImportRecipes?.({ items, mode });
+        await onImportFn?.({ items, mode });
         alert(`Import ok: ${items.length} Einträge verarbeitet.`);
         close();
         location.reload();

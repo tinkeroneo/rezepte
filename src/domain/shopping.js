@@ -43,7 +43,7 @@ export function normalizeShoppingKey(line) {
   if (!s) return "";
 
   s = s.replace(/\s*\([^)]*\)\s*$/g, "");
-  s = s.replace(/^\s*(\d+(?:[\.,]\d+)?|½|¼|¾)\s*(x\s*)?/i, "");
+  s = s.replace(/^\s*(\d+(?:[.,]\d+)?|½|¼|¾)\s*(x\s*)?/i, "");
   s = s.replace(/^\s*(dose|dosen|bund|stück|stueck|zehe|zehen|el|tl|prise|tasse|tassen|g|kg|ml|l)\b\s*/i, "");
   s = s.replace(/^\s*(dose|dosen|bund|stück|stueck|zehe|zehen|el|tl|prise|tasse|tassen|g|kg|ml|l)\b\s*/i, "");
 
