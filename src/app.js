@@ -32,7 +32,7 @@ import { renderLoginView } from "./views/login.view.js";
 
 import { initRadioDock } from "./ui/radioDock.js";
 import { Wake } from "./services/wakeLock.js";
-import { KEYS, lsGetStr, lsSetStr } from "./storage.js";
+import { KEYS, lsGetStr, lsSetStr, setStorageScope } from "./storage.js";
 import { installGlobalErrorHandler } from "./services/errors.js";
 import { getRecentErrors, clearRecentErrors } from "./services/errors.js";
 import { runExclusive } from "./services/locks.js";
@@ -500,11 +500,14 @@ async function boot() {
   if (useBackend) {
     try {
       const ctx = await initAuthAndSpace();
+      // Privacy: scope local storage per user+space. If not logged in, isolate.
+      setStorageScope({ userId: ctx?.userId || null, spaceId: ctx?.spaceId || null });
       if (!ctx?.spaceId) {
         router.setView({ name: "login" });
       }
     } catch (e) {
       console.error("Auth/Space init failed:", e);
+      setStorageScope({ userId: null, spaceId: null });
       router.setView({ name: "login" });
     }
   }
