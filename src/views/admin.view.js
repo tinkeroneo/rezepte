@@ -22,22 +22,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
       </header>
 
       <div class="card">
-        <h2>Account & Spaces</h2>
-        <div class="row">
-          <div class="muted" id="authInfo"></div>
-        </div>
-        <label class="field">
-          <div class="label">Aktiver Space</div>
-          <select id="spaceSelect"></select>
-          <div class="hint">Spaces steuern Zugriff/Sharing (RLS). Wechsel lädt Daten neu.</div>
-        </label>
-        <div class="row">
-          <button class="btn" id="btnSwitchSpace" type="button">Space wechseln</button>
-          <button class="btn danger" id="btnLogout" type="button">Logout</button>
-        </div>
-
-        <hr class="sep" />
-
         <h2>App</h2>
 
         <div class="row row--spread">
