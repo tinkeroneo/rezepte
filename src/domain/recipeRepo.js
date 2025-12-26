@@ -2,7 +2,7 @@
  * Tiny repository layer to keep backend/local persistence decisions in one place.
  * Keeps behavior identical to the previous wiring (local-first UX + backend sync when enabled).
  */
-
+import { setUseBackend } from "../app.js";
 export function createRecipeRepo({
   useBackend,
   listRecipes,
@@ -12,17 +12,27 @@ export function createRecipeRepo({
   saveRecipesLocal,
   toLocalShape,
 }) {
+  // IMPORTANT: do not freeze useBackend; allow switching after auth/space init
+  let _useBackend = !!useBackend;
+
   const normalizeList = (items) => (items ?? []).map(toLocalShape);
 
   const getLocal = () => normalizeList(loadRecipesLocal());
   const setLocal = (items) => saveRecipesLocal(normalizeList(items));
 
+
+
   return {
-    useBackend,
+    // keep for compatibility (some callers may read it)
+    get useBackend() {
+      return _useBackend;
+    },
+
+    setUseBackend,
 
     /** Load from backend when enabled; fallback to local on errors. */
     async getAll() {
-      if (!useBackend) return getLocal();
+      if (!_useBackend) return getLocal();
       try {
         const fromBackend = normalizeList(await listRecipes());
         setLocal(fromBackend);
@@ -41,7 +51,7 @@ export function createRecipeRepo({
       else local.push(recipe);
       setLocal(local);
 
-      if (!useBackend) return local;
+      if (!_useBackend) return local;
 
       await upsertRecipe(recipe);
       if (!refresh) return local;
@@ -55,7 +65,7 @@ export function createRecipeRepo({
     async remove(id) {
       const local = getLocal().filter((r) => r.id !== id);
       setLocal(local);
-      if (useBackend) await deleteRecipe(id);
+      if (_useBackend) await deleteRecipe(id);
       return local;
     },
 
