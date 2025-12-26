@@ -141,7 +141,7 @@ export async function initAuthAndSpaces() {
 export async function initAuthAndSpace() {
   const ctx = await initAuthAndSpaces();
   if (!ctx) return null;
-  return { session: ctx.session, spaceId: ctx.activeSpaceId };
+  return { session: ctx.session, userId: ctx.user?.id || null, spaceId: ctx.activeSpaceId };
 }
 
 export async function logout() {

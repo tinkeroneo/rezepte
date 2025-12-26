@@ -136,13 +136,3 @@
 
 </body>
 </html>
-
-<script type="module">
-  console.log("module ok");
-
-  import("./src/supabase.js").then(async m => {
-    const ctx = await m.initAuthAndSpace();
-    console.log("spaceId:", m.getSpaceId());
-    console.log("ctx:", ctx);
-  });
-</script>
