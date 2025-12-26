@@ -97,6 +97,32 @@ async function listUserSpaces() {
   return Array.isArray(data) ? data : [];
 }
 
+async function ensureDefaultSpaceForUser(userId) {
+  // First-login UX: If the user has no spaces yet, create a personal space.
+  // This prevents the app from bouncing back to the login view with an
+  // authenticated session but missing authorization scope.
+  if (!userId) return null;
+
+  // 1) Create space
+  const { data: spaceRow, error: spaceErr } = await supabase
+    .from("spaces")
+    .insert({ name: "Privat" })
+    .select("id")
+    .single();
+  if (spaceErr) throw spaceErr;
+
+  const spaceId = spaceRow?.id ? String(spaceRow.id) : null;
+  if (!spaceId) return null;
+
+  // 2) Link user -> space
+  const { error: linkErr } = await supabase
+    .from("user_spaces")
+    .insert({ user_id: userId, space_id: spaceId, role: "owner" });
+  if (linkErr) throw linkErr;
+
+  return spaceId;
+}
+
 /* ---------- public auth API ---------- */
 
 export async function initAuthAndSpaces() {
@@ -132,6 +158,16 @@ export async function initAuthAndSpaces() {
   const userId = _user?.id || null;
 
   _spaces = await listUserSpaces();
+  if (userId && (!_spaces || _spaces.length === 0)) {
+    // Create a default personal space on first login
+    const createdId = await ensureDefaultSpaceForUser(userId);
+    // Re-load (or synthesize) spaces
+    _spaces = await listUserSpaces();
+    // If RLS still delays the row, fall back to the created id
+    if ((!_spaces || _spaces.length === 0) && createdId) {
+      _spaces = [{ space_id: createdId, role: "owner" }];
+    }
+  }
   _spaceId = pickActiveSpaceId(userId, _spaces);
   if (_spaceId && userId) storeActiveSpaceForUser(userId, _spaceId);
 

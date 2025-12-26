@@ -504,6 +504,12 @@ async function boot() {
       setStorageScope({ userId: ctx?.userId || null, spaceId: ctx?.spaceId || null });
       if (!ctx?.spaceId) {
         router.setView({ name: "login" });
+      } else {
+        // If we came from a login route/hash, jump into the app after auth succeeds.
+        const v = router.getView();
+        if (v?.name === "login") {
+          router.setView({ name: "list", selectedId: null, q: "" });
+        }
       }
     } catch (e) {
       console.error("Auth/Space init failed:", e);
