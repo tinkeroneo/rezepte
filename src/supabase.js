@@ -53,22 +53,11 @@ function readAuthFromHash() {
     (Number.isFinite(expires_in) && expires_in > 0 ? expires_in : 3600);
 
   // Hash bereinigen (Router bleibt sauber)
-  history.replaceState(null, "", location.pathname + location.search);
+  window.history.replaceState(null, "", location.pathname + location.search);
 
   return { access_token, refresh_token, expires_at };
 }
 
-function loadStoredAuth() {
-  try {
-    const raw = localStorage.getItem(LS_AUTH_KEY);
-    if (!raw) return null;
-    const obj = JSON.parse(raw);
-    if (!obj?.access_token || !obj?.refresh_token) return null;
-    return obj;
-  } catch {
-    return null;
-  }
-}
 
 function loadAuth() {
   try {
@@ -143,17 +132,12 @@ async function refreshAccessToken(refresh_token) {
   };
 }
 
-function localhostRedirectToIndex() {
-  return "http://127.0.0.1:5500/git-rezepte-main/index.html";
+// Backwards-compatible alias
+async function refreshSession(refresh_token) {
+  return refreshAccessToken(refresh_token);
 }
 
-function cleanRedirectToIndex() {
-  const u = new URL(location.href);
-  u.hash = "";
-  u.search = "";
-  if (u.pathname.endsWith("/")) u.pathname += "index.html";
-  return u.toString();
-}
+
 
 
 
@@ -215,7 +199,7 @@ export async function initAuthAndSpaces() {
     storeAuth(_session);
     // Cleanup URL hash to avoid leaking tokens
     try {
-      history.replaceState(null, "", location.pathname + location.search);
+      window.history.replaceState(null, "", location.pathname + location.search);
     } catch {
       /* ignore */
     }

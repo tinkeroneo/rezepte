@@ -10,7 +10,6 @@ import {
   addRecipePart,
   removeRecipePart,
   initAuthAndSpaces,
-  getAuthContext,
   setActiveSpaceId as sbSetActiveSpaceId,
   logout as sbLogout
 } from "./supabase.js";
@@ -537,7 +536,7 @@ async function boot() {
         router.setView({ name: "list" });
       },
       logout() {
-        try { sbLogout(); } catch {}
+        try { sbLogout(); } catch (e) { /* ignore */ }
         // keep scope isolated post-logout
         setStorageScope({ userId: "anonymous", spaceId: "nospace" });
         router.setView({ name: "login" });

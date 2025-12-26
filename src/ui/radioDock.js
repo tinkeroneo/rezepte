@@ -67,7 +67,6 @@ export function initRadioDock() {
   const wrap = qs(root, "#radioDockWrap");
   const toggleBtn = qs(root, "#radioDockToggle");
   const panel = qs(root, "#radioPanel");
-  const winterRow = qs(root, "#radioWinterRow");
   const consentBlock = qs(root, "#radioConsentBlock");
   const iframeWrap = qs(root, "#radioIframeWrap");
   const closeBtn = qs(root, "#radioClose");
@@ -154,7 +153,7 @@ export function initRadioDock() {
   });
 
   // Initialize winter flag on load
-  document.documentElement.classList.toggle("winter", getWinterEnabled());
+  setWinterEnabled(getWinterEnabled());
 
   updateUI();
 }
