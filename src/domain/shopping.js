@@ -15,8 +15,7 @@ export function loadShoppingUI() {
   try {
     ui = JSON.parse(localStorage.getItem(SHOPPING_UI_KEY) || "{}");
   } catch {
-    ui = {};
-    ui.collapsedCats[cat] = true;
+    ui = { collapsedCats: {} };
   }
 
 
