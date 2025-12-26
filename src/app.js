@@ -9,9 +9,7 @@ import {
   listAllRecipeParts,
   addRecipePart,
   removeRecipePart,
-  initAuthAndSpaces,
-  setActiveSpaceId as sbSetActiveSpaceId,
-  logout as sbLogout
+  initAuthAndSpace
 } from "./supabase.js";
 
 import { initRouter } from "./state.js";
@@ -34,7 +32,7 @@ import { renderLoginView } from "./views/login.view.js";
 
 import { initRadioDock } from "./ui/radioDock.js";
 import { Wake } from "./services/wakeLock.js";
-import { KEYS, lsGetStr, lsSetStr, setStorageScope } from "./storage.js";
+import { KEYS, lsGetStr, lsSetStr } from "./storage.js";
 import { installGlobalErrorHandler } from "./services/errors.js";
 import { getRecentErrors, clearRecentErrors } from "./services/errors.js";
 import { runExclusive } from "./services/locks.js";
@@ -319,6 +317,8 @@ async function render(view, setView) {
     console.log("RENDER LOGIN VIEW");
 
     const info = {
+      // IMPORTANT: redirect should point to the actual index.html in dev
+      redirectTo: location.origin + location.pathname,
       debug: `origin=${location.origin}\npath=${location.pathname}\nhash=${location.hash}`,
     };
     return renderLoginView({ appEl, state: view, setView, info });
@@ -497,54 +497,16 @@ async function boot() {
   });
 
   // Now that router exists, we can route to login safely
-  let authCtx = null;
-
   if (useBackend) {
     try {
-      authCtx = await initAuthAndSpaces();
-    } catch (e) {
-      console.error("Auth/Spaces init failed:", e);
-      authCtx = null;
-    }
-
-    const userId = authCtx?.user?.id || null;
-    const activeSpaceId = authCtx?.activeSpaceId || null;
-
-    if (!userId || !activeSpaceId) {
-      // Ensure scoped caches don't leak across users
-      setStorageScope({ userId: "anonymous", spaceId: "nospace" });
-      router.setView({ name: "login" });
-      render(router.getView(), router.setView);
-      return;
-    }
-
-    setStorageScope({ userId, spaceId: activeSpaceId });
-
-    // Expose minimal auth+space controls for views (e.g. Admin)
-    window.__tinkeroneoAuth = {
-      user: authCtx.user,
-      spaces: authCtx.spaces || [],
-      activeSpaceId,
-      async switchSpace(spaceId) {
-        const sid = String(spaceId || "");
-        if (!sid) return;
-        sbSetActiveSpaceId(sid);
-        setStorageScope({ userId, spaceId: sid });
-        updateHeaderBadges({ syncing: true });
-        await runExclusive("loadAll", () => loadAll());
-        updateHeaderBadges({ syncing: false });
-        router.setView({ name: "list" });
-      },
-      logout() {
-        try { sbLogout(); } catch (e) { /* ignore */ }
-        // keep scope isolated post-logout
-        setStorageScope({ userId: "anonymous", spaceId: "nospace" });
+      const ctx = await initAuthAndSpace();
+      if (!ctx?.spaceId) {
         router.setView({ name: "login" });
-      },
-    };
-  } else {
-    // Backend disabled: isolate caches by anonymous scope
-    setStorageScope({ userId: "anonymous", spaceId: "nospace" });
+      }
+    } catch (e) {
+      console.error("Auth/Space init failed:", e);
+      router.setView({ name: "login" });
+    }
   }
 
   updateHeaderBadges({ syncing: true });
@@ -552,8 +514,6 @@ async function boot() {
   updateHeaderBadges({ syncing: false });
 
   render(router.getView(), router.setView);
-
-
 }
 
 boot();

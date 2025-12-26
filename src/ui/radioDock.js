@@ -67,6 +67,7 @@ export function initRadioDock() {
   const wrap = qs(root, "#radioDockWrap");
   const toggleBtn = qs(root, "#radioDockToggle");
   const panel = qs(root, "#radioPanel");
+  const winterRow = qs(root, "#radioWinterRow");
   const consentBlock = qs(root, "#radioConsentBlock");
   const iframeWrap = qs(root, "#radioIframeWrap");
   const closeBtn = qs(root, "#radioClose");
@@ -89,6 +90,20 @@ export function initRadioDock() {
 
   const renderBody = () => {
     consent = hasConsent();
+
+    // Winter overlay toggle (client-side UI + persisted app setting)
+    const winterEnabled = getWinterEnabled();
+    setWinterEnabled(winterEnabled);
+    winterRow.innerHTML = `
+      <label style="display:flex; align-items:center; gap:.5rem; margin:.25rem 0 .75rem 0;">
+        <input type="checkbox" id="radioWinterToggle" ${winterEnabled ? "checked" : ""} />
+        <span>Wintermodus (Overlay)</span>
+      </label>
+    `;
+    qs(winterRow, "#radioWinterToggle")?.addEventListener("change", (e) => {
+      const v = !!e?.target?.checked;
+      setWinterEnabled(v);
+    });
 
 
 
@@ -153,7 +168,7 @@ export function initRadioDock() {
   });
 
   // Initialize winter flag on load
-  setWinterEnabled(getWinterEnabled());
+  document.documentElement.classList.toggle("winter", getWinterEnabled());
 
   updateUI();
 }

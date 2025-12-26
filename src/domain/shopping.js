@@ -15,8 +15,13 @@ export function loadShoppingUI() {
   try {
     ui = JSON.parse(localStorage.getItem(SHOPPING_UI_KEY) || "{}");
   } catch {
+    // corrupt/invalid JSON -> reset UI state
     ui = { collapsedCats: {} };
   }
+
+  // ensure shape
+  if (!ui || typeof ui !== "object") ui = { collapsedCats: {} };
+  if (!ui.collapsedCats || typeof ui.collapsedCats !== "object") ui.collapsedCats = {};
 
 
   return ui;
