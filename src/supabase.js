@@ -141,7 +141,25 @@ export async function initAuthAndSpaces() {
     /* ignore */
   }
 
-  const { data: sessData, error: sessErr } = await supabase.auth.getSession();
+  
+  // 2) Handle legacy implicit flow (hash tokens) if present
+  try {
+    const h = String(window.location.hash || "");
+    if (h.includes("access_token=") && h.includes("refresh_token=")) {
+      const params = new URLSearchParams(h.replace(/^#/, ""));
+      const access_token = params.get("access_token");
+      const refresh_token = params.get("refresh_token");
+      if (access_token && refresh_token) {
+        await supabase.auth.setSession({ access_token, refresh_token });
+        // Clean URL (remove token hash params)
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+
+const { data: sessData, error: sessErr } = await supabase.auth.getSession();
   if (sessErr) throw sessErr;
   _session = sessData?.session || null;
 
@@ -193,22 +211,19 @@ export async function logout() {
 }
 
 function normalizeRedirectTo(redirectTo) {
-  // Falls leer -> aktuelle Seite ohne hash/query
-  const raw = (redirectTo && String(redirectTo).trim()) || (location.origin + location.pathname);
-
-  // Wenn jemand aus Versehen "origin + fullUrl" gemacht hat, reparieren wir das:
-  // Beispiel: "http://127.../http://127.../git-rezepte-main/index.html"
-  const doubled = raw.match(/^(https?:\/\/[^/]+)\/(https?:\/\/.+)$/i);
-  const fixedRaw = doubled ? doubled[2] : raw;
-
-  const u = new URL(fixedRaw); // muss absolute URL sein
+  const raw = (redirectTo && String(redirectTo).trim()) || String(window.location.href);
+  let u;
+  try {
+    u = new URL(raw, window.location.origin);
+  } catch {
+    u = new URL(window.location.href);
+  }
+  // strip hash (never include #login etc. in redirectTo)
   u.hash = "";
-  // optional: query killen (ich empfehle ja, weil du q/id in hash hast)
-  u.search = "";
-
-  // wenn auf Ordner gezeigt wird -> index.html erzwingen
-  if (u.pathname.endsWith("/")) u.pathname += "index.html";
-
+  // ensure we land on index.html (important for static hosts)
+  if (!u.pathname.endsWith("index.html")) {
+    u.pathname = u.pathname.replace(/\/+$/, "") + "/index.html";
+  }
   return u.toString();
 }
 
