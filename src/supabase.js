@@ -90,6 +90,27 @@ function storeAuth(auth) {
   }
 }
 
+/**
+ * Resolve current user from an access token.
+ * Supabase endpoint: GET /auth/v1/user
+ */
+async function getUserFromAccessToken(accessToken) {
+  if (!accessToken) return null;
+  const res = await sbFetch(`${SUPABASE_URL}/auth/v1/user`, {
+    method: "GET",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${accessToken}`,
+    },
+    timeoutMs: DEFAULT_TIMEOUT_MS,
+  });
+  if (!res.ok) return null;
+  const json = await res.json();
+  // supabase returns { id, email, ... }
+  if (!json?.id) return null;
+  return { id: json.id, email: json.email || null };
+}
+
 async function refreshAccessToken(refresh_token) {
   const res = await sbFetch(
     `${SUPABASE_URL}/auth/v1/token`,
