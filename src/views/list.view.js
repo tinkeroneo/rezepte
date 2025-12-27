@@ -84,15 +84,14 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
               <button class="btn btn-ghost" id="pendingToggle" type="button" style="display:none;"></button>
 
               <select id="sortSelect">
-                <option value="new">Neueste zuerst</option>
-                <option value="az">A–Z</option>
-                <option value="time">Dauer (kurz → lang)</option>
-                <option value="mealAsc">Mahlzeit (Früh → Spät)</option>
-                <option value="mealDesc">Mahlzeit (Spät → Früh)</option>
+                <option value="new">Neu/Alt</option>
+                <option value="az">Name</option>
+                <option value="time">Dauer</option>
                 <option value="lastCooked">Zuletzt gekocht</option>
-                <option value="bestRated">Best bewertet</option>
+                <option value="bestRated">Bewertung</option>
 
               </select>
+              <button class="btn btn-ghost" id="sortDirBtn" type="button" title="Sortierung umkehren">↑</button>
               <button class="btn btn-ghost" id="resetFilters" type="button" title="Filter zurücksetzen">↺</button>
             </div>
 
@@ -148,12 +147,27 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   const catEl = qs(appEl, "#catFilter");
   const tagEl = qs(appEl, "#tagFilter");
   const sortEl = qs(appEl, "#sortSelect");
+  const sortDirBtn = qs(appEl, "#sortDirBtn");
   const resetEl = qs(appEl, "#resetFilters");
 
   // persisted settings
   let cat = lsGetStr(KEYS.LIST_CAT, "");
   let tag = lsGetStr(KEYS.LIST_TAG, "");
   let sort = lsGetStr(KEYS.LIST_SORT, "new");
+  let sortDir = lsGetStr(KEYS.LIST_SORT_DIR, "");
+
+  // normalize legacy values
+  if (sort === "az") sort = "az"; // keep value stable
+
+  // default sort direction depends on the field
+  const defaultDirFor = (s) => {
+    if (s === "az") return "asc";
+    if (s === "time") return "asc";
+    if (s === "bestRated") return "desc";
+    if (s === "lastCooked") return "desc";
+    return "desc"; // "new"
+  };
+  if (sortDir !== "asc" && sortDir !== "desc") sortDir = defaultDirFor(sort);
 
   // init UI state
   catEl.value = cat;
@@ -177,6 +191,25 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   }
 
   sortEl.value = sort;
+  if (sortDirBtn) {
+    sortDirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
+    sortDirBtn.title = sortDir === "asc" ? "Aufsteigend" : "Absteigend";
+  }
+  if (sortDirBtn) {
+    const applySortDirUi = () => {
+      const isAsc = sortDir === "asc";
+      sortDirBtn.textContent = isAsc ? "↑" : "↓";
+      sortDirBtn.title = isAsc ? "Aufsteigend" : "Absteigend";
+    };
+    applySortDirUi();
+    sortDirBtn.addEventListener("click", () => {
+      sortDir = sortDir === "asc" ? "desc" : "asc";
+      lsSetStr(KEYS.LIST_SORT_DIR, sortDir);
+      lsSet(KEYS.NAV, { ...state, q: qEl.value });
+      applySortDirUi();
+      renderResults();
+    });
+  }
 
   // build tag options
   const tags = Array.from(
@@ -276,55 +309,19 @@ const sortTitle = (v) => {
   }
 };
 
-const mealOrder = (r) => {
-  const raw = String(r.category ?? "");
-  const first = raw.split("/")[0] ?? raw;
-  const key = sortTitle(first).replace(/\s+/g, " ").trim();
-
-  const map = new Map([
-    ["frühstück", 10],
-    ["brunch", 12],
-    ["mittagessen", 20],
-    ["vorspeise", 22],
-    ["suppe", 24],
-    ["salat", 26],
-    ["beilage", 28],
-    ["hauptgericht", 30],
-    ["hauptspeise", 30],
-    ["abendessen", 32],
-    ["snack", 40],
-    ["dip", 42],
-    ["mezze", 44],
-    ["kuchen", 50],
-    ["dessert", 52],
-    ["getränk", 60],
-    ["menü", 80],
-  ]);
-
-  // try direct match; else take first word
-  const direct = map.get(key);
-  if (direct !== undefined) return direct;
-
-  const firstWord = key.split(" ")[0];
-  return map.get(firstWord) ?? 999;
-};
-
     // 2) sortieren
+    const dir = sortDir === "asc" ? 1 : -1;
     if (sort === "az") {
-      list.sort((a, b) => sortTitle(a.title).localeCompare(sortTitle(b.title), "de"));
+      list.sort((a, b) => dir * sortTitle(a.title).localeCompare(sortTitle(b.title), "de"));
     } else if (sort === "time") {
-      list.sort((a, b) => parseMinutes(a.time) - parseMinutes(b.time));
-    } else if (sort === "mealAsc") {
-      list.sort((a, b) => (mealOrder(a) - mealOrder(b)) || sortTitle(a.title).localeCompare(sortTitle(b.title), "de"));
-    } else if (sort === "mealDesc") {
-      list.sort((a, b) => (mealOrder(b) - mealOrder(a)) || sortTitle(a.title).localeCompare(sortTitle(b.title), "de"));
+      list.sort((a, b) => dir * (parseMinutes(a.time) - parseMinutes(b.time)));
     } else if (sort === "lastCooked") {
-      list.sort((a, b) => (stats.get(b.id)?.lastAt ?? 0) - (stats.get(a.id)?.lastAt ?? 0));
+      list.sort((a, b) => dir * ((stats.get(a.id)?.lastAt ?? 0) - (stats.get(b.id)?.lastAt ?? 0)));
     } else if (sort === "bestRated") {
-      list.sort((a, b) => (stats.get(b.id)?.avg ?? -1) - (stats.get(a.id)?.avg ?? -1));
+      list.sort((a, b) => dir * ((stats.get(a.id)?.avg ?? -1) - (stats.get(b.id)?.avg ?? -1)));
     } else {
-      // "new"
-      list.sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
+      // "new" (created_at)
+      list.sort((a, b) => dir * ((a.createdAt ?? 0) - (b.createdAt ?? 0)));
     }
 
     return list;
@@ -552,20 +549,43 @@ function renderResults() {
   sortEl.addEventListener("change", () => {
     sort = sortEl.value;
     lsSetStr(KEYS.LIST_SORT, sort);
+    // reset direction to the field default when the field changes
+    sortDir = defaultDirFor(sort);
+    lsSetStr(KEYS.LIST_SORT_DIR, sortDir);
+    if (sortDirBtn) {
+      sortDirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
+      sortDirBtn.title = sortDir === "asc" ? "Aufsteigend" : "Absteigend";
+    }
     lsSet(KEYS.NAV, { ...state, q: qEl.value });
     renderResults();
   });
+
+  if (sortDirBtn) {
+    sortDirBtn.addEventListener("click", () => {
+      sortDir = sortDir === "asc" ? "desc" : "asc";
+      lsSetStr(KEYS.LIST_SORT_DIR, sortDir);
+      sortDirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
+      sortDirBtn.title = sortDir === "asc" ? "Aufsteigend" : "Absteigend";
+      renderResults();
+    });
+  }
 
   resetEl.addEventListener("click", () => {
     cat = "";
     tag = "";
     sort = "new";
+    sortDir = defaultDirFor(sort);
     catEl.value = cat;
     tagEl.value = tag;
     sortEl.value = sort;
+    if (sortDirBtn) {
+      sortDirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
+      sortDirBtn.title = sortDir === "asc" ? "Aufsteigend" : "Absteigend";
+    }
     lsSetStr(KEYS.LIST_CAT, cat);
     lsSetStr(KEYS.LIST_TAG, tag);
     lsSetStr(KEYS.LIST_SORT, sort);
+    lsSetStr(KEYS.LIST_SORT_DIR, sortDir);
     // also reset search
     setView({ name: "list", selectedId: null, q: "" });
     renderResults();

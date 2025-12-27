@@ -5,6 +5,9 @@ export function renderAdminView({ appEl, recipes, setView }) {
   const s = window.__tinkeroneoSettings || {};
 
   const useBackend = !!s.readUseBackend?.();
+  const auth = s.getAuthContext?.() || null;
+  const authedEmail = String(auth?.user?.email || "");
+  const activeSpaceId = String(auth?.spaceId || "");
   const theme = (s.readTheme?.() || "system");
   const winter = !!s.readWinter?.();
   const radioFeature = !!s.readRadioFeature?.();
@@ -119,6 +122,50 @@ export function renderAdminView({ appEl, recipes, setView }) {
           ${catRowsHtml || `<div class="hint">Noch keine Kategorien vorhanden.</div>`}
         </div>
 
+        <hr />
+
+        <h3>Space teilen</h3>
+        <div class="hint">Einladen per Mail: Die eingeladene Person loggt sich ein und wird automatisch Mitglied. (RLS schützt eure Daten.)</div>
+
+        ${useBackend
+          ? `
+            <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:center;">
+              <div class="hint" style="margin:0;">Angemeldet als: <b>${escapeHtml(authedEmail || "-")}</b></div>
+              <div class="hint" style="margin:0;">Aktiver Space: <b>${escapeHtml(activeSpaceId || "-")}</b></div>
+              <button class="btn" id="btnRefreshSharing" type="button">Refresh</button>
+            </div>
+
+            <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:flex-end;">
+              <label class="field" style="min-width:220px; flex: 1 1 220px;">
+                <div class="label">E-Mail</div>
+                <input id="shareEmail" type="email" placeholder="freundin@example.com" />
+              </label>
+
+              <label class="field" style="min-width:160px;">
+                <div class="label">Rolle</div>
+                <select id="shareRole">
+                  <option value="viewer">viewer (lesen)</option>
+                  <option value="editor">editor (bearbeiten)</option>
+                  <option value="owner">owner (verwalten)</option>
+                </select>
+              </label>
+
+              <button class="btn" id="btnInvite" type="button">Einladen</button>
+            </div>
+
+            <div class="row" style="flex-wrap:wrap; gap:1rem; align-items:flex-start;">
+              <div style="min-width:260px; flex: 1 1 260px;">
+                <div class="label">Mitglieder (user_spaces)</div>
+                <div id="membersList" class="hint">Lade…</div>
+              </div>
+              <div style="min-width:260px; flex: 1 1 260px;">
+                <div class="label">Offene Einladungen</div>
+                <div id="invitesList" class="hint">Lade…</div>
+              </div>
+            </div>
+          `
+          : `<div class="hint">Aktiviere CLOUD, um Sharing zu nutzen.</div>`
+        }
 
         <hr />
 
@@ -317,6 +364,112 @@ export function renderAdminView({ appEl, recipes, setView }) {
     });
   }
 
+  // Sharing (space invites)
+  async function refreshSharing() {
+    const membersEl = qs("#membersList");
+    const invitesEl = qs("#invitesList");
+    if (!membersEl || !invitesEl) return;
+
+    if (!useBackend) {
+      membersEl.textContent = "CLOUD deaktiviert";
+      invitesEl.textContent = "CLOUD deaktiviert";
+      return;
+    }
+
+    if (!s.listSpaceMembers || !s.listPendingInvites) {
+      membersEl.textContent = "Sharing-API fehlt";
+      invitesEl.textContent = "Sharing-API fehlt";
+      return;
+    }
+
+    membersEl.textContent = "Lade…";
+    invitesEl.textContent = "Lade…";
+
+    try {
+      const members = await s.listSpaceMembers({ spaceId: activeSpaceId });
+      const invites = await s.listPendingInvites({ spaceId: activeSpaceId });
+
+      membersEl.innerHTML = renderMembersHtml(members);
+      invitesEl.innerHTML = renderInvitesHtml(invites);
+
+      // wire revoke buttons
+      invitesEl.querySelectorAll("[data-revoke]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-revoke");
+          if (!id) return;
+          try {
+            await s.revokeInvite?.(id);
+            setMsg("Invite entfernt ✅", "ok");
+            await refreshSharing();
+          } catch (e) {
+            setMsg(String(e?.message || e), "bad");
+          }
+        });
+      });
+    } catch (e) {
+      membersEl.textContent = "Fehler beim Laden";
+      invitesEl.textContent = String(e?.message || e);
+    }
+  }
+
+  qs("#btnRefreshSharing")?.addEventListener("click", () => { refreshSharing(); });
+
+  qs("#btnInvite")?.addEventListener("click", async () => {
+    const email = (qs("#shareEmail")?.value || "").trim();
+    const role = (qs("#shareRole")?.value || "viewer").trim();
+    try {
+      if (!s.inviteToSpace) throw new Error("inviteToSpace fehlt");
+      await s.inviteToSpace({ email, role, spaceId: activeSpaceId });
+      setMsg("Invite gesendet ✅", "ok");
+      const inp = qs("#shareEmail");
+      if (inp) inp.value = "";
+      await refreshSharing();
+    } catch (e) {
+      setMsg(String(e?.message || e), "bad");
+    }
+  });
+
+  // initial load
+  refreshSharing();
+
+}
+
+function renderMembersHtml(members) {
+  if (!Array.isArray(members) || members.length === 0) {
+    return `<div class="hint">Keine Mitglieder gefunden.</div>`;
+  }
+  const rows = members
+    .map(m => {
+      const uid = escapeHtml(m?.user_id || "");
+      const role = escapeHtml(m?.role || "viewer");
+      return `<div class="row row--spread" style="align-items:center; gap:10px;">
+        <div class="hint" style="margin:0; overflow:hidden; text-overflow:ellipsis;">${uid}</div>
+        <div class="pill">${role}</div>
+      </div>`;
+    })
+    .join("");
+  return `<div style="display:flex; flex-direction:column; gap:6px;">${rows}</div>`;
+}
+
+function renderInvitesHtml(invites) {
+  if (!Array.isArray(invites) || invites.length === 0) {
+    return `<div class="hint">Keine offenen Einladungen.</div>`;
+  }
+  const rows = invites
+    .map(inv => {
+      const id = escapeHtml(inv?.id || "");
+      const mail = escapeHtml(inv?.email || "");
+      const role = escapeHtml(inv?.role || "viewer");
+      return `<div class="row row--spread" style="align-items:center; gap:10px;">
+        <div style="min-width:0; flex:1 1 auto;">
+          <div class="hint" style="margin:0; overflow:hidden; text-overflow:ellipsis;">${mail}</div>
+        </div>
+        <div class="pill">${role}</div>
+        <button class="btn" type="button" data-revoke="${id}" title="Einladung entfernen">✖</button>
+      </div>`;
+    })
+    .join("");
+  return `<div style="display:flex; flex-direction:column; gap:6px;">${rows}</div>`;
 }
 
 /* ---------- helpers ---------- */

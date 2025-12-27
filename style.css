@@ -69,6 +69,14 @@ header {
 }
 .badge-btn:hover{ filter: brightness(1.06); }
 .badge-btn:active{ transform: translateY(1px); }
+.badge-select{
+  max-width: 11.5rem;
+  cursor: pointer;
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: white;
+}
+.badge-select option{ color: black; }
 .badge.badge--local{ background: rgba(255,255,255,0.16); }
 .badge.badge--cloud{ background: rgba(255,255,255,0.22); }
 /* .badge.badge--offline{ background: rgba(255,255,255,0.14); border-style:dashed; } */
