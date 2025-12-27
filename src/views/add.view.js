@@ -64,24 +64,27 @@ window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
         <label class="muted">Titel</label>
         <input id="title" type="text" placeholder="z.B. Bohnen-Rührei Deluxe" value="${escapeHtml(r.title)}" />
 
-        <div class="row">
-          <div style="flex:1;">
+        <div class="row" style="flex-wrap:wrap; gap:.75rem;">
+          <div style="flex:1; min-width:220px;">
             <label class="muted">Kategorie</label>
             <input id="category" type="text" placeholder="z.B. Frühstück" value="${escapeHtml(r.category)}" />
           </div>
-          <div style="flex:1;">
+          <div style="flex:2; min-width:260px;">
+            <label class="muted">Tags (kommagetrennt)</label>
+            <input id="tags" type="text" placeholder="z.B. schnell, proteinreich, mealprep" value="${escapeHtml((r.tags || []).join(', '))}" />
+          </div>
+        </div>
+
+        <div class="row" style="flex-wrap:wrap; gap:.75rem;">
+          <div style="flex:1; min-width:220px;">
             <label class="muted">Zeit</label>
             <input id="time" type="text" placeholder="z.B. 10 Minuten" value="${escapeHtml(r.time)}" />
-
+          </div>
+          <div style="flex:2; min-width:260px;">
             <label class="muted">Quelle (optional)</label>
             <input id="source" type="text"
               placeholder="z. B. Ottolenghi – Simple, S. 123 / Oma / Eigenkreation"
               value="${escapeHtml(r.source ?? "")}" />
-          </div>
-
-          <div class="field">
-            <label class="muted">Tags (kommagetrennt)</label>
-            <input id="tags" type="text" placeholder="z.B. schnell, vegan, mealprep" value="${escapeHtml((r.tags || []).join(', '))}" />
           </div>
         </div>
 

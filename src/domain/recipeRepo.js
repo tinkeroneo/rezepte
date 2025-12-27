@@ -3,6 +3,7 @@
  * Keeps behavior identical to the previous wiring (local-first UX + backend sync when enabled).
  */
 import { setUseBackend } from "../app.js";
+import { enqueueOfflineAction } from "./offlineQueue.js";
 export function createRecipeRepo({
   useBackend,
   listRecipes,
@@ -53,7 +54,13 @@ export function createRecipeRepo({
 
       if (!_useBackend) return local;
 
-      await upsertRecipe(recipe);
+      try {
+        await upsertRecipe(recipe);
+      } catch {
+        // Keep local UX, queue for later retry
+        enqueueOfflineAction({ kind: "recipe_upsert", recipeId: recipe.id, recipe });
+        return local;
+      }
       if (!refresh) return local;
 
       const fromBackend = normalizeList(await listRecipes());
@@ -65,7 +72,13 @@ export function createRecipeRepo({
     async remove(id) {
       const local = getLocal().filter((r) => r.id !== id);
       setLocal(local);
-      if (_useBackend) await deleteRecipe(id);
+      if (_useBackend) {
+        try {
+          await deleteRecipe(id);
+        } catch {
+          enqueueOfflineAction({ kind: "recipe_delete", recipeId: id });
+        }
+      }
       return local;
     },
 

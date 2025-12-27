@@ -1,12 +1,8 @@
 // supabase.js
-// Supabase Auth (Magic Link / PKCE) + minimaler REST Client + Space Support
-// Voraussetzung: RLS aktiv, user_spaces gepflegt
+// Minimaler Supabase REST Client mit Auth + Space Support
+// Voraussetzung: RLS aktiv, space_id = UUID (text), user_spaces gepflegt
 
-// IMPORTANT:
-// Für Magic Links nutzt Supabase inzwischen i.d.R. PKCE/Code-Flow.
-// Der robusteste Weg im Browser (ohne eigenes Verifier-Handling) ist supabase-js.
-
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { getClientId } from "./domain/clientId.js";
 
 /* =========================
    CONFIG
@@ -27,216 +23,210 @@ const BUCKET = "recipe-images";
    AUTH / SPACE STATE
 ========================= */
 
-// Session/Spaces werden von supabase-js persistent gemanagt.
-// Wir halten nur eine kleine In-Memory-Sicht für den Rest des Codes.
+const LS_AUTH_KEY = "tinkeroneo_sb_auth_v1";
 
-const LS_ACTIVE_SPACE_PREFIX = "tinkeroneo_active_space_v1::u=";
-const LS_CLIENT_ID = "tinkeroneo_client_id_v1";
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
-
-let _session = null; // supabase-js session
-let _user = null; // supabase user
-let _spaces = []; // [{ space_id, role }]
-// Legacy name: many parts of the app expect "spaceId" via getSpaceId().
+let _session = null; // { access_token, refresh_token, expires_at }
 let _spaceId = null;
 
 /* ---------- helpers ---------- */
 
-function readActiveSpaceForUser(userId) {
-  if (!userId) return "";
+function readAuthFromHash() {
+  const raw = location.hash || "";
+  if (!raw.includes("access_token=") || !raw.includes("refresh_token=")) {
+    return null;
+  }
+
+  const h = raw.replace(/^#/, "");
+  const p = new URLSearchParams(h);
+
+  const access_token = p.get("access_token");
+  const refresh_token = p.get("refresh_token");
+  const expires_in = Number(p.get("expires_in") || "0");
+
+  if (!access_token || !refresh_token) return null;
+
+  const expires_at =
+    Math.floor(Date.now() / 1000) +
+    (Number.isFinite(expires_in) && expires_in > 0 ? expires_in : 3600);
+
+  // Hash bereinigen (Router bleibt sauber)
+  window.history.replaceState(null, "", location.pathname + location.search);
+
+  return { access_token, refresh_token, expires_at };
+}
+
+function loadStoredAuth() {
   try {
-    return String(localStorage.getItem(LS_ACTIVE_SPACE_PREFIX + userId) || "");
+    const raw = localStorage.getItem(LS_AUTH_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    if (!obj?.access_token || !obj?.refresh_token) return null;
+    return obj;
   } catch {
-    return "";
+    return null;
   }
 }
 
-function storeActiveSpaceForUser(userId, spaceId) {
-  if (!userId) return;
+function storeAuth(auth) {
   try {
-    localStorage.setItem(LS_ACTIVE_SPACE_PREFIX + userId, String(spaceId || ""));
+    localStorage.setItem(LS_AUTH_KEY, JSON.stringify(auth));
   } catch {
     /* ignore */
   }
 }
 
-function pickActiveSpaceId(userId, spaces) {
-  const preferred = readActiveSpaceForUser(userId);
-  if (preferred && spaces.some((s) => String(s.space_id) === preferred)) return preferred;
-  const first = spaces?.[0]?.space_id;
-  return first ? String(first) : null;
+async function refreshAccessToken(refresh_token) {
+  const res = await sbFetch(
+    `${SUPABASE_URL}/auth/v1/token`,
+    {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        grant_type: "refresh_token",
+        refresh_token,
+      }),
+      timeoutMs: 12000,
+    }
+  );
+
+  if (!res.ok) return null;
+  const json = await res.json();
+  if (!json?.access_token || !json?.refresh_token) return null;
+
+  const expires_at =
+    Math.floor(Date.now() / 1000) +
+    Number(json.expires_in || 3600);
+
+  return {
+    access_token: json.access_token,
+    refresh_token: json.refresh_token,
+    expires_at,
+  };
 }
 
-// Device identifier for optional client-side logs/events.
-// Not used for ownership / RLS.
-function getClientId() {
-  try {
-    const existing = localStorage.getItem(LS_CLIENT_ID);
-    if (existing) return String(existing);
-    const id = (crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2));
-    localStorage.setItem(LS_CLIENT_ID, id);
-    return id;
-  } catch {
-    return "web";
+// (redirect helpers removed – keep redirect handling in the login view)
+
+
+async function resolveSpaceId(access_token) {
+  const res = await sbFetch(
+    `${SUPABASE_URL}/rest/v1/user_spaces?select=space_id&limit=1`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${access_token}`,
+      },
+      timeoutMs: 12000,
+    }
+  );
+
+  if (!res.ok) {
+    throw new Error(
+      `Failed to resolve space: ${res.status} ${await sbJson(res)}`
+    );
   }
-}
 
-
-async function listUserSpaces() {
-  const { data, error } = await supabase
-    .from("user_spaces")
-    .select("space_id,role");
-  if (error) throw error;
-  return Array.isArray(data) ? data : [];
-}
-
-async function ensureDefaultSpaceForUser(userId) {
-  // First-login UX: If the user has no spaces yet, create a personal space.
-  // This prevents the app from bouncing back to the login view with an
-  // authenticated session but missing authorization scope.
-  if (!userId) return null;
-
-  // 1) Create space
-  const { data: spaceRow, error: spaceErr } = await supabase
-    .from("spaces")
-    .insert({ name: "Privat" })
-    .select("id")
-    .single();
-  if (spaceErr) throw spaceErr;
-
-  const spaceId = spaceRow?.id ? String(spaceRow.id) : null;
-  if (!spaceId) return null;
-
-  // 2) Link user -> space
-  const { error: linkErr } = await supabase
-    .from("user_spaces")
-    .insert({ user_id: userId, space_id: spaceId, role: "owner" });
-  if (linkErr) throw linkErr;
-
-  return spaceId;
+  const rows = await res.json();
+  const sid = rows?.[0]?.space_id;
+  if (!sid) throw new Error("No space assigned to user");
+  return sid;
 }
 
 /* ---------- public auth API ---------- */
 
-export async function initAuthAndSpaces() {
-  // 0) PKCE Code Flow: falls Supabase mit ?code=... zurückkommt
-  try {
-    const u = new URL(location.href);
-    const code = u.searchParams.get("code");
-    if (code) {
-      // exchangeCodeForSession nimmt den Code (supabase-js v2)
-      await supabase.auth.exchangeCodeForSession(code);
-      // URL bereinigen
-      u.searchParams.delete("code");
-      window.history.replaceState(null, "", u.pathname + (u.search ? "?" + u.searchParams.toString() : "") + u.hash);
-    }
-  } catch {
-    /* ignore */
+export async function initAuthAndSpace() {
+  // 1) Magic-Link Hash
+  const fromHash = readAuthFromHash();
+  if (fromHash) {
+    _session = fromHash;
+    storeAuth(_session);
   }
 
-  
-  // 2) Handle legacy implicit flow (hash tokens) if present
-  try {
-    const h = String(window.location.hash || "");
-    if (h.includes("access_token=") && h.includes("refresh_token=")) {
-      const params = new URLSearchParams(h.replace(/^#/, ""));
-      const access_token = params.get("access_token");
-      const refresh_token = params.get("refresh_token");
-      if (access_token && refresh_token) {
-        await supabase.auth.setSession({ access_token, refresh_token });
-        // Clean URL (remove token hash params)
-        window.history.replaceState(null, "", window.location.pathname + window.location.search);
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-
-const { data: sessData, error: sessErr } = await supabase.auth.getSession();
-  if (sessErr) throw sessErr;
-  _session = sessData?.session || null;
-
+  // 2) Stored auth
   if (!_session) {
-    _user = null;
-    _spaces = [];
+    _session = loadStoredAuth();
+  }
+
+  // 3) Refresh if needed
+  if (_session?.refresh_token) {
+    const now = Math.floor(Date.now() / 1000);
+    const needsRefresh =
+      !_session.expires_at || _session.expires_at - now < 60;
+
+    if (needsRefresh) {
+      const refreshed = await refreshAccessToken(_session.refresh_token);
+      if (!refreshed) {
+        logout();
+        return null;
+      }
+      _session = refreshed;
+      storeAuth(_session);
+    }
+  }
+
+  if (!_session?.access_token) {
     _spaceId = null;
     return null;
   }
 
-  const { data: userData, error: userErr } = await supabase.auth.getUser();
-  if (userErr) throw userErr;
-  _user = userData?.user || null;
-  const userId = _user?.id || null;
-
-  _spaces = await listUserSpaces();
-  if (userId && (!_spaces || _spaces.length === 0)) {
-    // Create a default personal space on first login
-    const createdId = await ensureDefaultSpaceForUser(userId);
-    // Re-load (or synthesize) spaces
-    _spaces = await listUserSpaces();
-    // If RLS still delays the row, fall back to the created id
-    if ((!_spaces || _spaces.length === 0) && createdId) {
-      _spaces = [{ space_id: createdId, role: "owner" }];
-    }
-  }
-  _spaceId = pickActiveSpaceId(userId, _spaces);
-  if (_spaceId && userId) storeActiveSpaceForUser(userId, _spaceId);
-
-  return { session: _session, user: _user, spaces: _spaces, activeSpaceId: _spaceId };
+  // 4) Resolve space
+  _spaceId = await resolveSpaceId(_session.access_token);
+  return { session: _session, spaceId: _spaceId };
 }
 
-export async function initAuthAndSpace() {
-  const ctx = await initAuthAndSpaces();
-  if (!ctx) return null;
-  return { session: ctx.session, userId: ctx.user?.id || null, spaceId: ctx.activeSpaceId };
-}
-
-export async function logout() {
+export function logout() {
+  _session = null;
+  _spaceId = null;
   try {
-    await supabase.auth.signOut();
+    localStorage.removeItem(LS_AUTH_KEY);
   } catch {
     /* ignore */
   }
-  _session = null;
-  _user = null;
-  _spaces = [];
-  _spaceId = null;
 }
 
 function normalizeRedirectTo(redirectTo) {
-  const raw = (redirectTo && String(redirectTo).trim()) || String(window.location.href);
-  let u;
-  try {
-    u = new URL(raw, window.location.origin);
-  } catch {
-    u = new URL(window.location.href);
-  }
-  // strip hash (never include #login etc. in redirectTo)
+  // Falls leer -> aktuelle Seite ohne hash/query
+  const raw = (redirectTo && String(redirectTo).trim()) || (location.origin + location.pathname);
+
+  // Wenn jemand aus Versehen "origin + fullUrl" gemacht hat, reparieren wir das:
+  // Beispiel: "http://127.../http://127.../git-rezepte-main/index.html"
+  const doubled = raw.match(/^(https?:\/\/[^/]+)\/(https?:\/\/.+)$/i);
+  const fixedRaw = doubled ? doubled[2] : raw;
+
+  const u = new URL(fixedRaw); // muss absolute URL sein
   u.hash = "";
-  // ensure we land on index.html (important for static hosts)
-  if (!u.pathname.endsWith("index.html")) {
-    u.pathname = u.pathname.replace(/\/+$/, "") + "/index.html";
-  }
+  // optional: query killen (ich empfehle ja, weil du q/id in hash hast)
+  u.search = "";
+
+  // wenn auf Ordner gezeigt wird -> index.html erzwingen
+  if (u.pathname.endsWith("/")) u.pathname += "index.html";
+
   return u.toString();
 }
 
 export async function requestMagicLink({ email, redirectTo }) {
-  const safeRedirect = normalizeRedirectTo(redirectTo);
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: {
-      emailRedirectTo: safeRedirect,
-      shouldCreateUser: true,
+  const safeRedirect = normalizeRedirectTo(
+    redirectTo || (location.hostname === "127.0.0.1"
+      ? "http://127.0.0.1:5500/git-rezepte-main/index.html"
+      : "https://cook.tinkeroneo.de/index.html")
+  );
+
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({
+      email,
+      create_user: true,
+      options: { emailRedirectTo: safeRedirect },
+    }),
   });
-  if (error) throw error;
+
+  if (!res.ok) throw new Error(`Magic link failed: ${res.status} ${await res.text()}`);
   return true;
 }
 
@@ -244,33 +234,24 @@ export async function requestMagicLink({ email, redirectTo }) {
 
 
 export function getSpaceId() {
-  // backwards compat
   return _spaceId;
-}
-
-export function getAuthContext() {
-  return { session: _session, user: _user, spaces: _spaces, activeSpaceId: _spaceId };
-}
-
-export function setActiveSpaceId(spaceId) {
-  const sid = spaceId ? String(spaceId) : null;
-  _spaceId = sid;
-  const userId = _user?.id || null;
-  if (userId) storeActiveSpaceForUser(userId, sid);
 }
 
 /* ---------- guards ---------- */
 
 function requireSpace() {
-  if (!_spaceId) throw new Error("Space not initialized. Call initAuthAndSpaces() first.");
+  if (!_spaceId) {
+    throw new Error("Space not initialized. Call initAuthAndSpace() first.");
+  }
 }
 
 function sbHeaders() {
-  const accessToken = _session?.access_token;
-  if (!accessToken) throw new Error("Not authenticated");
+  if (!_session?.access_token) {
+    throw new Error("Not authenticated");
+  }
   return {
     apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${accessToken}`,
+    Authorization: `Bearer ${_session.access_token}`,
     "Content-Type": "application/json",
   };
 }

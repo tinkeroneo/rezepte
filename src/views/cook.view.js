@@ -20,6 +20,16 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
  
   const isMenu = (partsByParent.get(r.id)?.length ?? 0) > 0;
+  const radioEnabled = (() => {
+    try {
+      const v = localStorage.getItem("tinkeroneo_radio_feature_v1");
+      if (v === "0") return false;
+      if (v === "1") return true;
+      return true; // default ON
+    } catch {
+      return true; // default ON
+    }
+  })();
   const cookSections = isMenu
     ? buildMenuStepSections(r, recipes, partsByParent)
     : [{ recipeId: r.id, title: r.title, cards: splitStepsToCards(r.steps ?? []) }];
@@ -99,6 +109,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
       <div class="cookbar">
         <div class="row">
           <button class="btn btn-ghost" id="ingredientsBtn">Zutaten</button>
+          ${radioEnabled ? `<button class="btn btn-ghost" id="radioBtn">Radio</button>` : ""}
           <button class="btn btn-ghost" id="resetBtn">Reset Steps</button>
         </div>
       </div>
@@ -245,7 +256,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
   // Optional: Radio (e.g. egoFM) – only load iframe after explicit consent.
   // This avoids loading third-party content without a user action.
-  const RADIO_CONSENT_KEY = "tinkeroneo_radio_consent_v1";
+  if (radioEnabled) {
+    const RADIO_CONSENT_KEY = "tinkeroneo_radio_consent_v1";
 
   const hasRadioConsent = () => {
     try { return localStorage.getItem(RADIO_CONSENT_KEY) === "1"; } catch { return false; }
@@ -321,9 +333,10 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
     }
   }
 
-  qs(appEl, "#radioBtn")?.addEventListener("click", () => {
-    openRadioSheet();
-  });
+    qs(appEl, "#radioBtn")?.addEventListener("click", () => {
+      openRadioSheet();
+    });
+  }
 
   qsa(appEl, 'input[type="checkbox"][data-stepkey]').forEach(cb => {
     cb.addEventListener("change", () => {

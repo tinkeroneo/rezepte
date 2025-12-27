@@ -10,19 +10,18 @@ import { norm } from "../utils.js";
 
 export function loadShoppingUI() {
   const SHOPPING_UI_KEY = "tinkeroneo_shopping_ui_v1";
-  let ui;
+  let ui = null;
 
   try {
     ui = JSON.parse(localStorage.getItem(SHOPPING_UI_KEY) || "{}");
   } catch {
-    // corrupt/invalid JSON -> reset UI state
-    ui = { collapsedCats: {} };
+    ui = null;
   }
 
-  // ensure shape
-  if (!ui || typeof ui !== "object") ui = { collapsedCats: {} };
+  // Hard defaults / shape guard
+  if (!ui || typeof ui !== "object") ui = {};
   if (!ui.collapsedCats || typeof ui.collapsedCats !== "object") ui.collapsedCats = {};
-
+  if (typeof ui.collapsedChecked !== "boolean") ui.collapsedChecked = true; // default: checked items collapsed
 
   return ui;
 }
