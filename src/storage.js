@@ -6,6 +6,7 @@ export const KEYS = {
   SHOPPING: "tinkeroneo_shopping_v1",
   NAV: "tinkeroneo_nav_v1",
   LIST_SORT: "tinkeroneo_list_sort_v1",
+  LIST_SORT_DIR: "tinkeroneo_list_sort_dir_v1",
   LIST_CAT: "tinkeroneo_list_cat_v1",
   LIST_TAG: "tinkeroneo_list_tag_v1",
   OFFLINE_QUEUE: "tinkeroneo_offline_queue_v1",

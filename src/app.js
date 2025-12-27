@@ -10,8 +10,17 @@ import {
   addRecipePart,
   removeRecipePart,
   initAuthAndSpace,
+  getAuthContext,
+  inviteToSpace,
+  listPendingInvites,
+  listSpaceMembers,
+  revokeInvite,
   logout as sbLogout,
-  isAuthenticated
+  isAuthenticated,
+  listMySpaces,
+  setActiveSpaceId,
+  acceptInvite,
+  declineInvite
 } from "./supabase.js";
 
 import { initRouter } from "./state.js";
@@ -31,6 +40,7 @@ import { renderSelftestView } from "./views/selftest.view.js";
 import { renderDiagnosticsView } from "./views/diagnostics.view.js";
 import { renderTimersOverlay } from "./views/timers.view.js";
 import { renderLoginView } from "./views/login.view.js";
+import { renderInvitesView } from "./views/invites.view.js";
 
 import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds } from "./domain/offlineQueue.js";
 
@@ -134,6 +144,7 @@ function setTimerStepHighlight(on) {
 
 let useBackend = readUseBackend();
 let recipeRepo = null;
+let mySpaces = [];
 
 function rebuildRecipeRepo(on) {
   recipeRepo = createRecipeRepo({
@@ -182,6 +193,15 @@ export async function setUseBackend(next) {
 window.__tinkeroneoSettings = {
   readUseBackend,
   setUseBackend: async (v) => setUseBackend(v),
+
+  // auth/space context (only meaningful in CLOUD)
+  getAuthContext: () => {
+    try { return getAuthContext(); } catch { return null; }
+  },
+  inviteToSpace: async ({ email, role, spaceId }) => inviteToSpace({ email, role, spaceId }),
+  listPendingInvites: async ({ spaceId } = {}) => listPendingInvites({ spaceId }),
+  listSpaceMembers: async ({ spaceId } = {}) => listSpaceMembers({ spaceId }),
+  revokeInvite: async (inviteId) => revokeInvite(inviteId),
 
   readTheme,
   setTheme: (v) => setTheme(v),
@@ -281,6 +301,9 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
     mode.textContent = useBackend ? "CLOUD" : "LOCAL";
     mode.classList.toggle("badge--ok", useBackend);
     mode.classList.toggle("badge--warn", !useBackend);
+    mode.title = useBackend
+      ? "Cloud: synchronisiert & teilbar (Supabase). Klick: auf LOCAL umschalten."
+      : "Local: nur auf diesem Gerät (offline-fähig). Klick: auf CLOUD umschalten.";
   }
 
   const authBtn = document.getElementById("authBadge");
@@ -289,6 +312,9 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
     authBtn.textContent = authed ? "LOGOUT" : "LOGIN";
     authBtn.classList.toggle("badge--ok", authed);
     authBtn.classList.toggle("badge--warn", !authed);
+    authBtn.title = useBackend
+      ? (authed ? "Logout" : "Login per Magic Link")
+      : "Cloud ist aus: erst auf CLOUD umschalten";
   }
 
   const sync = document.getElementById("syncBadge");
@@ -316,7 +342,61 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
       sync.classList.add("badge--ok");
       sync.classList.remove("badge--warn", "badge--bad");
     }
+
+    if (!navigator.onLine) sync.title = "Offline: Änderungen werden lokal gespeichert und später synchronisiert";
+    else if (syncError) sync.title = "Synchronisationsfehler: bitte später erneut versuchen";
+    else if (showPending) sync.title = `${pending} Änderung(en) warten auf Sync`;
+    else sync.title = "Synchronisation OK";
   }
+
+  // Space selector (only meaningful in CLOUD + authed)
+  const spaceSel = document.getElementById("spaceSelect");
+  if (spaceSel) {
+    const authed = useBackend && isAuthenticated?.();
+    spaceSel.hidden = !authed || !Array.isArray(mySpaces) || mySpaces.length <= 1;
+  }
+}
+
+async function refreshSpaceSelect() {
+  const sel = document.getElementById("spaceSelect");
+  if (!sel) return;
+
+  if (!(useBackend && isAuthenticated?.())) {
+    mySpaces = [];
+    sel.innerHTML = "";
+    sel.hidden = true;
+    return;
+  }
+
+  try {
+    mySpaces = await listMySpaces();
+  } catch {
+    mySpaces = [];
+  }
+
+  const ctx = (() => {
+    try { return getAuthContext(); } catch { return null; }
+  })();
+  const active = String(ctx?.spaceId || "");
+
+  if (!Array.isArray(mySpaces) || mySpaces.length <= 1) {
+    sel.innerHTML = "";
+    sel.hidden = true;
+    return;
+  }
+
+  sel.innerHTML = mySpaces
+    .map(s => {
+      const sid = String(s?.space_id || "");
+      const name = String(s?.name || sid);
+      const role = String(s?.role || "viewer");
+      const label = `${name} (${role})`;
+      const esc = (x) => String(x).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+      return `<option value="${esc(sid)}" ${sid === active ? "selected" : ""}>${esc(label)}</option>`;
+    })
+    .join("");
+
+  sel.hidden = false;
 }
 
 /* =========================
@@ -375,6 +455,59 @@ async function render(view, setView) {
       debug: `origin=${location.origin}\npath=${location.pathname}\nhash=${location.hash}`,
     };
     return renderLoginView({ appEl, state: view, setView, info });
+  }
+
+  // Invites confirmation view
+  if (view.name === "invites") {
+    const inv = window.__tinkeroneoPendingInvites || [];
+    return renderInvitesView({
+      appEl,
+      invites: inv,
+      onAccept: async (inviteId) => {
+        try {
+          await acceptInvite(inviteId);
+        } catch (e) {
+          alert(String(e?.message || e));
+        }
+        // reload invites list
+        try {
+          const ctx = await initAuthAndSpace();
+          window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
+        } catch {
+          window.__tinkeroneoPendingInvites = [];
+        }
+        // if none left, continue
+        if (!(window.__tinkeroneoPendingInvites || []).length) {
+          await runExclusive("loadAll", () => loadAll());
+          setView({ name: "list", selectedId: null, q: "" });
+          return;
+        }
+        render({ name: "invites" }, setView);
+      },
+      onDecline: async (inviteId) => {
+        try {
+          await declineInvite(inviteId);
+        } catch (e) {
+          alert(String(e?.message || e));
+        }
+        try {
+          const ctx = await initAuthAndSpace();
+          window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
+        } catch {
+          window.__tinkeroneoPendingInvites = [];
+        }
+        if (!(window.__tinkeroneoPendingInvites || []).length) {
+          await runExclusive("loadAll", () => loadAll());
+          setView({ name: "list", selectedId: null, q: "" });
+          return;
+        }
+        render({ name: "invites" }, setView);
+      },
+      onSkip: async () => {
+        await runExclusive("loadAll", () => loadAll());
+        setView({ name: "list", selectedId: null, q: "" });
+      },
+    });
   }
 
   // Global overlay always (except login)
@@ -587,6 +720,27 @@ async function boot() {
     });
   }
 
+  const spaceSel = document.getElementById("spaceSelect");
+  if (spaceSel && !spaceSel.__installed) {
+    spaceSel.__installed = true;
+    spaceSel.addEventListener("change", async () => {
+      const sid = String(spaceSel.value || "").trim();
+      if (!sid) return;
+      try {
+        setActiveSpaceId(sid);
+        const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+        setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
+
+        updateHeaderBadges({ syncing: true });
+        await runExclusive("loadAll", () => loadAll());
+        updateHeaderBadges({ syncing: false });
+        router.setView({ name: "list", selectedId: null, q: "" });
+      } catch (e) {
+        alert(String(e?.message || e));
+      }
+    });
+  }
+
   // Now that router exists, we can route to login safely
   if (useBackend) {
     try {
@@ -594,9 +748,15 @@ async function boot() {
       if (ctx?.userId || ctx?.spaceId) {
         setOfflineQueueScope({ userId: ctx.userId || null, spaceId: ctx.spaceId || null });
       }
-      if (!ctx?.spaceId) {
+      // pending invites -> user must confirm
+      if (Array.isArray(ctx?.pendingInvites) && ctx.pendingInvites.length) {
+        window.__tinkeroneoPendingInvites = ctx.pendingInvites;
+        router.setView({ name: "invites" });
+      } else if (!ctx?.spaceId) {
         router.setView({ name: "login" });
       }
+
+      await refreshSpaceSelect();
     } catch (e) {
       console.error("Auth/Space init failed:", e);
       router.setView({ name: "login" });
