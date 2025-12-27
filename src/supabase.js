@@ -186,6 +186,11 @@ export function logout() {
   }
 }
 
+// Lightweight auth state check for UI (header badges etc.)
+export function isAuthenticated() {
+  return !!_session?.access_token;
+}
+
 function normalizeRedirectTo(redirectTo) {
   // Falls leer -> aktuelle Seite ohne hash/query
   const raw = (redirectTo && String(redirectTo).trim()) || (location.origin + location.pathname);
@@ -313,7 +318,7 @@ export async function upsertRecipe(recipe) {
     image_url: recipe.image_url ?? null,
     source: recipe.source ?? "",
     tags: recipe.tags ?? [],
-    image_focus: recipe.image_focus ?? { x: 50, y: 50 },
+    image_focus: recipe.image_focus ?? { x: 50, y: 50, zoom: 1, mode: "auto" },
   };
 
   const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipes`, {

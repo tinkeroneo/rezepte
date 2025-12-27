@@ -49,7 +49,8 @@ export function renderShoppingView({ appEl, state, setView }) {
         const openItems = items.filter(([_, obj]) => !obj?.done);
         const doneItems = items.filter(([_, obj]) => !!obj?.done);
 
-        const collapsed = !!ui.collapsedCats[cat];
+        const hasExplicit = Object.prototype.hasOwnProperty.call(ui.collapsedCats, cat);
+        const collapsed = hasExplicit ? !!ui.collapsedCats[cat] : !!ui.collapsedChecked;
         const doneCount = doneItems.length;
 
         return `
@@ -133,7 +134,9 @@ export function renderShoppingView({ appEl, state, setView }) {
       const cat = btn.getAttribute("data-toggle-done");
       const uiState = loadShoppingUI();
       uiState.collapsedCats = uiState.collapsedCats || {};
-      uiState.collapsedCats[cat] = !uiState.collapsedCats[cat];
+      const hasExplicit = Object.prototype.hasOwnProperty.call(uiState.collapsedCats, cat);
+      const current = hasExplicit ? !!uiState.collapsedCats[cat] : !!uiState.collapsedChecked;
+      uiState.collapsedCats[cat] = !current;
       saveShoppingUI(uiState);
       renderShoppingView({ appEl, state, setView });
     });

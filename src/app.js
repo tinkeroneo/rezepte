@@ -9,7 +9,9 @@ import {
   listAllRecipeParts,
   addRecipePart,
   removeRecipePart,
-  initAuthAndSpace
+  initAuthAndSpace,
+  logout as sbLogout,
+  isAuthenticated
 } from "./supabase.js";
 
 import { initRouter } from "./state.js";
@@ -43,7 +45,8 @@ import { runExclusive } from "./services/locks.js";
    CONFIG / STATE
 ========================= */
 
-const DEFAULT_USE_BACKEND = true;
+// Default should be local-first (offline friendly). User can switch to CLOUD anytime.
+const DEFAULT_USE_BACKEND = false;
 
 function readUseBackend() {
   const v = lsGetStr(KEYS.USE_BACKEND, "");
@@ -280,6 +283,14 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
     mode.classList.toggle("badge--warn", !useBackend);
   }
 
+  const authBtn = document.getElementById("authBadge");
+  if (authBtn) {
+    const authed = useBackend && isAuthenticated?.();
+    authBtn.textContent = authed ? "LOGOUT" : "LOGIN";
+    authBtn.classList.toggle("badge--ok", authed);
+    authBtn.classList.toggle("badge--warn", !authed);
+  }
+
   const sync = document.getElementById("syncBadge");
   if (sync) {
     const pending = (getOfflineQueue?.() || []).length;
@@ -477,6 +488,13 @@ async function render(view, setView) {
       removeRecipePart,
       addRecipePart,
       listAllRecipeParts,
+      onUpdateRecipe: async (rec) => {
+        return runExclusive(`upsert:${rec.id}`, async () => {
+          recipes = await recipeRepo.upsert(rec, { refresh: useBackend });
+          // ensure current view keeps updated recipe
+          render(router.getView(), router.setView);
+        });
+      },
       addToShopping,
       rebuildPartsIndexSetter: (freshParts) => setParts(freshParts),
     });
@@ -537,6 +555,37 @@ async function boot() {
   router = initRouter({
     onViewChange: (view) => render(view, router.setView),
   });
+
+  // Header controls: mode toggle + login/logout (router now available)
+  const modeBtn = document.getElementById("modeBadge");
+  if (modeBtn && !modeBtn.__installed) {
+    modeBtn.__installed = true;
+    modeBtn.addEventListener("click", async () => {
+      await setUseBackend(!useBackend);
+      updateHeaderBadges();
+    });
+  }
+
+  const authBtn = document.getElementById("authBadge");
+  if (authBtn && !authBtn.__installed) {
+    authBtn.__installed = true;
+    authBtn.addEventListener("click", async () => {
+      // If we're local-only, switch to cloud and open login.
+      if (!useBackend) {
+        await setUseBackend(true);
+        router.setView({ name: "login" });
+        updateHeaderBadges();
+        return;
+      }
+
+      // Cloud enabled: toggle auth
+      if (isAuthenticated?.()) {
+        sbLogout();
+      }
+      router.setView({ name: "login" });
+      updateHeaderBadges();
+    });
+  }
 
   // Now that router exists, we can route to login safely
   if (useBackend) {
