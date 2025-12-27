@@ -35,6 +35,22 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     </div>
   `;
 
+  const imgStyleFromFocus = (focus, { height = 120 } = {}) => {
+    const f = (focus && typeof focus === "object") ? focus : {};
+    const x = Number.isFinite(Number(f.x)) ? Number(f.x) : 50;
+    const y = Number.isFinite(Number(f.y)) ? Number(f.y) : 50;
+    const zoom = Number.isFinite(Number(f.zoom)) ? Math.max(1, Math.min(3, Number(f.zoom))) : 1;
+    const mode = f.mode === "cover" || f.mode === "crop" || f.mode === "manual" ? "cover" : "auto";
+
+    // auto: show full image (contain). manual/cover: crop + position + optional zoom.
+    const fit = mode === "cover" ? "cover" : "contain";
+    const pos = `${x}% ${y}%`;
+    const scale = mode === "cover" ? zoom : 1;
+    const origin = pos;
+
+    return `height:${height}px; object-fit:${fit}; object-position:${pos}; transform:scale(${scale}); transform-origin:${origin};`;
+  };
+
 
 
   let viewMode = lsGetStr(KEYS.VIEWMODE, "grid");
@@ -365,15 +381,16 @@ function renderResults() {
           <div class="grid">
             ${filtered.map(r => `
               <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
-                ${r.image_url
-                  ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-                  : coverFallbackHtml(r, "grid-img")
-                }
+                <div class="grid-media">
+                  ${r.image_url
+                    ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" style="${imgStyleFromFocus(r.image_focus, { height: 120 })}" />`
+                    : coverFallbackHtml(r, "grid-img")
+                  }
+                  <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
+                  ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
+                </div>
                 <div class="grid-body">
-                  <div class="grid-title" style="display:flex; justify-content:space-between; gap:.5rem;">
-                    <span>${escapeHtml(r.title)}</span>${r._pending ? `<span class="pill pill-warn" title="Wartet auf Sync">⏳</span>` : ``}
-                    <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
-                  </div>
+                  <div class="grid-title"><span>${escapeHtml(r.title)}</span></div>
                   <div class="grid-meta">
                     ${r.category ? `<span class="pill">${escapeHtml(r.category)}</span>` : ``}
                     ${r.time ? `<span class="pill pill-ghost">${escapeHtml(r.time)}</span>` : ``}
@@ -392,15 +409,16 @@ function renderResults() {
           card.dataset.id = r.id;
           card.style.setProperty("--cat-accent", catAccent(r.category));
           card.innerHTML = `
-            ${r.image_url
-              ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-              : coverFallbackHtml(r, "grid-img")
-            }
+            <div class="grid-media">
+              ${r.image_url
+                ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" style="${imgStyleFromFocus(r.image_focus, { height: 120 })}" />`
+                : coverFallbackHtml(r, "grid-img")
+              }
+              <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
+              ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
+            </div>
             <div class="grid-body">
-              <div class="grid-title" style="display:flex; justify-content:space-between; gap:.5rem;">
-                <span>${escapeHtml(r.title)}</span>${r._pending ? `<span class="pill pill-warn" title="Wartet auf Sync">⏳</span>` : ``}
-                <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
-              </div>
+              <div class="grid-title"><span>${escapeHtml(r.title)}</span></div>
               <div class="grid-meta">
                 ${r.category ? `<span class="pill">${escapeHtml(r.category)}</span>` : ``}
                 ${r.time ? `<span class="pill pill-ghost">${escapeHtml(r.time)}</span>` : ``}
@@ -418,10 +436,14 @@ function renderResults() {
             ${filtered.map(r => `
               <div class="list-item" data-id="${escapeHtml(r.id)}" data-category="${escapeHtml(r.category || "")}" style="--cat-accent:${catAccent(r.category)}">
                 <div class="li-left">
-                  ${r.image_url
-                    ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-                    : coverFallbackHtml(r, "li-thumb li-thumb--empty")
-                  }
+                  <div class="li-media">
+                    ${r.image_url
+                      ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" style="${imgStyleFromFocus(r.image_focus, { height: 64 })}" />`
+                      : coverFallbackHtml(r, "li-thumb li-thumb--empty")
+                    }
+                    <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
+                    ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
+                  </div>
                   <div class="li-body">
                     <div class="li-title">${escapeHtml(r.title)}</div>
                     <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
@@ -430,10 +452,7 @@ function renderResults() {
                       : ""}
                   </div>
                 </div>
-                <div class="li-actions">
-                  <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
-                  <div class="li-chev" aria-hidden="true">›</div>
-                </div>
+                <div class="li-actions"><div class="li-chev" aria-hidden="true">›</div></div>
               </div>
             `).join("")}
           </div>
@@ -448,10 +467,14 @@ function renderResults() {
           item.style.setProperty("--cat-accent", catAccent(r.category));
           item.innerHTML = `
             <div class="li-left">
-              ${r.image_url
-                ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
-                : coverFallbackHtml(r, "li-thumb li-thumb--empty")
-              }
+              <div class="li-media">
+                ${r.image_url
+                  ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" style="${imgStyleFromFocus(r.image_focus, { height: 64 })}" />`
+                  : coverFallbackHtml(r, "li-thumb li-thumb--empty")
+                }
+                <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
+                ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
+              </div>
               <div class="li-body">
                 <div class="li-title">${escapeHtml(r.title)}</div>
                 <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
@@ -460,10 +483,7 @@ function renderResults() {
                   : ""}
               </div>
             </div>
-            <div class="li-actions">
-              <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
-              <div class="li-chev" aria-hidden="true">›</div>
-            </div>
+            <div class="li-actions"><div class="li-chev" aria-hidden="true">›</div></div>
           `;
           return item;
         });

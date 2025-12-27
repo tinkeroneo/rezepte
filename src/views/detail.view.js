@@ -21,10 +21,36 @@ export function renderDetailView({
   appEl, state, recipes, partsByParent, recipeParts,
   setView, useBackend,
   sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts,
+  onUpdateRecipe,
   addToShopping, rebuildPartsIndexSetter
 }) {
   const r = recipes.find(x => x.id === state.selectedId);
   if (!r) return setView({ name: "list", selectedId: null, q: state.q });
+
+  const normalizeFocus = (focus) => {
+    const f = (focus && typeof focus === "object") ? { ...focus } : {};
+    const x = Number.isFinite(Number(f.x)) ? Number(f.x) : 50;
+    const y = Number.isFinite(Number(f.y)) ? Number(f.y) : 50;
+    const zoom = Number.isFinite(Number(f.zoom)) ? Math.max(1, Math.min(3, Number(f.zoom))) : 1;
+    const mode = (f.mode === "cover" || f.mode === "manual" || f.mode === "crop") ? "cover" : "auto";
+    return { x, y, zoom, mode };
+  };
+
+  const applyFocusToImg = (img, focus) => {
+    if (!img) return;
+    const f = normalizeFocus(focus);
+    const pos = `${f.x}% ${f.y}%`;
+    img.style.objectPosition = pos;
+    if (f.mode === "cover") {
+      img.style.objectFit = "cover";
+      img.style.transform = `scale(${f.zoom})`;
+      img.style.transformOrigin = pos;
+    } else {
+      img.style.objectFit = "contain";
+      img.style.transform = "scale(1)";
+      img.style.transformOrigin = "50% 50%";
+    }
+  };
 
   // pull cook events once per recipe (best effort)
   if (!__pulledCookEvents.has(r.id)) {
@@ -38,6 +64,8 @@ export function renderDetailView({
   const avg = getAvgRating(r.id);
   const avgCount = getRatingCount(r.id);
   const avgRounded = avg ? Math.round(avg) : 0; // 0..5
+
+  const focus0 = normalizeFocus(r.image_focus);
   const avgLabel = avg ? avg.toFixed(1) : "—";
   const lastStr = last
     ? new Date(last.at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })
@@ -106,8 +134,50 @@ export function renderDetailView({
 
         ${r.image_url ? `
           <div style="margin:.75rem 0;">
-            <img id="detailImg" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}"
-                 style="width:100%; max-height:260px; object-fit:contain; background:linear-gradient(135deg,#eef2ff,#f8fafc); border-radius:12px; display:block; cursor:zoom-in;" />
+            <div class="img-focus-frame">
+              <img id="detailImg" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}"
+                   style="width:100%; height:260px; object-fit:contain; object-position:50% 50%; background:linear-gradient(135deg,#eef2ff,#f8fafc); border-radius:12px; display:block;" />
+            </div>
+
+            <div class="row" style="justify-content:space-between; align-items:center; margin-top:.45rem;">
+              <button class="btn btn-ghost" id="imgFocusToggle" type="button">🖼️ Bild anpassen</button>
+              <span class="muted" id="imgFocusHint" style="font-size:.95rem;"></span>
+            </div>
+
+            <div id="imgFocusPanel" class="card" style="margin-top:.5rem; padding:.75rem; display:none;">
+              <div class="row" style="justify-content:space-between; gap:.75rem; flex-wrap:wrap;">
+                <label class="muted" style="display:flex; gap:.5rem; align-items:center;">
+                  Modus
+                  <select id="imgFocusMode" class="input" style="min-width:140px;">
+                    <option value="auto">Auto (ganzes Bild)</option>
+                    <option value="cover">Cover (Zuschnitt)</option>
+                  </select>
+                </label>
+                <label class="muted" style="display:flex; gap:.5rem; align-items:center;">
+                  Zoom
+                  <input id="imgFocusZoom" type="range" min="1" max="3" step="0.05" />
+                  <span id="imgFocusZoomVal" class="muted" style="min-width:3ch; text-align:right;"></span>
+                </label>
+              </div>
+
+              <div class="row" style="gap:.75rem; align-items:center; margin-top:.5rem; flex-wrap:wrap;">
+                <label class="muted" style="display:flex; gap:.5rem; align-items:center;">
+                  X
+                  <input id="imgFocusX" type="range" min="0" max="100" step="1" />
+                  <span id="imgFocusXVal" class="muted" style="min-width:3ch; text-align:right;"></span>
+                </label>
+                <label class="muted" style="display:flex; gap:.5rem; align-items:center;">
+                  Y
+                  <input id="imgFocusY" type="range" min="0" max="100" step="1" />
+                  <span id="imgFocusYVal" class="muted" style="min-width:3ch; text-align:right;"></span>
+                </label>
+              </div>
+
+              <div class="row" style="justify-content:flex-end; margin-top:.75rem; gap:.5rem;">
+                <button class="btn btn-ghost" id="imgFocusReset" type="button">Reset</button>
+                <button class="btn" id="imgFocusSave" type="button">Speichern</button>
+              </div>
+            </div>
           </div>
         ` : ""}
 
@@ -188,7 +258,93 @@ export function renderDetailView({
   // Image lightbox
   const img = qs(appEl, "#detailImg");
   if (img) {
+    // Apply stored focus/zoom to preview image
+    applyFocusToImg(img, r.image_focus);
+
+    // Focus controls
+    const toggle = qs(appEl, "#imgFocusToggle");
+    const panel = qs(appEl, "#imgFocusPanel");
+    const hint = qs(appEl, "#imgFocusHint");
+    const modeEl = qs(appEl, "#imgFocusMode");
+    const xEl = qs(appEl, "#imgFocusX");
+    const yEl = qs(appEl, "#imgFocusY");
+    const zoomEl = qs(appEl, "#imgFocusZoom");
+    const xVal = qs(appEl, "#imgFocusXVal");
+    const yVal = qs(appEl, "#imgFocusYVal");
+    const zVal = qs(appEl, "#imgFocusZoomVal");
+    const resetBtn = qs(appEl, "#imgFocusReset");
+    const saveBtn = qs(appEl, "#imgFocusSave");
+
+    const stateFocus = { ...focus0 };
+    const syncLabels = () => {
+      if (xVal) xVal.textContent = String(Math.round(stateFocus.x));
+      if (yVal) yVal.textContent = String(Math.round(stateFocus.y));
+      if (zVal) zVal.textContent = stateFocus.zoom.toFixed(2);
+      if (hint) hint.textContent = stateFocus.mode === "cover" ? "Zuschnitt: positionieren + zoomen" : "Auto: ganzes Bild";
+    };
+
+    const applyPreview = () => {
+      applyFocusToImg(img, stateFocus);
+      syncLabels();
+    };
+
+    if (modeEl) modeEl.value = stateFocus.mode;
+    if (xEl) xEl.value = String(stateFocus.x);
+    if (yEl) yEl.value = String(stateFocus.y);
+    if (zoomEl) zoomEl.value = String(stateFocus.zoom);
+    syncLabels();
+
+    toggle?.addEventListener("click", () => {
+      if (!panel) return;
+      panel.style.display = panel.style.display === "none" ? "block" : "none";
+      // small UX: when opening, switch to cover automatically if image is currently auto
+      if (panel.style.display !== "none" && stateFocus.mode === "auto") {
+        stateFocus.mode = "cover";
+        if (modeEl) modeEl.value = "cover";
+        applyPreview();
+      }
+    });
+
+    modeEl?.addEventListener("change", () => {
+      stateFocus.mode = modeEl.value === "cover" ? "cover" : "auto";
+      applyPreview();
+    });
+    xEl?.addEventListener("input", () => {
+      stateFocus.x = Number(xEl.value) || 50;
+      applyPreview();
+    });
+    yEl?.addEventListener("input", () => {
+      stateFocus.y = Number(yEl.value) || 50;
+      applyPreview();
+    });
+    zoomEl?.addEventListener("input", () => {
+      stateFocus.zoom = Math.max(1, Math.min(3, Number(zoomEl.value) || 1));
+      applyPreview();
+    });
+
+    resetBtn?.addEventListener("click", () => {
+      stateFocus.x = 50; stateFocus.y = 50; stateFocus.zoom = 1; stateFocus.mode = "auto";
+      if (modeEl) modeEl.value = "auto";
+      if (xEl) xEl.value = "50";
+      if (yEl) yEl.value = "50";
+      if (zoomEl) zoomEl.value = "1";
+      applyPreview();
+    });
+
+    saveBtn?.addEventListener("click", async () => {
+      if (typeof onUpdateRecipe !== "function") return;
+      const next = { ...r, image_focus: normalizeFocus(stateFocus) };
+      saveBtn.disabled = true;
+      try {
+        await onUpdateRecipe(next);
+        ack(saveBtn);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
     img.addEventListener("click", () => {
+      if (panel && panel.style.display !== "none") return;
       sheetRoot.innerHTML = `
         <div class="sheet-backdrop" id="imgBackdrop"></div>
         <div class="sheet" role="dialog" aria-modal="true">
@@ -234,7 +390,7 @@ export function renderDetailView({
     const ev = addCookEvent(r.id, { at: Date.now() });
     if (ev) pushCookEventToBackend(r.id, ev).catch(() => { });
     ack(qs(appEl, "#cookLogNowBtn"));
-    renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, addToShopping, rebuildPartsIndexSetter });
+    renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, onUpdateRecipe, addToShopping, rebuildPartsIndexSetter });
   });
 
   qsa(appEl, "[data-cook-rate]").forEach(btn => {
@@ -242,7 +398,7 @@ export function renderDetailView({
       e.preventDefault();
       e.stopPropagation();
       const rating = parseInt(btn.dataset.cookRate, 10);
-      openCookRatingDialog({ recipeId: r.id, rating, onDone: () => renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, addToShopping, rebuildPartsIndexSetter }) });
+      openCookRatingDialog({ recipeId: r.id, rating, onDone: () => renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, onUpdateRecipe, addToShopping, rebuildPartsIndexSetter }) });
     });
   });
 
@@ -259,7 +415,7 @@ export function renderDetailView({
 
       deleteCookEvent(r.id, id);
       requestAnimationFrame(() => {
-        renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, addToShopping, rebuildPartsIndexSetter });
+        renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, onUpdateRecipe, addToShopping, rebuildPartsIndexSetter });
       });
     });
   });
@@ -276,7 +432,7 @@ export function renderDetailView({
         ev,
         onSave: (patch) => {
           updateCookEvent(r.id, id, patch);
-          renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, addToShopping, rebuildPartsIndexSetter });
+          renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, onUpdateRecipe, addToShopping, rebuildPartsIndexSetter });
         }
       });
     });

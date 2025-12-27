@@ -61,6 +61,14 @@ header {
   color: white;
   user-select: none;
 }
+.badge-btn{
+  appearance: none;
+  background: rgba(255,255,255,0.18);
+  border: 1px solid rgba(255,255,255,0.25);
+  cursor: pointer;
+}
+.badge-btn:hover{ filter: brightness(1.06); }
+.badge-btn:active{ transform: translateY(1px); }
 .badge.badge--local{ background: rgba(255,255,255,0.16); }
 .badge.badge--cloud{ background: rgba(255,255,255,0.22); }
 /* .badge.badge--offline{ background: rgba(255,255,255,0.14); border-style:dashed; } */
@@ -417,6 +425,47 @@ ul li.muted {
   box-shadow: 0 4px 10px rgba(0,0,0,0.07);
   overflow: hidden;
   cursor: pointer;
+}
+
+.grid-media{
+  position: relative;
+  overflow: hidden;
+}
+
+.fav-overlay{
+  position: absolute;
+  right: .45rem;
+  bottom: .45rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.12);
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(6px);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.dark .fav-overlay{ background: rgba(20,20,20,0.65); border-color: rgba(255,255,255,0.16); color: var(--text); }
+.fav-overlay:hover{ filter: brightness(1.03); }
+.fav-overlay:active{ transform: translateY(1px); }
+
+.pending-overlay{
+  position: absolute;
+  left: .45rem;
+  bottom: .45rem;
+  z-index: 3;
+}
+
+.li-media{
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
 }
 
 .grid-img {
