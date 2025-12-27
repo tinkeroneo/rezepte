@@ -6,6 +6,7 @@ const KEYMAP = {
   theme: "tinkeroneo_theme_v1",
   use_backend: "tinkeroneo_use_backend_v1",
   radio_feature: "tinkeroneo_radio_feature_v1",
+  radio_consent: "tinkeroneo_radio_consent_v1",
   timer_ring_interval_ms: "tinkeroneo_timer_ring_interval_ms_v1",
   timer_max_ring_seconds: "tinkeroneo_timer_max_ring_seconds_v1",
   timer_step_highlight: "tinkeroneo_timer_step_highlight_v1",

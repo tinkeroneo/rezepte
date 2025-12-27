@@ -5,6 +5,7 @@ import { downloadJson } from "../services/exportDownload.js";
 import { buildCookStatsByRecipeId } from "../domain/cooklog.js";
 import { isFavorite, toggleFavorite } from "../domain/favorites.js";
 import { getTagColors } from "../domain/tagColors.js";
+import { getColorForCategory } from "../domain/categories.js";
 
 
 
@@ -63,6 +64,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
               <select id="tagFilter">
                 <option value="">Alle Tags</option>
               </select>
+
+              <button class="btn btn-ghost" id="pendingToggle" type="button" style="display:none;"></button>
 
               <select id="sortSelect">
                 <option value="new">Neueste zuerst</option>
@@ -139,6 +142,24 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   // init UI state
   catEl.value = cat;
   tagEl.value = tag;
+  const pendingBtn = qs("#pendingToggle", appEl);
+  const pendingCount = recipes.filter(r => r._pending).length;
+  if (pendingBtn) {
+    if (pendingCount > 0) {
+      pendingBtn.style.display = "";
+      const on = !!(state.ui && state.ui.pendingOnly);
+      pendingBtn.textContent = on ? `⏳ ${pendingCount} (nur offene)` : `⏳ ${pendingCount}`;
+      pendingBtn.classList.toggle("active", on);
+      pendingBtn.onclick = () => {
+        state.ui = state.ui || {};
+        state.ui.pendingOnly = !state.ui.pendingOnly;
+        window.dispatchEvent(new window.CustomEvent("tinkeroneo:rerender"));
+      };
+    } else {
+      pendingBtn.style.display = "none";
+    }
+  }
+
   sortEl.value = sort;
 
   // build tag options
@@ -293,17 +314,20 @@ const mealOrder = (r) => {
     return list;
   }
   function catAccent(category) {
+    // Admin-configured category colors have priority
+    const cfg = getColorForCategory(category);
+    if (cfg) return cfg;
+
     const c = String(category ?? "").trim().toLowerCase();
 
-    // bewusst gedeckte Töne (nicht penetrant)
-    if (c.includes("früh") || c.includes("breakfast")) return "rgba(47, 133, 90, 0.55)";      // grün
-    if (c.includes("nacht") || c.includes("dessert") || c.includes("sweet")) return "rgba(214, 125, 60, 0.55)"; // warm orange
-    if (c.includes("getränk") || c.includes("drink")) return "rgba(66, 153, 225, 0.55)";     // blau
-    if (c.includes("snack")) return "rgba(159, 122, 234, 0.55)";                              // lila
-    if (c.includes("haupt") || c.includes("mittag") || c.includes("abend") || c.includes("dinner")) return "rgba(75, 85, 99, 0.45)"; // grau
-
-    // fallback
-    return "rgba(0,0,0,0.10)";
+    // fallback palette (gedeckt)
+    if (c.includes("früh") || c.includes("breakfast")) return "rgb(255, 214, 140)";
+    if (c.includes("mittag") || c.includes("lunch")) return "rgb(208, 232, 186)";
+    if (c.includes("abend") || c.includes("dinner")) return "rgb(180, 205, 255)";
+    if (c.includes("snack")) return "rgb(231, 212, 255)";
+    if (c.includes("dessert") || c.includes("süß")) return "rgb(255, 201, 225)";
+    if (c.includes("drink") || c.includes("getränk")) return "rgb(180, 232, 255)";
+    return "rgb(210, 225, 220)";
   }
 
   
@@ -347,7 +371,7 @@ function renderResults() {
                 }
                 <div class="grid-body">
                   <div class="grid-title" style="display:flex; justify-content:space-between; gap:.5rem;">
-                    <span>${escapeHtml(r.title)}</span>
+                    <span>${escapeHtml(r.title)}</span>${r._pending ? `<span class="pill pill-warn" title="Wartet auf Sync">⏳</span>` : ``}
                     <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
                   </div>
                   <div class="grid-meta">
@@ -374,7 +398,7 @@ function renderResults() {
             }
             <div class="grid-body">
               <div class="grid-title" style="display:flex; justify-content:space-between; gap:.5rem;">
-                <span>${escapeHtml(r.title)}</span>
+                <span>${escapeHtml(r.title)}</span>${r._pending ? `<span class="pill pill-warn" title="Wartet auf Sync">⏳</span>` : ``}
                 <button class="btn btn-ghost fav-btn" data-fav="${escapeHtml(r.id)}" title="Favorit">${isFavorite(r.id) ? "★" : "☆"}</button>
               </div>
               <div class="grid-meta">
@@ -392,7 +416,7 @@ function renderResults() {
         resultsEl.innerHTML = `
           <div class="list">
             ${filtered.map(r => `
-              <div class="list-item" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
+              <div class="list-item" data-id="${escapeHtml(r.id)}" data-category="${escapeHtml(r.category || "")}" style="--cat-accent:${catAccent(r.category)}">
                 <div class="li-left">
                   ${r.image_url
                     ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
@@ -788,6 +812,22 @@ function renderResults() {
     });
 
     refreshHint();
+  }
+
+  // Live update of category accents when colors are changed in Admin
+  try {
+    if (window.__tinkeroneoCatColorsHandler) {
+      window.removeEventListener("category-colors-changed", window.__tinkeroneoCatColorsHandler);
+    }
+    window.__tinkeroneoCatColorsHandler = () => {
+      document.querySelectorAll(".list-item[data-category]").forEach((el) => {
+        const catVal = el.getAttribute("data-category") || "";
+        el.style.setProperty("--cat-accent", catAccent(catVal));
+      });
+    };
+    window.addEventListener("category-colors-changed", window.__tinkeroneoCatColorsHandler);
+  } catch {
+    // ignore
   }
 
 }

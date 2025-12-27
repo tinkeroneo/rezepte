@@ -30,20 +30,20 @@ import { renderDiagnosticsView } from "./views/diagnostics.view.js";
 import { renderTimersOverlay } from "./views/timers.view.js";
 import { renderLoginView } from "./views/login.view.js";
 
+import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds } from "./domain/offlineQueue.js";
+
 import { initRadioDock } from "./ui/radioDock.js";
 import { Wake } from "./services/wakeLock.js";
-import { KEYS, lsGetStr, lsSetStr, setStorageScope } from "./storage.js";
+import { KEYS, lsGetStr, lsSetStr } from "./storage.js";
 import { installGlobalErrorHandler } from "./services/errors.js";
 import { getRecentErrors, clearRecentErrors } from "./services/errors.js";
 import { runExclusive } from "./services/locks.js";
-import { ensureRadioDock } from "./services/radio.js";
 
 /* =========================
    CONFIG / STATE
 ========================= */
 
 const DEFAULT_USE_BACKEND = true;
-ensureRadioDock();
 
 function readUseBackend() {
   const v = lsGetStr(KEYS.USE_BACKEND, "");
@@ -68,6 +68,28 @@ function readWinter() {
 }
 function setWinter(on) {
   lsSetStr(KEYS.WINTER, on ? "1" : "0");
+}
+
+// Radio (feature + consent)
+function readRadioFeature() {
+  const v = lsGetStr(KEYS.RADIO_FEATURE, "");
+  if (v === "1") return true;
+  if (v === "0") return false;
+  return true; // default ON
+}
+function setRadioFeature(on) {
+  lsSetStr(KEYS.RADIO_FEATURE, on ? "1" : "0");
+  window.dispatchEvent(new window.Event("tinkeroneo:radioFeatureChanged"));
+}
+function readRadioConsent() {
+  const v = lsGetStr(KEYS.RADIO_CONSENT, "");
+  if (v === "1") return true;
+  if (v === "0") return false;
+  return false;
+}
+function clearRadioConsent() {
+  lsSetStr(KEYS.RADIO_CONSENT, "0");
+  window.dispatchEvent(new window.Event("tinkeroneo:radioFeatureChanged"));
 }
 
 // Timer settings (ring + step highlight)
@@ -164,6 +186,11 @@ window.__tinkeroneoSettings = {
   readWinter,
   setWinter: (on) => setWinter(on),
 
+  readRadioFeature,
+  setRadioFeature: (on) => setRadioFeature(on),
+  readRadioConsent,
+  clearRadioConsent,
+
   readTimerRingIntervalMs,
   setTimerRingIntervalMs,
 
@@ -255,14 +282,24 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
 
   const sync = document.getElementById("syncBadge");
   if (sync) {
-    sync.hidden = !syncing && !syncError && navigator.onLine;
+    const pending = (getOfflineQueue?.() || []).length;
+    const showPending = navigator.onLine && !syncing && !syncError && pending > 0;
+
+    // Visible when syncing, error, offline, or pending actions exist
+    sync.hidden = !syncing && !syncError && navigator.onLine && pending === 0;
 
     if (!navigator.onLine) {
-      // optional: show offline badge
+      sync.textContent = "OFFLINE";
+      sync.classList.add("badge--warn");
+      sync.classList.remove("badge--ok", "badge--bad");
     } else if (syncError) {
       sync.textContent = "SYNC";
       sync.classList.add("badge--bad");
       sync.classList.remove("badge--ok", "badge--warn");
+    } else if (showPending) {
+      sync.textContent = `PENDING ${pending}`;
+      sync.classList.add("badge--warn");
+      sync.classList.remove("badge--ok", "badge--bad");
     } else {
       sync.textContent = "⟳";
       sync.classList.add("badge--ok");
@@ -287,7 +324,12 @@ function setParts(newParts) {
 async function loadAll() {
   if (!recipeRepo) rebuildRecipeRepo(useBackend);
 
-  recipes = await recipeRepo.getAll();
+  const pendingIds = getPendingRecipeIds?.() || new Set();
+  recipes = (await recipeRepo.getAll()).map((r) => ({
+    ...r,
+    _pending: pendingIds.has(r.id),
+  }));
+
 
   if (!useBackend) {
     setParts([]);
@@ -317,8 +359,8 @@ async function render(view, setView) {
     console.log("RENDER LOGIN VIEW");
 
     const info = {
-      // IMPORTANT: redirect should point to the actual index.html in dev
-      redirectTo: location.origin + location.pathname,
+      // redirect should always land on index.html (avoid directory listing)
+      redirectTo: new URL("index.html", location.href).toString().replace(/#.*$/, ""),
       debug: `origin=${location.origin}\npath=${location.pathname}\nhash=${location.hash}`,
     };
     return renderLoginView({ appEl, state: view, setView, info });
@@ -500,20 +542,14 @@ async function boot() {
   if (useBackend) {
     try {
       const ctx = await initAuthAndSpace();
-      // Privacy: scope local storage per user+space. If not logged in, isolate.
-      setStorageScope({ userId: ctx?.userId || null, spaceId: ctx?.spaceId || null });
+      if (ctx?.userId || ctx?.spaceId) {
+        setOfflineQueueScope({ userId: ctx.userId || null, spaceId: ctx.spaceId || null });
+      }
       if (!ctx?.spaceId) {
         router.setView({ name: "login" });
-      } else {
-        // If we came from a login route/hash, jump into the app after auth succeeds.
-        const v = router.getView();
-        if (v?.name === "login") {
-          router.setView({ name: "list", selectedId: null, q: "" });
-        }
       }
     } catch (e) {
       console.error("Auth/Space init failed:", e);
-      setStorageScope({ userId: null, spaceId: null });
       router.setView({ name: "login" });
     }
   }
