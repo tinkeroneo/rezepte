@@ -580,6 +580,12 @@ function requireSpace() {
   }
 }
 
+function requireSession() {
+  if (!_session || !_session.access_token) {
+    throw new Error("Not authenticated. Please log in again.");
+  }
+}
+
 function sbHeaders() {
   if (!_session?.access_token) {
     throw new Error("Not authenticated");
@@ -829,6 +835,7 @@ export async function logClientEvent(evt) {
 
 export async function uploadRecipeImage(file, recipeId) {
   requireSpace();
+  requireSession();
 
   if (!file) throw new Error("Kein File ausgewählt.");
   if (file.type && !ALLOWED_IMAGE_TYPES.has(file.type)) {
@@ -846,27 +853,30 @@ export async function uploadRecipeImage(file, recipeId) {
       ? "webp"
       : "jpg");
 
-  const path = `${_spaceId}/${recipeId}-${Date.now()}.${ext}`;
+  const signRes = await sbFetch(`${SUPABASE_URL}/functions/v1/sign-upload`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${_session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      spaceId: _spaceId,
+      recipeId,
+      ext,
+      contentType: file.type || "application/octet-stream",
+    }),
+  });
 
-  const signRes = await sbFetch(
-    `${SUPABASE_URL}/functions/v1/sign-upload`,
-    {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        path,
-        contentType: file.type || "application/octet-stream",
-      }),
-    }
-  );
-
-  if (!signRes.ok)
+  if (!signRes.ok) {
     throw new Error(`sign-upload failed: ${await signRes.text()}`);
+  }
 
-  const { signedUrl } = await signRes.json();
+  const { signedUrl, path } = await signRes.json();
+
+  if (!signedUrl || !path) {
+    throw new Error("sign-upload: Antwort unvollständig (signedUrl/path fehlt).");
+  }
 
   const upRes = await sbFetch(signedUrl, {
     method: "PUT",
@@ -875,8 +885,8 @@ export async function uploadRecipeImage(file, recipeId) {
     body: file,
   });
 
-  if (!upRes.ok)
-    throw new Error(`upload failed: ${await upRes.text()}`);
+  if (!upRes.ok) throw new Error(`upload failed: ${await upRes.text()}`);
 
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
 }
+
