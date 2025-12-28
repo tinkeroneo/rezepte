@@ -12,7 +12,8 @@ import {
   updateCookEvent,
   deleteCookEvent,
   pullCookEventsFromBackend,
-  pushCookEventToBackend
+  pushCookEventToBackend,
+  removeCookEventFromBackend
 } from "../domain/cooklog.js";
 
 const __pulledCookEvents = new Set(); // recipeId
@@ -414,6 +415,12 @@ export function renderDetailView({
       if (row) row.remove();
 
       deleteCookEvent(r.id, id);
+
+      // Keep backend in sync (otherwise the next pull will restore the old entry)
+      if (useBackend) {
+        removeCookEventFromBackend(id).catch(() => { });
+      }
+
       requestAnimationFrame(() => {
         renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, onUpdateRecipe, addToShopping, rebuildPartsIndexSetter });
       });
@@ -432,6 +439,13 @@ export function renderDetailView({
         ev,
         onSave: (patch) => {
           updateCookEvent(r.id, id, patch);
+
+          // Push updated entry to backend so edits (date/time, rating, note) persist
+          if (useBackend) {
+            const updated = listCookEvents(r.id).find(x => x.id === id);
+            if (updated) pushCookEventToBackend(r.id, updated).catch(() => { });
+          }
+
           renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, onUpdateRecipe, addToShopping, rebuildPartsIndexSetter });
         }
       });
@@ -720,7 +734,18 @@ function openEditCookEventDialog({ ev, onSave }) {
   sheet.querySelector("#ceClose").addEventListener("click", close);
   sheet.querySelector("#ceSave").addEventListener("click", () => {
     const atStr = sheet.querySelector("#ceAt").value;
-    const at = atStr ? new Date(atStr).getTime() : ev.at;
+    // datetime-local returns "YYYY-MM-DDTHH:mm" (no timezone). Parse as local time
+    const at = (() => {
+      if (!atStr) return ev.at;
+      const m = String(atStr).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+      if (!m) return ev.at;
+      const y = parseInt(m[1], 10);
+      const mo = parseInt(m[2], 10) - 1;
+      const d = parseInt(m[3], 10);
+      const hh = parseInt(m[4], 10);
+      const mm = parseInt(m[5], 10);
+      return new Date(y, mo, d, hh, mm, 0, 0).getTime();
+    })();
     const ratingStr = sheet.querySelector("#ceRating").value;
     const rating = ratingStr ? parseInt(ratingStr, 10) : null;
     const note = sheet.querySelector("#ceNote").value || "";
