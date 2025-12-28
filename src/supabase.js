@@ -743,13 +743,11 @@ export async function removeRecipePart(parentId, childId) {
 
 export async function listCookEventsSb(recipeId) {
   requireSpace();
-  const clientId = getClientId();
   const url =
     `${SUPABASE_URL}/rest/v1/cook_events?space_id=eq.${encodeURIComponent(
       _spaceId
     )}` +
     `&recipe_id=eq.${encodeURIComponent(recipeId)}` +
-    `&client_id=eq.${encodeURIComponent(clientId)}` +
     `&order=at.desc`;
 
   const res = await sbFetch(url, { headers: sbHeaders() });
@@ -786,20 +784,16 @@ export async function upsertCookEventSb(ev) {
 
 export async function deleteCookEventSb(id) {
   requireSpace();
-  const clientId = getClientId();
   const url =
     `${SUPABASE_URL}/rest/v1/cook_events?id=eq.${encodeURIComponent(
       id
-    )}&space_id=eq.${encodeURIComponent(
-      _spaceId
-    )}&client_id=eq.${encodeURIComponent(clientId)}`;
+    )}&space_id=eq.${encodeURIComponent(_spaceId)}`;
 
   const res = await sbFetch(url, { method: "DELETE", headers: sbHeaders() });
   if (!res.ok)
     throw new Error(
       `deleteCookEvent failed: ${res.status} ${await sbJson(res)}`
     );
-  return true;
 }
 
 /* =========================
