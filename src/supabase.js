@@ -305,22 +305,48 @@ export async function initAuthAndSpace() {
   }
 
   // 3.5) Load user (email) and fetch pending invites (confirmation happens in UI)
-  _user = await fetchCurrentUser(_session.access_token);
-  const pendingInvites = await fetchMyInvites({
-    access_token: _session.access_token,
-    email: _user?.email,
-  });
+  // Be resilient: if network is unavailable, keep the local session so the app
+  // can still run in LOCAL mode and not "bounce" to Login on refresh.
+  let pendingInvites = [];
+  try {
+    _user = await fetchCurrentUser(_session.access_token);
+    pendingInvites = await fetchMyInvites({
+      access_token: _session.access_token,
+      email: _user?.email,
+    });
+  } catch (e) {
+    // keep _session; just mark user/space unknown for now
+    _user = null;
+    _spaceId = null;
+    return {
+      session: _session,
+      user: null,
+      userId: null,
+      spaceId: null,
+      pendingInvites: [],
+      offline: true,
+    };
+  }
 
   // 4) Resolve space (respect stored active space per user)
   try {
     _spaceId = await resolveSpaceId({ access_token: _session.access_token, userId: _user?.id });
   } catch (e) {
-    // New users may have no membership yet -> provision a private default space.
     const msg = String(e?.message || e || "");
+    // New users may have no membership yet -> provision a private default space.
     if (msg.includes("No space assigned")) {
       _spaceId = await provisionDefaultSpace({ access_token: _session.access_token, userId: _user?.id });
     } else {
-      throw e;
+      // Network / transient errors: don't force a logout.
+      _spaceId = null;
+      return {
+        session: _session,
+        user: _user,
+        userId: _user?.id || null,
+        spaceId: null,
+        pendingInvites,
+        offline: true,
+      };
     }
   }
 

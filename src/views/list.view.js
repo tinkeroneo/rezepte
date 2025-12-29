@@ -271,6 +271,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
 
     // 1) filtern
     let list = recipes.filter(r => {
+      // optional: show only unsynced (pending) recipes
+      if (state?.ui?.pendingOnly && !r._pending) return false;
       if (cat && (r.category ?? "") !== cat) return false;
       if (tag) {
         const rt = Array.isArray(r.tags) ? r.tags : [];

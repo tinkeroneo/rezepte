@@ -1,9 +1,12 @@
 // src/views/login.view.js
-console.log("LOGIN VIEW LOADED");
-
-import { requestMagicLink, logout } from "../supabase.js";
+import { requestMagicLink, logout, isAuthenticated } from "../supabase.js";
 
 export function renderLoginView({ appEl, state, setView, info }) {
+  // If we already have a session, don't show login again.
+  if (isAuthenticated?.()) {
+    setView({ name: "list", selectedId: null, q: state?.q });
+    return;
+  }
   const emailPrefill = info?.emailPrefill || "";
 
   const suggested = info?.redirectTo || defaultRedirectToIndex();
@@ -16,36 +19,23 @@ export function renderLoginView({ appEl, state, setView, info }) {
         <button class="btn" id="btnBack" type="button">← Zurück</button>
       </header>
 
-      <div class="card">
-        <h2>Magic Link</h2>
-        <p class="muted">
-          Du bekommst einen Login-Link per E-Mail. Danach landest du wieder hier und bist eingeloggt.
-        </p>
+      <div class="container">
+        <div class="card">
+          <h2>Magic Link</h2>
+          <p class="muted">Du bekommst einen Login-Link per E-Mail. Danach bist du eingeloggt.</p>
 
-        <label class="field">
-          <div class="label">E-Mail</div>
-          <input id="email" type="email" placeholder="name@example.com" value="${escapeHtml(emailPrefill)}" />
-        </label>
+          <label class="field">
+            <div class="label">E-Mail</div>
+            <input id="email" type="email" placeholder="name@example.com" value="${escapeHtml(emailPrefill)}" />
+          </label>
 
-        <label class="field">
-          <div class="label">Redirect URL</div>
-          <input id="redirect" type="text" value="${escapeHtml(suggested)}" />
-          <div class="hint">
-            Muss in Supabase → Auth → URL Configuration → <b>Additional Redirect URLs</b> erlaubt sein.
+          <div class="row">
+            <button class="btn primary" id="btnSend" type="button">Magic Link senden</button>
+            <button class="btn" id="btnLogout" type="button">Logout</button>
           </div>
-        </label>
 
-        <div class="row">
-          <button class="btn primary" id="btnSend" type="button">Magic Link senden</button>
-          <button class="btn" id="btnLogout" type="button">Logout (lokal)</button>
+          <div id="msg" class="msg"></div>
         </div>
-
-        <div id="msg" class="msg"></div>
-
-        <details class="details">
-          <summary>Debug</summary>
-          <pre class="pre">${escapeHtml(buildDebugText(info))}</pre>
-        </details>
       </div>
     </div>
   `;
@@ -69,16 +59,9 @@ export function renderLoginView({ appEl, state, setView, info }) {
 
   $("#btnSend")?.addEventListener("click", async () => {
     const email = ($("#email").value || "").trim();
-    const redirectTo = ($("#redirect").value || "").trim();
+    const redirectTo = suggested;
 
     if (!email) return setMsg("Bitte E-Mail eingeben.", "bad");
-    if (!redirectTo) return setMsg("Bitte Redirect URL setzen.", "bad");
-
-    // basic sanity: must be http(s)
-    if (!/^https?:\/\//i.test(redirectTo)) {
-      return setMsg("Redirect URL muss mit http:// oder https:// beginnen.", "bad");
-    }
-
     // Make sure it points to index.html when using Live Server folder URLs
     const normalizedRedirect = normalizeRedirectToIndexHtml(redirectTo);
 

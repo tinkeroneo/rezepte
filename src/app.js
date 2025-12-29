@@ -365,13 +365,11 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
 
   const authBtn = document.getElementById("authBadge");
   if (authBtn) {
-    const authed = useBackend && isAuthenticated?.();
+    const authed = isAuthenticated?.();
     authBtn.textContent = authed ? "LOGOUT" : "LOGIN";
     authBtn.classList.toggle("badge--ok", authed);
     authBtn.classList.toggle("badge--warn", !authed);
-    authBtn.title = useBackend
-      ? (authed ? "Abmelden" : "Anmelden per Magic Link")
-      : "Für Login/Sharing: erst auf CLOUD umschalten";
+    authBtn.title = authed ? "Abmelden" : (useBackend ? "Anmelden per Magic Link" : "Für Login/Sharing: erst auf CLOUD umschalten");
   }
 
   const sync = document.getElementById("syncBadge");
@@ -409,8 +407,8 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
   // Space selector (only meaningful in CLOUD + authed)
   const spaceSel = document.getElementById("spaceSelect");
   if (spaceSel) {
-    const authed = useBackend && isAuthenticated?.();
-    spaceSel.hidden = !authed || !Array.isArray(mySpaces) || mySpaces.length <= 1;
+    const authed = isAuthenticated?.();
+    spaceSel.hidden = !authed || !Array.isArray(mySpaces) || mySpaces.length === 0;
   }
 }
 
@@ -436,11 +434,26 @@ async function refreshSpaceSelect() {
   })();
   const active = String(ctx?.spaceId || "");
 
-  if (!Array.isArray(mySpaces) || mySpaces.length <= 1) {
+  if (!Array.isArray(mySpaces) || mySpaces.length === 0) {
     sel.innerHTML = "";
     sel.hidden = true;
     return;
   }
+
+  // Show the current space even if there is only one (better UX than an empty/hidden selector)
+  if (mySpaces.length === 1) {
+    const s = mySpaces[0];
+    const sid = String(s?.space_id || "");
+    const name = String(s?.name || sid);
+    const role = String(s?.role || "viewer");
+    const esc = (x) => String(x).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    sel.innerHTML = `<option value="${esc(sid)}" selected>${esc(`${name} (${role})`)}</option>`;
+    sel.disabled = true;
+    sel.hidden = false;
+    return;
+  }
+
+  sel.disabled = false;
 
   sel.innerHTML = mySpaces
     .map(s => {
@@ -760,18 +773,22 @@ async function boot() {
   if (authBtn && !authBtn.__installed) {
     authBtn.__installed = true;
     authBtn.addEventListener("click", async () => {
-      // If we're local-only, switch to cloud and open login.
-      if (!useBackend) {
-        await setUseBackend(true);
-        router.setView({ name: "login" });
+      const authed = isAuthenticated?.();
+
+      // If already authenticated, allow logout regardless of LOCAL/CLOUD.
+      if (authed) {
+        try { sbLogout(); } catch { /* ignore */ }
         updateHeaderBadges();
+        router.setView({ name: "login" });
         return;
       }
 
-      // Cloud enabled: toggle auth
-      if (isAuthenticated?.()) {
-        sbLogout();
+      // Not authenticated:
+      // If we're local-only, switch to cloud and open login.
+      if (!useBackend) {
+        await setUseBackend(true);
       }
+
       router.setView({ name: "login" });
       updateHeaderBadges();
     });
@@ -798,7 +815,9 @@ async function boot() {
     });
   }
 
-  // Now that router exists, we can route to login safely
+  // Now that router exists, we can init auth.
+  // Important: do NOT bounce users to Login just because network/RLS is temporarily failing.
+  // We keep LOCAL usable offline and keep auth tokens in storage.
   if (useBackend) {
     try {
       const ctx = await initAuthAndSpace();
@@ -809,14 +828,26 @@ async function boot() {
       if (Array.isArray(ctx?.pendingInvites) && ctx.pendingInvites.length) {
         window.__tinkeroneoPendingInvites = ctx.pendingInvites;
         router.setView({ name: "invites" });
-      } else if (!ctx?.spaceId) {
+      } else if (!ctx?.spaceId && !isAuthenticated?.()) {
         router.setView({ name: "login" });
+      } else if (!ctx?.spaceId && isAuthenticated?.()) {
+        // Session ok but space unresolved => stay usable in LOCAL
+        try { await setUseBackend(false); } catch { /* ignore */ }
       }
 
       await refreshSpaceSelect();
     } catch (e) {
       console.error("Auth/Space init failed:", e);
-      router.setView({ name: "login" });
+      // If offline or backend hiccup: fall back to LOCAL but keep session.
+      try {
+        if (!navigator.onLine) {
+          await setUseBackend(false);
+        }
+      } catch { /* ignore */ }
+      // Only force login when we truly have no session.
+      if (!isAuthenticated?.()) {
+        router.setView({ name: "login" });
+      }
     }
   }
 
