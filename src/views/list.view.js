@@ -16,7 +16,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   const tagChip = (t) => {
     const col = tagColors[t];
     const style = col ? `style="border-color:${escapeHtml(col)}; background:${escapeHtml(col)}22; color:${escapeHtml(col)}"` : "";
-    return `<span class="chip tag-chip" ${style}>#${escapeHtml(t)}</span>`;
+    return `<span class="badge badge--tag" ${style}>#${escapeHtml(t)}</span>`;
   };
 
   const coverEmoji = (r) => {
@@ -60,9 +60,9 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
       <div class="topbar">
         <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
           <input id="q" type="search" placeholder="Suche… (z.B. Bohnen, scharf, Frühstück)" value="${escapeHtml(state.q)}" />
-          <button class="btn btn-ghost" id="shoppingBtn" type="button" title="Einkaufsliste">🧺</button>
-          <button class="btn btn-ghost" id="exportOpenBtn">Export</button>
-          <button class="btn btn-ghost" id="importBtn">Import</button>
+          <button class="btn btn--ghost" id="shoppingBtn" type="button" title="Einkaufsliste">🧺</button>
+          <button class="btn btn--ghost" id="exportOpenBtn">Export</button>
+          <button class="btn btn--ghost" id="importBtn">Import</button>
 
         </div>
       </div>
@@ -81,7 +81,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
                 <option value="">Alle Tags</option>
               </select>
 
-              <button class="btn btn-ghost" id="pendingToggle" type="button" style="display:none;"></button>
+              <button class="btn btn--ghost" id="pendingToggle" type="button" style="display:none;"></button>
 
               <select id="sortSelect">
                 <option value="new">Neu/Alt</option>
@@ -91,15 +91,15 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
                 <option value="bestRated">Bewertung</option>
 
               </select>
-              <button class="btn btn-ghost" id="sortDirBtn" type="button" title="Sortierung umkehren">↑</button>
-              <button class="btn btn-ghost" id="resetFilters" type="button" title="Filter zurücksetzen">↺</button>
+              <button class="btn btn--ghost" id="sortDirBtn" type="button" title="Sortierung umkehren">↑</button>
+              <button class="btn btn--ghost" id="resetFilters" type="button" title="Filter zurücksetzen">↺</button>
             </div>
 
           </div>
 
-          <div class="toggle" aria-label="Ansicht umschalten">
-            <button id="modeList" type="button">Liste</button>
-            <button id="modeGrid" type="button">Grid</button>
+          <div class="seg" aria-label="Ansicht umschalten">
+            <button class="seg__btn" id="modeList" type="button">Liste</button>
+            <button class="seg__btn" id="modeGrid" type="button">Grid</button>
           </div>
 
           <input
@@ -141,8 +141,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   const modeGridBtn = qs(appEl, "#modeGrid");
 
   const applyModeButtons = () => {
-    modeListBtn.classList.toggle("active", viewMode === "list");
-    modeGridBtn.classList.toggle("active", viewMode === "grid");
+    modeListBtn.classList.toggle("is-active", viewMode === "list");
+    modeGridBtn.classList.toggle("is-active", viewMode === "grid");
   };
   const catEl = qs(appEl, "#catFilter");
   const tagEl = qs(appEl, "#tagFilter");
@@ -179,7 +179,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
       pendingBtn.style.display = "";
       const on = !!(state.ui && state.ui.pendingOnly);
       pendingBtn.textContent = on ? `⏳ ${pendingCount} (nur offene)` : `⏳ ${pendingCount}`;
-      pendingBtn.classList.toggle("active", on);
+      pendingBtn.classList.toggle("is-active", on);
       pendingBtn.onclick = () => {
         state.ui = state.ui || {};
         state.ui.pendingOnly = !state.ui.pendingOnly;
@@ -619,7 +619,7 @@ function renderResults() {
         <div class="muted">Wähle Rezepte & Format</div>
         <div class="muted">Basis: ${safeList.length} sichtbare Rezepte</div>
       </div>
-      <button class="btn btn-ghost" id="exportCloseBtn">Schließen</button>
+      <button class="btn btn--ghost" id="exportCloseBtn">Schließen</button>
     </div>
 
     <hr />
@@ -628,8 +628,8 @@ function renderResults() {
       <div class="row" style="justify-content:space-between;">
         <div style="font-weight:800;">Rezepte</div>
         <div class="row" style="gap:.5rem;">
-          <button class="btn btn-ghost" id="exportSelectAllBtn">Alle</button>
-          <button class="btn btn-ghost" id="exportSelectNoneBtn">Keine</button>
+          <button class="btn btn--ghost" id="exportSelectAllBtn">Alle</button>
+          <button class="btn btn--ghost" id="exportSelectNoneBtn">Keine</button>
         </div>
       </div>
       
@@ -660,7 +660,7 @@ function renderResults() {
 
     <div class="row" style="justify-content:space-between;">
       <div class="muted" id="exportCountHint">${safeList.length} ausgewählt</div>
-      <button class="btn btn-primary" id="exportDoBtn">Export starten</button>
+      <button class="btn btn--solid" id="exportDoBtn">Export starten</button>
     </div>
   `;
 
@@ -746,7 +746,7 @@ function renderResults() {
         <h3 style="margin:0;">Import</h3>
         <div class="muted">${useBackendFlag ? "Ziel: Supabase (Backend) + Local Cache" : "Ziel: nur Local Storage"}</div>
       </div>
-      <button class="btn btn-ghost" id="impClose">Schließen</button>
+      <button class="btn btn--ghost" id="impClose">Schließen</button>
     </div>
 
     <hr />
@@ -754,7 +754,7 @@ function renderResults() {
     <div class="card" style="padding:.85rem;">
       <div style="font-weight:800; margin-bottom:.35rem;">Quelle</div>
       <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-        <button class="btn btn-ghost" id="impPickFile">JSON-Datei wählen</button>
+        <button class="btn btn--ghost" id="impPickFile">JSON-Datei wählen</button>
         <span class="muted" id="impFileName"></span>
       </div>
 
@@ -782,7 +782,7 @@ function renderResults() {
 
     <div class="row" style="justify-content:space-between;">
       <div class="muted" id="impHint">0 Einträge erkannt</div>
-      <button class="btn btn-primary" id="impDo">Import starten</button>
+      <button class="btn btn--solid" id="impDo">Import starten</button>
     </div>
   `;
 

@@ -109,13 +109,13 @@ function clearRadioConsent() {
 function readTimerRingIntervalMs() {
   const raw = lsGetStr(KEYS.TIMER_RING_INTERVAL_MS, "");
   const n = Number(raw);
-  if (!Number.isFinite(n)) return 125;
-  return Math.max(125, Math.min(5000, Math.round(n)));
+  if (!Number.isFinite(n)) return 2800;
+  return Math.max(250, Math.min(10000, Math.round(n)));
 }
 function setTimerRingIntervalMs(ms) {
   const n = Number(ms);
   if (!Number.isFinite(n)) return;
-  const clamped = Math.max(125, Math.min(5000, Math.round(n)));
+  const clamped = Math.max(250, Math.min(10000, Math.round(n)));
   lsSetStr(KEYS.TIMER_RING_INTERVAL_MS, String(clamped));
 }
 
@@ -141,6 +141,48 @@ function readTimerStepHighlight() {
 function setTimerStepHighlight(on) {
   lsSetStr(KEYS.TIMER_STEP_HIGHLIGHT, on ? "1" : "0");
 }
+
+// Timer sound settings
+function readTimerSoundEnabled() {
+  const raw = lsGetStr(KEYS.TIMER_SOUND_ENABLED, "");
+  if (raw === "0") return false;
+  if (raw === "1") return true;
+  return true; // default ON
+}
+function setTimerSoundEnabled(on) {
+  lsSetStr(KEYS.TIMER_SOUND_ENABLED, on ? "1" : "0");
+  window.dispatchEvent(new window.Event("tinkeroneo:timerSoundChanged"));
+}
+
+function readTimerSoundId() {
+  const raw = lsGetStr(KEYS.TIMER_SOUND_ID, "");
+  const v = String(raw || "").trim();
+  if (!v) return "gong"; // default
+  const allowed = new Set(["gong", "wood", "pulse", "bowl"]);
+  return allowed.has(v) ? v : "gong";
+}
+function setTimerSoundId(id) {
+  const v = String(id || "").trim();
+  const allowed = new Set(["gong", "wood", "pulse", "bowl"]);
+  const safe = allowed.has(v) ? v : "gong";
+  lsSetStr(KEYS.TIMER_SOUND_ID, safe);
+  window.dispatchEvent(new window.Event("tinkeroneo:timerSoundChanged"));
+}
+
+function readTimerSoundVolume() {
+  const raw = lsGetStr(KEYS.TIMER_SOUND_VOLUME, "");
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0.7;
+  return Math.max(0, Math.min(1, n));
+}
+function setTimerSoundVolume(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return;
+  const clamped = Math.max(0, Math.min(1, n));
+  lsSetStr(KEYS.TIMER_SOUND_VOLUME, String(clamped));
+  window.dispatchEvent(new window.Event("tinkeroneo:timerSoundChanged"));
+}
+
 
 let useBackend = readUseBackend();
 let recipeRepo = null;
@@ -222,6 +264,15 @@ window.__tinkeroneoSettings = {
 
   readTimerStepHighlight,
   setTimerStepHighlight,
+
+  readTimerSoundEnabled,
+  setTimerSoundEnabled,
+
+  readTimerSoundId,
+  setTimerSoundId,
+
+  readTimerSoundVolume,
+  setTimerSoundVolume,
 };
 
 /* =========================
@@ -291,7 +342,13 @@ function applyThemeAndOverlay() {
     theme === "dark" ||
     (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
 
+  // Preferred: drive theming via tokens on :root[data-theme].
+  // Back-compat: also toggle body.dark (older selectors).
+  const resolved = wantsDark ? "dark" : "light";
+  document.documentElement.dataset.theme = resolved;
   document.body.classList.toggle("dark", !!wantsDark);
+
+  // Overlay
   document.body.classList.toggle("winter", readWinter());
 }
 
@@ -302,8 +359,8 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
     mode.classList.toggle("badge--ok", useBackend);
     mode.classList.toggle("badge--warn", !useBackend);
     mode.title = useBackend
-      ? "Cloud: synchronisiert & teilbar (Supabase). Klick: auf LOCAL umschalten."
-      : "Local: nur auf diesem Gerät (offline-fähig). Klick: auf CLOUD umschalten.";
+      ? "CLOUD: Sync + Teilen im Space (Supabase). Klick = auf LOCAL (nur dieses Gerät)."
+      : "LOCAL: nur auf diesem Gerät (offline). Klick = auf CLOUD (Sync + Teilen).";
   }
 
   const authBtn = document.getElementById("authBadge");
@@ -313,8 +370,8 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
     authBtn.classList.toggle("badge--ok", authed);
     authBtn.classList.toggle("badge--warn", !authed);
     authBtn.title = useBackend
-      ? (authed ? "Logout" : "Login per Magic Link")
-      : "Cloud ist aus: erst auf CLOUD umschalten";
+      ? (authed ? "Abmelden" : "Anmelden per Magic Link")
+      : "Für Login/Sharing: erst auf CLOUD umschalten";
   }
 
   const sync = document.getElementById("syncBadge");
@@ -343,10 +400,10 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
       sync.classList.remove("badge--warn", "badge--bad");
     }
 
-    if (!navigator.onLine) sync.title = "Offline: Änderungen werden lokal gespeichert und später synchronisiert";
-    else if (syncError) sync.title = "Synchronisationsfehler: bitte später erneut versuchen";
+    if (!navigator.onLine) sync.title = "Offline: Änderungen bleiben lokal und werden später synchronisiert";
+    else if (syncError) sync.title = "Sync-Fehler: bitte später nochmal";
     else if (showPending) sync.title = `${pending} Änderung(en) warten auf Sync`;
-    else sync.title = "Synchronisation OK";
+    else sync.title = "Sync ok";
   }
 
   // Space selector (only meaningful in CLOUD + authed)

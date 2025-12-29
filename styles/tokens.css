@@ -1,0 +1,81 @@
+/* Theme tokens + component system (silbergrau + champagner-gold)
+
+   Rule of thumb:
+   - Components + views must only use CSS variables (no hardcoded colors)
+   - Light/Dark are ONLY token overrides
+*/
+
+:root{
+  /* spacing scale */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+
+  /* radii */
+  --r-1: 12px;
+  --r-2: 16px;
+  --r-pill: 999px;
+
+  /* elevation */
+  --shadow: 0 6px 16px rgba(0,0,0,0.08);
+  --shadow-strong: 0 14px 40px rgba(0,0,0,0.12);
+
+  /* base palette (light) */
+  color-scheme: light;
+  --bg: #f6f7f8;
+  --card: #ffffff;
+  --text: #171b22;
+  --muted: rgba(23,27,34,0.65);
+  --border: rgba(0,0,0,0.10);
+
+  /* accent: champagner gold */
+  --primary: #d2b37b;
+  --primary-2: #b8945f;
+  --gold-weak: rgba(210,179,123,0.22);
+
+  /* topbar */
+  --topbar-bg: var(--card);
+  --topbar-text: var(--text);
+  --topbar-border: var(--border);
+}
+
+/* Explicit theme overrides (preferred) */
+:root[data-theme="light"]{
+  color-scheme: light;
+}
+
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #0f1114;
+  --card: #141820;
+  --text: #e7edf6;
+  --muted: rgba(231,237,246,0.65);
+  --border: rgba(255,255,255,0.10);
+
+  --primary: #d2b37b;
+  --primary-2: #b8945f;
+  --gold-weak: rgba(210,179,123,0.22);
+
+  --shadow: 0 10px 26px rgba(0,0,0,0.40);
+  --shadow-strong: 0 18px 56px rgba(0,0,0,0.55);
+}
+
+/* Back-compat: keep body.dark working (older markup/JS) */
+body.dark{
+  --bg: #0f1114;
+  --card: #141820;
+  --text: #e7edf6;
+  --muted: rgba(231,237,246,0.65);
+  --border: rgba(255,255,255,0.10);
+
+  --primary: #d2b37b;
+  --primary-2: #b8945f;
+  --gold-weak: rgba(210,179,123,0.22);
+
+  --shadow: 0 10px 26px rgba(0,0,0,0.40);
+  --shadow-strong: 0 18px 56px rgba(0,0,0,0.55);
+}
+

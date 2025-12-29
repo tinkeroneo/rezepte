@@ -71,7 +71,12 @@ export function renderDetailView({
   const lastStr = last
     ? new Date(last.at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })
     : "—";
-  const events = listCookEvents(r.id).slice(0, 8);
+  // Kochverlauf: bewusst unauffällig. Default: eingeklappt (persistiert pro Rezept).
+  const events = listCookEvents(r.id).slice(0, 30);
+  const cookLogKey = `tinkeroneo_cooklog_open_${r.id}`;
+  const cookLogOpen = (() => {
+    try { return localStorage.getItem(cookLogKey) === "1"; } catch { return false; }
+  })();
 
   const isMenu = (partsByParent.get(r.id)?.length ?? 0) > 0;
   const stepSections = isMenu ? buildMenuStepSections(r, recipes, partsByParent) : [];
@@ -81,29 +86,43 @@ export function renderDetailView({
 
   appEl.innerHTML = `
     <div class="container">
-      <div class="card">
-      <div class="row" style="justify-content:space-between; gap:.5rem;">
-        <button class="btn btn-ghost" id="backBtn">← Zurück</button>
-        <button class="btn btn-ghost" id="cookBtn">👨‍🍳Kochen</button>
+      <section class="card">
+        <div class="card__hd">
+          <div class="row" style="justify-content:space-between; gap:.5rem;">
+        <button class="btn btn--ghost" id="backBtn">← Zurück</button>
+        <button class="btn btn--ghost" id="cookBtn">👨‍🍳Kochen</button>
       </div>
-        <h2>${escapeHtml(r.title)} 
-        <button class="btn btn-ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button></h2>
+        </div>
+        <div class="card__bd">
+          <h2>${escapeHtml(r.title)} 
+        <button class="btn btn--ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button></h2>
         <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
         ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
 
-        <div class="card" style="margin-top:.75rem;">
-          <div class="toolbar">
+        </div>
+      </section>
+
+      <section class="card card--tight" style="margin-top:.75rem;">
+        <div class="card__hd"><div class="toolbar">
             <div>
               <h3 style="margin:0;">Kochverlauf</h3>
               <div class="muted">Zuletzt gekocht: <b>${escapeHtml(lastStr)}</b> · Ø ${escapeHtml(avgLabel)} (${avgCount})</div>
             </div>
-            <button class="btn btn-ghost" id="cookLogNowBtn" type="button" title="Heute gekocht">✅</button>
-          </div>
+            <div class="row" style="gap:.35rem;">
+              <button class="btn btn--ghost" id="cookLogToggle" type="button"
+                      title="Verlauf ein-/ausklappen"
+                      aria-expanded="${cookLogOpen ? "true" : "false"}">
+                ${cookLogOpen ? "▾" : "▸"} Verlauf (${events.length})
+              </button>
+              <button class="btn btn--ghost" id="cookLogNowBtn" type="button" title="Heute gekocht">✅</button>
+            </div>
+          </div></div>
 
+        <div class="card__bd">
           <div class="row" id="cookStars" style="gap:.15rem; align-items:center; flex-wrap:wrap; margin-top:.35rem;">
             ${[1, 2, 3, 4, 5].map(n => `
               <button type="button"
-                      class="btn btn-ghost"
+                      class="btn btn--ghost"
                       data-cook-rate="${n}"
                       title="${n} Sterne"
                       style="padding:.35rem .5rem;">
@@ -112,8 +131,8 @@ export function renderDetailView({
             `).join("")}
           </div>
 
-          ${events.length ? `
-            <div style="margin-top:.5rem;">
+          <div id="cookLogList" style="margin-top:.5rem; ${cookLogOpen ? "" : "display:none;"}">
+            ${events.length ? `
               ${events.map(ev => `
                 <div class="row" style="justify-content:space-between; align-items:flex-start; padding:.45rem 0; border-top:1px solid #eee;">
                   <div style="min-width:0;">
@@ -124,14 +143,15 @@ export function renderDetailView({
                     ${ev.note ? `<div class="muted" style="margin-top:.2rem; white-space:pre-wrap;">${escapeHtml(ev.note)}</div>` : ``}
                   </div>
                   <div class="row" style="gap:.35rem;">
-                    <button class="btn btn-ghost" data-ev-edit="${escapeHtml(ev.id)}">✎</button>
-                    <button class="btn btn-ghost" data-ev-del="${escapeHtml(ev.id)}">🗑</button>
+                    <button class="btn btn--ghost" data-ev-edit="${escapeHtml(ev.id)}" title="Bearbeiten">✎</button>
+                    <button class="btn btn--ghost" data-ev-del="${escapeHtml(ev.id)}" title="Löschen">🗑</button>
                   </div>
                 </div>
               `).join("")}
-            </div>
-          ` : `<div class="muted" style="margin-top:.35rem;">Noch nichts geloggt.</div>`}
+            ` : `<div class="muted" style="margin-top:.35rem;">Noch nichts geloggt.</div>`}
+          </div>
         </div>
+      </section>
 
         ${r.image_url ? `
           <div style="margin:.75rem 0;">
@@ -141,7 +161,7 @@ export function renderDetailView({
             </div>
 
             <div class="row" style="justify-content:space-between; align-items:center; margin-top:.45rem;">
-              <button class="btn btn-ghost" id="imgFocusToggle" type="button">🖼️ Bild anpassen</button>
+              <button class="btn btn--ghost" id="imgFocusToggle" type="button">🖼️ Bild anpassen</button>
               <span class="muted" id="imgFocusHint" style="font-size:.95rem;"></span>
             </div>
 
@@ -175,7 +195,7 @@ export function renderDetailView({
               </div>
 
               <div class="row" style="justify-content:flex-end; margin-top:.75rem; gap:.5rem;">
-                <button class="btn btn-ghost" id="imgFocusReset" type="button">Reset</button>
+                <button class="btn btn--ghost" id="imgFocusReset" type="button">Reset</button>
                 <button class="btn" id="imgFocusSave" type="button">Speichern</button>
               </div>
             </div>
@@ -185,7 +205,7 @@ export function renderDetailView({
         <hr />
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Zutaten</h3>
-          <button class="btn btn-ghost" id="addToShoppingBtn" >🧺</button>
+          <button class="btn btn--ghost" id="addToShoppingBtn" >🧺</button>
         </div>
 
         ${isMenu
@@ -201,7 +221,7 @@ export function renderDetailView({
         <hr />
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Bestandteile</h3>
-          <button class="btn btn-ghost" id="addPartBtn" type="button">+ Hinzufügen</button>
+          <button class="btn btn--ghost" id="addPartBtn" type="button">+ Hinzufügen</button>
         </div>
 
         ${children.length ? `
@@ -209,7 +229,7 @@ export function renderDetailView({
             ${children.map(c => `
               <li style="display:flex; justify-content:space-between; gap:.5rem; align-items:center;">
                 <a href="#" data-open-child="${escapeHtml(c.id)}">${escapeHtml(c.title)}</a>
-                <button class="btn btn-ghost" data-remove-child="${escapeHtml(c.id)}" type="button">✕</button>
+                <button class="btn btn--ghost" data-remove-child="${escapeHtml(c.id)}" type="button">✕</button>
               </li>
             `).join("")}
           </ul>
@@ -244,8 +264,8 @@ export function renderDetailView({
 
         <hr />
         <div class="row" style="justify-content:space-between; gap:.5rem;">
-          <button class="btn btn-ghost" id="deleteBtn">Löschen</button>
-          <button class="btn btn-primary" id="editBtn">Bearbeiten</button>
+          <button class="btn btn--ghost" id="deleteBtn">Löschen</button>
+          <button class="btn btn--solid" id="editBtn">Bearbeiten</button>
         </div>
 
         <div id="sheetRoot"></div>
@@ -352,7 +372,7 @@ export function renderDetailView({
           <div class="sheet-handle"></div>
           <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
             <h3 style="margin:0;">${escapeHtml(r.title)}</h3>
-            <button class="btn btn-ghost" id="closeImg">Schließen</button>
+            <button class="btn btn--ghost" id="closeImg">Schließen</button>
           </div>
           <div style="margin-top:.75rem;">
             <img src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" style="width:100%; border-radius:12px; display:block;" />
@@ -392,6 +412,22 @@ export function renderDetailView({
     if (ev) pushCookEventToBackend(r.id, ev).catch(() => { });
     ack(qs(appEl, "#cookLogNowBtn"));
     renderDetailView({ appEl, state, recipes, partsByParent, recipeParts, setView, useBackend, sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts, onUpdateRecipe, addToShopping, rebuildPartsIndexSetter });
+  });
+
+  // Kochverlauf: default eingeklappt (persistiert)
+  qs(appEl, "#cookLogToggle")?.addEventListener("click", () => {
+    const listEl = qs(appEl, "#cookLogList");
+    if (!listEl) return;
+    const open = listEl.style.display === "none";
+    listEl.style.display = open ? "" : "none";
+
+    const btn = qs(appEl, "#cookLogToggle");
+    if (btn) {
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      btn.innerHTML = `${open ? "▾" : "▸"} Verlauf (${events.length})`;
+    }
+
+    try { localStorage.setItem(cookLogKey, open ? "1" : "0"); } catch { /* ignore */ }
   });
 
   qsa(appEl, "[data-cook-rate]").forEach(btn => {
@@ -517,7 +553,7 @@ export function renderDetailView({
 
         <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
           <h3 style="margin:0;">Teilrezept hinzufügen</h3>
-          <button class="btn btn-ghost" id="closePart">Schließen</button>
+          <button class="btn btn--ghost" id="closePart">Schließen</button>
         </div>
 
         <input id="partSearch" type="search" placeholder="Suche… (z.B. Sauce, Reis, Salat)" style="margin-top:.6rem;" />
@@ -615,7 +651,7 @@ function openCookRatingDialog({ recipeId, rating, onDone }) {
         <h3 style="margin:0;">Bewertung</h3>
         <div class="muted">${"⭐".repeat(rating)} (${rating}/5)</div>
       </div>
-      <button class="btn btn-ghost" id="cookRateCancel" type="button" title="Abbrechen">✕</button>
+      <button class="btn btn--ghost" id="cookRateCancel" type="button" title="Abbrechen">✕</button>
     </div>
 
     <div class="card" style="padding:.85rem; margin-top:.75rem;">
@@ -623,7 +659,7 @@ function openCookRatingDialog({ recipeId, rating, onDone }) {
       <textarea id="cookRateNote" placeholder="z.B. mehr Zitrone, weniger Salz, statt Reis: Bulgur"></textarea>
       <div class="row" style="justify-content:space-between; margin-top:.6rem;">
         <div class="muted" id="cookRateHint">Enter = speichern (ohne Text)</div>
-        <button class="btn btn-primary" id="cookRateSave" type="button" title="Speichern">💾 Speichern</button>
+        <button class="btn btn--solid" id="cookRateSave" type="button" title="Speichern">💾 Speichern</button>
       </div>
     </div>
   `;
@@ -700,7 +736,7 @@ function openEditCookEventDialog({ ev, onSave }) {
         <h3 style="margin:0;">Eintrag bearbeiten</h3>
         <div class="muted">${new Date(ev.at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}</div>
       </div>
-      <button class="btn btn-ghost" id="ceClose" type="button" title="Schließen">✕</button>
+      <button class="btn btn--ghost" id="ceClose" type="button" title="Schließen">✕</button>
     </div>
 
     <hr />
@@ -723,7 +759,7 @@ function openEditCookEventDialog({ ev, onSave }) {
       <textarea id="ceNote" placeholder="…">${escapeHtml(ev.note ?? "")}</textarea>
       <div class="row" style="justify-content:space-between; margin-top:.6rem;">
         <div class="muted">Enter macht Zeilenumbruch</div>
-        <button class="btn btn-primary" id="ceSave" type="button">💾 Speichern</button>
+        <button class="btn btn--solid" id="ceSave" type="button">💾 Speichern</button>
       </div>
     </div>
   `;

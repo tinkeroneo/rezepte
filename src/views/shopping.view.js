@@ -36,9 +36,9 @@ export function renderShoppingView({ appEl, state, setView }) {
     <div class="container">
       <div class="card">
         <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
-          <button class="btn btn-ghost" id="backBtn">← Zurück</button>
+          <button class="btn btn--ghost" id="backBtn">← Zurück</button>
           <h2 style="margin:0;">🧺 Einkaufsliste</h2>
-          <button class="btn btn-ghost" id="clearShopping">Leeren</button>
+          <button class="btn btn--ghost" id="clearShopping">Leeren</button>
         </div>
 
         ${entries.length === 0
@@ -59,7 +59,7 @@ export function renderShoppingView({ appEl, state, setView }) {
           <div class="muted" style="font-weight:800; margin-bottom:.35rem;">${escapeHtml(cat)}</div>
 
           ${doneCount
-            ? `<button class="btn btn-ghost" type="button" data-toggle-done="${escapeHtml(cat)}">
+            ? `<button class="btn btn--ghost" type="button" data-toggle-done="${escapeHtml(cat)}">
                    ${collapsed ? `Erledigte anzeigen (${doneCount})` : `Erledigte einklappen (${doneCount})`}
                  </button>`
             : ``

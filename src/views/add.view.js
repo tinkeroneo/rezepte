@@ -58,7 +58,7 @@ window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
   appEl.innerHTML = `
     <div class="container">
       <div class="card">
-        <button class="btn btn-ghost" id="backBtn">← Zurück</button>
+        <button class="btn btn--ghost" id="backBtn">← Zurück</button>
         <h2>${isEdit ? "Rezept bearbeiten" : "Neues Rezept"}</h2>
 
         <label class="muted">Titel</label>
@@ -104,7 +104,7 @@ window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
         <textarea id="steps" placeholder="z.B. Bohnen zerdrücken\nZwiebel anbraten\n...">${escapeHtml(stepsText)}</textarea>
 
         <div class="row" style="justify-content:flex-end; margin-top:.75rem;">
-          <button class="btn btn-primary" id="saveBtn">${isEdit ? "Speichern" : "Anlegen"}</button>
+          <button class="btn btn--solid" id="saveBtn">${isEdit ? "Speichern" : "Anlegen"}</button>
         </div>
 
         <div class="muted" style="margin-top:.75rem;">

@@ -6,9 +6,9 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
     <div class="container">
       <div class="topbar">
         <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
-          <button class="btn btn-ghost" id="backBtn">← Zurück</button>
+          <button class="btn btn--ghost" id="backBtn">← Zurück</button>
           <div class="title">Diagnostics</div>
-          <button class="btn btn-ghost" id="refreshBtn">↻</button>
+          <button class="btn btn--ghost" id="refreshBtn">↻</button>
         </div>
       </div>
 
@@ -35,7 +35,7 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
           </div>
         ` : `<div class="muted">Keine gespeicherten Fehler.</div>`}
         <div class="row" style="margin-top:.75rem; gap:.5rem;">
-          <button class="btn btn-ghost" id="clearErrBtn">Fehlerliste leeren</button>
+          <button class="btn btn--ghost" id="clearErrBtn">Fehlerliste leeren</button>
         </div>
       </div>
 

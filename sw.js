@@ -1,9 +1,13 @@
 // sw.js - minimal offline cache for app shell (no build step)
-const CACHE = "tinkeroneo-shell-v2-20251224";
+const CACHE = "tinkeroneo-shell-v3-20251229";
 const ASSETS = [
   "./",
   "./index.html",
   "./style.css",
+  "./styles/tokens.css",
+  "./styles/base.css",
+  "./styles/components.css",
+  "./styles/views.css",
   "./favicon.svg",
   "./manifest.json",
   "./wakelock.js",
@@ -35,7 +39,12 @@ const ASSETS = [
   "./src/views/shopping.view.js",
   "./src/views/selftest.view.js",
   "./src/views/timers.view.js",
-  "./src/views/diagnostics.view.js"
+  "./src/views/diagnostics.view.js",
+  "styles/tokens.css",
+  "styles/base.css",
+  "styles/components.css",
+  "styles/views.css",
+  "style.css",
 ];
 
 self.addEventListener("install", (event) => {

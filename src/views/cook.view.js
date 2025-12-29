@@ -7,13 +7,18 @@ import { ack } from "../ui/feedback.js";
 
 // Kochverlauf/Bewertung ist in der Detail-View (nicht hier),
 // damit Steps/Timer nicht verdeckt werden.
-const audio = createBeep()
 let __audioPrimedOnce = false;
 
 
 export function renderCookView({ appEl, state, recipes, partsByParent, setView }) {
   const r = recipes.find(x => x.id === state.selectedId);
    if (!r) return setView({ name: "list", selectedId: null, q: state.q });
+
+  const settings = window.__tinkeroneoSettings || {};
+  const timerSoundEnabled = settings.readTimerSoundEnabled ? !!settings.readTimerSoundEnabled() : true;
+  const timerSoundId = settings.readTimerSoundId ? String(settings.readTimerSoundId() || "gong") : "gong";
+  const timerSoundVolume = settings.readTimerSoundVolume ? Number(settings.readTimerSoundVolume() ?? 0.65) : 0.65;
+  const audio = createBeep({ soundId: timerSoundId, volume: timerSoundVolume });
 
   // Cook-View soll möglichst „koch-fokussiert“ sein (Steps + Timer).
   // Kochverlauf/Bewertung ist in der Detail-View.
@@ -48,7 +53,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
   appEl.innerHTML = `
     <div class="container">
       <div class="card">
-        <button class="btn btn-ghost" id="backBtn">← Zurück</button>
+        <button class="btn btn--ghost" id="backBtn">← Zurück</button>
         <h2>👩‍🍳 ${escapeHtml(r.title)}</h2>
 
 
@@ -94,7 +99,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
                       ${dur ? `
                         <div class="timer-pill">
                           <span class="muted">⏱ ${escapeHtml(formatTime(dur))}</span>
-                          <button class="btn btn-ghost" data-start-timer="${escapeHtml(key)}" data-title="${escapeHtml(title)}" data-seconds="${dur}" type="button">Start</button>
+                          <button class="btn btn--ghost" data-start-timer="${escapeHtml(key)}" data-title="${escapeHtml(title)}" data-seconds="${dur}" type="button">Start</button>
                         </div>
                       ` : ""}
                     </li>
@@ -108,9 +113,9 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
       <div class="cookbar">
         <div class="row">
-          <button class="btn btn-ghost" id="ingredientsBtn">Zutaten</button>
-          ${radioEnabled ? `<button class="btn btn-ghost" id="radioBtn">Radio</button>` : ""}
-          <button class="btn btn-ghost" id="resetBtn">Reset Steps</button>
+          <button class="btn btn--ghost" id="ingredientsBtn">Zutaten</button>
+          ${radioEnabled ? `<button class="btn btn--ghost" id="radioBtn">Radio</button>` : ""}
+          <button class="btn btn--ghost" id="resetBtn">Reset Steps</button>
         </div>
       </div>
 
@@ -126,6 +131,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
   // Kochverlauf / Bewertung ist in der Detail-View
 
   let timersExpanded = false;
+  let _lastOverdueKeys = new Set();
   function flashTimerRootOnce() {
     // nur kurz sichtbar, dann wieder aus
     timerRoot.classList.remove("timer-flash");
@@ -138,10 +144,9 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
     }, 220);
   }
 
-  const s = window.__tinkeroneoSettings || {};
-  const ringIntervalMs = s.readTimerRingIntervalMs?.() ?? 5000;
-  const maxRingSeconds = s.readTimerMaxRingSeconds?.() ?? 120;
-  const stepHighlightEnabled = s.readTimerStepHighlight?.() ?? true;
+  const ringIntervalMs = settings.readTimerRingIntervalMs?.() ?? 2800;
+  const maxRingSeconds = settings.readTimerMaxRingSeconds?.() ?? 120;
+  const stepHighlightEnabled = settings.readTimerStepHighlight?.() ?? true;
 
   const tm = createTimerManager({
     storageKey: timersKey,
@@ -163,10 +168,29 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
               .map(t => String(t.key))
           );
 
+          // one-time subtle nudge: if a timer just turned overdue, briefly outline that step
+          const newlyOverdue = [];
+          overdueKeys.forEach(k => { if (!_lastOverdueKeys.has(k)) newlyOverdue.push(k); });
+          _lastOverdueKeys = overdueKeys;
+
           qsa(appEl, "li[data-stepwrap]").forEach(li => {
             const k = li.getAttribute("data-stepwrap") || "";
             li.classList.toggle("step-overdue", overdueKeys.has(k));
           });
+
+          if (newlyOverdue.length) {
+            const first = newlyOverdue[0];
+            const li = qs(appEl, `li[data-stepwrap="${CSS.escape(first)}"]`);
+            if (li) {
+              li.classList.add("step-current");
+              // only scroll if far away; keep it calm
+              const rect = li.getBoundingClientRect();
+              if (rect.top < 0 || rect.bottom > window.innerHeight) {
+                li.scrollIntoView({ block: "center", behavior: "smooth" });
+              }
+              window.setTimeout(() => li.classList.remove("step-current"), 2000);
+            }
+          }
         } catch {
           // ignore
         }
@@ -215,8 +239,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
     },
     onFire: () => {
-      // fire twice
-      audio.beep(); audio.beep();
+      if (!timerSoundEnabled) return;
+      audio.beep();
     }
   });
 
@@ -235,7 +259,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
         <div class="sheet-handle"></div>
         <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
           <h3 style="margin:0;">Zutaten</h3>
-          <button class="btn btn-ghost" id="closeSheet">Schließen</button>
+          <button class="btn btn--ghost" id="closeSheet">Schließen</button>
         </div>
         <div style="margin-top:.75rem;">
           ${isMenu
@@ -277,7 +301,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
         <div class="sheet-handle"></div>
         <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
           <h3 style="margin:0;">Radio</h3>
-          <button class="btn btn-ghost" id="closeRadio">Schließen</button>
+          <button class="btn btn--ghost" id="closeRadio">Schließen</button>
         </div>
 
         ${consent ? `
@@ -294,7 +318,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
             <div class="row" style="justify-content:space-between; align-items:center; margin-top:.65rem; gap:.5rem;">
               <div class="muted">Drittanbieter-Inhalt wurde geladen (egoFM).</div>
-              <button class="btn btn-ghost" id="revokeRadio" type="button">Consent widerrufen</button>
+              <button class="btn btn--ghost" id="revokeRadio" type="button">Consent widerrufen</button>
             </div>
           </div>
         ` : `
@@ -307,8 +331,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
             </div>
 
             <div class="row" style="margin-top:.75rem; justify-content:flex-end; gap:.5rem;">
-              <button class="btn btn-ghost" id="radioCancel" type="button">Abbrechen</button>
-              <button class="btn btn-primary" id="radioAllow" type="button">Ja, laden</button>
+              <button class="btn btn--ghost" id="radioCancel" type="button">Abbrechen</button>
+              <button class="btn btn--solid" id="radioAllow" type="button">Ja, laden</button>
             </div>
           </div>
         `}

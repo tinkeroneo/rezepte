@@ -22,6 +22,9 @@ export const KEYS = {
   TIMER_RING_INTERVAL_MS: "tinkeroneo_timer_ring_interval_ms_v1",
   TIMER_MAX_RING_SECONDS: "tinkeroneo_timer_max_ring_seconds_v1",
   TIMER_STEP_HIGHLIGHT: "tinkeroneo_timer_step_highlight_v1",
+  TIMER_SOUND_ID: "tinkeroneo_timer_sound_id_v1",
+  TIMER_SOUND_ENABLED: "tinkeroneo_timer_sound_enabled_v1",
+  TIMER_SOUND_VOLUME: "tinkeroneo_timer_sound_volume_v1",
 };
 
 export function lsGet(key, fallback = null) {

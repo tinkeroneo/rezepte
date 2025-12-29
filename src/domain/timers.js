@@ -93,7 +93,7 @@ export function getSortedActiveTimers(timers) {
 /* -------------------- beep -------------------- */
 
 // Robust beep helper (works even when AudioContext fails)
-export function createBeep() {
+export function createBeep({ soundId = 'gong', volume = 0.7 } = {}) {
   let ctx = null;
   let enabled = true;
   let warned = false;
@@ -149,9 +149,8 @@ export function createBeep() {
     }
   }
 
-  function beep({ ms = 120, freq = 880 } = {}) {
+  function beep({ id = soundId } = {}) {
     if (!enabled) {
-      // fallback: vibration if available
       if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
       return false;
     }
@@ -163,30 +162,53 @@ export function createBeep() {
     }
 
     try {
-      // do NOT create beep if context is not running and can't be resumed
       if (c.state === "suspended") {
-        // best effort resume, but don't spam; if fails -> disable
         c.resume().catch((e) => { enabled = false; warnOnce(e); });
         return false;
       }
 
-      const o = c.createOscillator();
-      const g = c.createGain();
-
-      o.type = "sine";
-      o.frequency.value = freq;
-
-      // gentle envelope (avoid clicks)
       const t0 = c.currentTime;
-      g.gain.setValueAtTime(0.0001, t0);
-      g.gain.exponentialRampToValueAtTime(0.12, t0 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + ms / 1000);
 
-      o.connect(g);
-      g.connect(c.destination);
+      // Helper: one voice with envelope
+      function voice({ type = "sine", freq = 440, dur = 0.35, gain = 0.14, detune = 0 } = {}) {
+        const o = c.createOscillator();
+        const g = c.createGain();
+        o.type = type;
+        o.frequency.setValueAtTime(freq, t0);
+        if (detune) o.detune.setValueAtTime(detune, t0);
 
-      o.start(t0);
-      o.stop(t0 + ms / 1000 + 0.02);
+        // envelope
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain * volume), t0 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+
+        o.connect(g);
+        g.connect(c.destination);
+        o.start(t0);
+        o.stop(t0 + dur + 0.03);
+      }
+
+      const sid = String(id || soundId || "gong");
+
+      // Profiles: placeholder but clearly distinct + calm
+      if (sid === "wood") {
+        // warm, short "tok"
+        voice({ type: "triangle", freq: 240, dur: 0.12, gain: 0.18 });
+        voice({ type: "sine", freq: 480, dur: 0.06, gain: 0.06, detune: -12 });
+      } else if (sid === "pulse") {
+        // soft electronic blip
+        voice({ type: "sine", freq: 880, dur: 0.10, gain: 0.10 });
+      } else if (sid === "bowl") {
+        // singing bowl-ish: longer decay + partials
+        voice({ type: "sine", freq: 528, dur: 0.85, gain: 0.06 });
+        voice({ type: "sine", freq: 660, dur: 0.75, gain: 0.05, detune: 6 });
+        voice({ type: "triangle", freq: 396, dur: 0.90, gain: 0.04 });
+      } else {
+        // gong (default): short warm bell
+        voice({ type: "sine", freq: 660, dur: 0.42, gain: 0.07 });
+        voice({ type: "triangle", freq: 440, dur: 0.36, gain: 0.09 });
+        voice({ type: "sine", freq: 990, dur: 0.22, gain: 0.03 });
+      }
 
       return true;
     } catch (e) {
@@ -196,8 +218,7 @@ export function createBeep() {
       return false;
     }
   }
-
-  return { prime, beep };
+return { prime, beep };
 }
 
 
@@ -209,6 +230,9 @@ export function createTimerManager({
   onFire = null,
   tickMs = 1000,
   ringIntervalMs = 5000,
+  // NOTE: maxRingSeconds is kept for backward compatibility but intentionally
+  // ignored. If a timer is overdue, it should continue ringing until the user
+  // explicitly stops or extends it.
   maxRingSeconds = 120,
 } = {}) {
   let interval = null;
@@ -294,11 +318,11 @@ export function createTimerManager({
         changed = true;
       }
 
-      const ringAgeMs = now - raw.ringStartedAt;
-      const withinWindow = ringAgeMs <= maxRingSeconds * 1000;
       const due = (now - (raw.lastRingAt || 0)) >= ringIntervalMs;
 
-      if (withinWindow && due) {
+      // Ring indefinitely until the timer is stopped/dismissed or extended.
+      // (maxRingSeconds is intentionally ignored.)
+      if (due) {
         raw.lastRingAt = now;
         changed = true;
         try {
