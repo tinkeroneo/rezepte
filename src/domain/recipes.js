@@ -54,6 +54,7 @@ export function toLocalShape(r) {
     category: normStr(r.category),
     time: normStr(r.time),
     image_url: normStr(r.image_url),
+    image_focus: (r.image_focus && typeof r.image_focus === 'object') ? r.image_focus : (r.imageFocus && typeof r.imageFocus === 'object' ? r.imageFocus : null),
     source: normStr(r.source),
     tags: tags.map((t) => String(t).trim()).filter(Boolean),
     ingredients: normLines(r.ingredients),

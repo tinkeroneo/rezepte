@@ -88,76 +88,29 @@ export function renderDetailView({
     <div class="container">
       <section class="card">
         <div class="card__hd">
-          <div class="row" style="justify-content:space-between; gap:.5rem;">
-        <button class="btn btn--ghost" id="backBtn">← Zurück</button>
-        <button class="btn btn--ghost" id="cookBtn">👨‍🍳Kochen</button>
-      </div>
+          <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
+            <button class="btn btn--ghost" id="backBtn">← Zurück</button>
+            <div class="row" style="gap:.5rem;">
+              <button class="btn btn--ghost" id="cookBtn">👨‍🍳 Kochen</button>
+              <button class="btn btn--ghost" id="editBtn" title="Rezept bearbeiten">✏️ Bearbeiten</button>
+            </div>
+          </div>
         </div>
         <div class="card__bd">
           <h2>${escapeHtml(r.title)} 
         <button class="btn btn--ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button></h2>
-        <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
+        ${r.time ? `<div class="muted">${escapeHtml(r.time)}</div>` : ""}
         ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
 
         </div>
       </section>
 
-      <section class="card card--tight" style="margin-top:.75rem;">
-        <div class="card__hd"><div class="toolbar">
-            <div>
-              <h3 style="margin:0;">Kochverlauf</h3>
-              <div class="muted">Zuletzt gekocht: <b>${escapeHtml(lastStr)}</b> · Ø ${escapeHtml(avgLabel)} (${avgCount})</div>
-            </div>
-            <div class="row" style="gap:.35rem;">
-              <button class="btn btn--ghost" id="cookLogToggle" type="button"
-                      title="Verlauf ein-/ausklappen"
-                      aria-expanded="${cookLogOpen ? "true" : "false"}">
-                ${cookLogOpen ? "▾" : "▸"} Verlauf (${events.length})
-              </button>
-              <button class="btn btn--ghost" id="cookLogNowBtn" type="button" title="Heute gekocht">✅</button>
-            </div>
-          </div></div>
-
-        <div class="card__bd">
-          <div class="row" id="cookStars" style="gap:.15rem; align-items:center; flex-wrap:wrap; margin-top:.35rem;">
-            ${[1, 2, 3, 4, 5].map(n => `
-              <button type="button"
-                      class="btn btn--ghost"
-                      data-cook-rate="${n}"
-                      title="${n} Sterne"
-                      style="padding:.35rem .5rem;">
-                ${n <= avgRounded ? "★" : "☆"}
-              </button>
-            `).join("")}
-          </div>
-
-          <div id="cookLogList" style="margin-top:.5rem; ${cookLogOpen ? "" : "display:none;"}">
-            ${events.length ? `
-              ${events.map(ev => `
-                <div class="row" style="justify-content:space-between; align-items:flex-start; padding:.45rem 0; border-top:1px solid #eee;">
-                  <div style="min-width:0;">
-                    <div style="font-weight:650;">
-                      ${new Date(ev.at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}
-                      ${ev.rating ? `<span class="muted" style="margin-left:.35rem;">(${ev.rating}/5)</span>` : ``}
-                    </div>
-                    ${ev.note ? `<div class="muted" style="margin-top:.2rem; white-space:pre-wrap;">${escapeHtml(ev.note)}</div>` : ``}
-                  </div>
-                  <div class="row" style="gap:.35rem;">
-                    <button class="btn btn--ghost" data-ev-edit="${escapeHtml(ev.id)}" title="Bearbeiten">✎</button>
-                    <button class="btn btn--ghost" data-ev-del="${escapeHtml(ev.id)}" title="Löschen">🗑</button>
-                  </div>
-                </div>
-              `).join("")}
-            ` : `<div class="muted" style="margin-top:.35rem;">Noch nichts geloggt.</div>`}
-          </div>
-        </div>
-      </section>
+      
 
         ${r.image_url ? `
           <div style="margin:.75rem 0;">
             <div class="img-focus-frame">
-              <img id="detailImg" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}"
-                   style="width:100%; height:260px; object-fit:contain; object-position:50% 50%; background:linear-gradient(135deg,#eef2ff,#f8fafc); border-radius:12px; display:block;" />
+              <img id="detailImg" class="detail-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" />
             </div>
 
             <div class="row" style="justify-content:space-between; align-items:center; margin-top:.45rem;">
@@ -262,13 +215,58 @@ export function renderDetailView({
           </div>
         `}
 
-        <hr />
-        <div class="row" style="justify-content:space-between; gap:.5rem;">
-          <button class="btn btn--ghost" id="deleteBtn">Löschen</button>
-          <button class="btn btn--solid" id="editBtn">Bearbeiten</button>
-        </div>
+<section class="card card--tight" style="margin-top:.75rem;">
+        <div class="card__hd"><div class="toolbar">
+            <div>
+              <h3 style="margin:0;">Kochverlauf</h3>
+              <div class="muted">Zuletzt gekocht: <b>${escapeHtml(lastStr)}</b> · Ø ${escapeHtml(avgLabel)} (${avgCount})</div>
+            </div>
+            <div class="row" style="gap:.35rem;">
+              <button class="btn btn--ghost" id="cookLogToggle" type="button"
+                      title="Verlauf ein-/ausklappen"
+                      aria-expanded="${cookLogOpen ? "true" : "false"}">
+                ${cookLogOpen ? "▾" : "▸"} Verlauf (${events.length})
+              </button>
+              <button class="btn btn--ghost" id="cookLogNowBtn" type="button" title="Heute gekocht">✅</button>
+            </div>
+          </div></div>
 
-        <div id="sheetRoot"></div>
+        <div class="card__bd">
+          <div class="row" id="cookStars" style="gap:.15rem; align-items:center; flex-wrap:wrap; margin-top:.35rem;">
+            ${[1, 2, 3, 4, 5].map(n => `
+              <button type="button"
+                      class="btn btn--ghost"
+                      data-cook-rate="${n}"
+                      title="${n} Sterne"
+                      style="padding:.35rem .5rem;">
+                ${n <= avgRounded ? "★" : "☆"}
+              </button>
+            `).join("")}
+          </div>
+
+          <div id="cookLogList" style="margin-top:.5rem; ${cookLogOpen ? "" : "display:none;"}">
+            ${events.length ? `
+              ${events.map(ev => `
+                <div class="row" style="justify-content:space-between; align-items:flex-start; padding:.45rem 0; border-top:1px solid #eee;">
+                  <div style="min-width:0;">
+                    <div style="font-weight:650;">
+                      ${new Date(ev.at).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}
+                      ${ev.rating ? `<span class="muted" style="margin-left:.35rem;">(${ev.rating}/5)</span>` : ``}
+                    </div>
+                    ${ev.note ? `<div class="muted" style="margin-top:.2rem; white-space:pre-wrap;">${escapeHtml(ev.note)}</div>` : ``}
+                  </div>
+                  <div class="row" style="gap:.35rem;">
+                    <button class="btn btn--ghost" data-ev-edit="${escapeHtml(ev.id)}" title="Bearbeiten">✎</button>
+                    <button class="btn btn--ghost" data-ev-del="${escapeHtml(ev.id)}" title="Löschen">🗑</button>
+                  </div>
+                </div>
+              `).join("")}
+            ` : `<div class="muted" style="margin-top:.35rem;">Noch nichts geloggt.</div>`}
+          </div>
+        </div>
+      </section>
+
+      <div id="sheetRoot"></div>
       </div>
     </div>
   `;
@@ -500,7 +498,7 @@ export function renderDetailView({
     setView({ name: "shopping", selectedId: null, q: state.q });
   });
 
-  qs(appEl, "#deleteBtn").addEventListener("click", async () => {
+  qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
     if (!confirm("Rezept wirklich löschen?")) return;
     // local deletion is handled in app.js via callback — simplest: reload after delete
     await sbDelete?.(r.id).catch(() => { });
