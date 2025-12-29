@@ -35,11 +35,18 @@ export function initRadioDock() {
   const root = document.getElementById("radioDockRoot") || document.getElementById("radioDock");
   if (!root) return;
 
+  // The toggle lives in the global header (menu line), not inside CookView.
+  // This keeps Radio as a global feature and avoids view-specific emphasis.
+  const headerBtn = document.getElementById("radioHeaderBtn");
+
   const mountIfNeeded = () => {
     if (!isFeatureEnabled()) {
+      if (headerBtn) headerBtn.hidden = true;
       renderDisabled(root);
       return;
     }
+
+    if (headerBtn) headerBtn.hidden = false;
 
     root.style.display = "block";
 
@@ -52,11 +59,10 @@ export function initRadioDock() {
 
     root.innerHTML = `
       <div class="radio-dock" id="radioDockWrap">
-        <button class="radio-dock-btn" id="radioDockToggle" type="button" title="Radio">🎧</button>
         <div class="radio-dock-panel" id="radioPanel" aria-hidden="true">
           <div class="radio-dock-header">
             <div class="radio-dock-title">Radio</div>
-            <button class="btn btn-ghost" id="radioClose" type="button" title="Schließen">✕</button>
+            <button class="btn btn--ghost" id="radioClose" type="button" title="Schließen">✕</button>
           </div>
           <div class="radio-panel-body" id="radioPanelBody">
             <div id="radioConsentBlock"></div>
@@ -67,7 +73,6 @@ export function initRadioDock() {
     `;
 
     const wrap = qs(root, "#radioDockWrap");
-    const toggleBtn = qs(root, "#radioDockToggle");
     const panel = qs(root, "#radioPanel");
     const consentBlock = qs(root, "#radioConsentBlock");
     const iframeWrap = qs(root, "#radioIframeWrap");
@@ -105,8 +110,8 @@ export function initRadioDock() {
             Der Radio-Player lädt Inhalte von egoFM (externe Domain). Möchtest du das erlauben?
           </div>
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-            <button class="btn btn-primary" id="radioConsentYes" type="button">Erlauben</button>
-            <button class="btn btn-ghost" id="radioConsentNo" type="button">Nein</button>
+            <button class="btn btn--solid" id="radioConsentYes" type="button">Erlauben</button>
+            <button class="btn btn--ghost" id="radioConsentNo" type="button">Nein</button>
           </div>
         `;
         iframeWrap.innerHTML = "";
@@ -131,14 +136,19 @@ export function initRadioDock() {
     const updateUI = () => {
       wrap.classList.toggle("is-open", expanded);
       panel.setAttribute("aria-hidden", expanded ? "false" : "true");
+      if (headerBtn) headerBtn.setAttribute("aria-pressed", expanded ? "true" : "false");
       if (expanded) renderBody();
     };
 
-    toggleBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      expanded = !expanded;
-      updateUI();
-    });
+    // Toggle comes from the header
+    if (headerBtn && !headerBtn.__wired) {
+      headerBtn.__wired = true;
+      headerBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        expanded = !expanded;
+        updateUI();
+      });
+    }
 
     closeBtn.addEventListener("click", (e) => {
       e.preventDefault();

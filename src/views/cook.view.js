@@ -25,16 +25,6 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
  
   const isMenu = (partsByParent.get(r.id)?.length ?? 0) > 0;
-  const radioEnabled = (() => {
-    try {
-      const v = localStorage.getItem("tinkeroneo_radio_feature_v1");
-      if (v === "0") return false;
-      if (v === "1") return true;
-      return true; // default ON
-    } catch {
-      return true; // default ON
-    }
-  })();
   const cookSections = isMenu
     ? buildMenuStepSections(r, recipes, partsByParent)
     : [{ recipeId: r.id, title: r.title, cards: splitStepsToCards(r.steps ?? []) }];
@@ -114,7 +104,6 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
       <div class="cookbar">
         <div class="row">
           <button class="btn btn--ghost" id="ingredientsBtn">Zutaten</button>
-          ${radioEnabled ? `<button class="btn btn--ghost" id="radioBtn">Radio</button>` : ""}
           <button class="btn btn--ghost" id="resetBtn">Reset Steps</button>
         </div>
       </div>
@@ -278,89 +267,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
     qs(sheetRoot, "#closeSheet").addEventListener("click", () => sheetRoot.innerHTML = "");
   });
 
-  // Optional: Radio (e.g. egoFM) – only load iframe after explicit consent.
-  // This avoids loading third-party content without a user action.
-  if (radioEnabled) {
-    const RADIO_CONSENT_KEY = "tinkeroneo_radio_consent_v1";
-
-  const hasRadioConsent = () => {
-    try { return localStorage.getItem(RADIO_CONSENT_KEY) === "1"; } catch { return false; }
-  };
-  const setRadioConsent = (v) => {
-    try {
-      if (v) localStorage.setItem(RADIO_CONSENT_KEY, "1");
-      else localStorage.removeItem(RADIO_CONSENT_KEY);
-    } catch { /* ignore */ }
-  };
-
-  function openRadioSheet() {
-    const consent = hasRadioConsent();
-    sheetRoot.innerHTML = `
-      <div class="sheet-backdrop" id="radioBackdrop"></div>
-      <div class="sheet" role="dialog" aria-modal="true">
-        <div class="sheet-handle"></div>
-        <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
-          <h3 style="margin:0;">Radio</h3>
-          <button class="btn btn--ghost" id="closeRadio">Schließen</button>
-        </div>
-
-        ${consent ? `
-          <div style="margin-top:.75rem;">
-            <iframe
-              src="https://player.egofm.de/radioplayer/?stream=egofm"
-              width="100%"
-              height="140"
-              style="border:0; border-radius:12px;"
-              loading="lazy"
-              allow="autoplay"
-              title="egoFM Radio Player"
-            ></iframe>
-
-            <div class="row" style="justify-content:space-between; align-items:center; margin-top:.65rem; gap:.5rem;">
-              <div class="muted">Drittanbieter-Inhalt wurde geladen (egoFM).</div>
-              <button class="btn btn--ghost" id="revokeRadio" type="button">Consent widerrufen</button>
-            </div>
-          </div>
-        ` : `
-          <div class="card" style="margin-top:.75rem;">
-            <div style="font-weight:800; margin-bottom:.25rem;">Datenschutz / Consent</div>
-            <div class="muted" style="line-height:1.4;">
-              Wenn du den Player lädst, wird ein Drittanbieter-Inhalt (egoFM) eingebunden.
-              Dabei können Verbindungsdaten (z.B. IP-Adresse, User-Agent) an den Drittanbieter übertragen werden.
-              Der Player wird erst nach deiner Zustimmung geladen.
-            </div>
-
-            <div class="row" style="margin-top:.75rem; justify-content:flex-end; gap:.5rem;">
-              <button class="btn btn--ghost" id="radioCancel" type="button">Abbrechen</button>
-              <button class="btn btn--solid" id="radioAllow" type="button">Ja, laden</button>
-            </div>
-          </div>
-        `}
-      </div>
-    `;
-
-    const close = () => (sheetRoot.innerHTML = "");
-    qs(sheetRoot, "#radioBackdrop")?.addEventListener("click", close);
-    qs(sheetRoot, "#closeRadio")?.addEventListener("click", close);
-
-    if (!consent) {
-      qs(sheetRoot, "#radioCancel")?.addEventListener("click", close);
-      qs(sheetRoot, "#radioAllow")?.addEventListener("click", () => {
-        setRadioConsent(true);
-        openRadioSheet();
-      });
-    } else {
-      qs(sheetRoot, "#revokeRadio")?.addEventListener("click", () => {
-        setRadioConsent(false);
-        openRadioSheet();
-      });
-    }
-  }
-
-    qs(appEl, "#radioBtn")?.addEventListener("click", () => {
-      openRadioSheet();
-    });
-  }
+  // Radio ist global (Header-Button + Radio-Dock). In der CookView kein extra Button,
+  // damit der Fokus auf Steps + Timern bleibt.
 
   qsa(appEl, 'input[type="checkbox"][data-stepkey]').forEach(cb => {
     cb.addEventListener("change", () => {

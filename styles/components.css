@@ -295,8 +295,8 @@ textarea { min-height: 120px; resize: vertical; }
 /* Radio mini dock (persist across views) */
 .radio-dock {
   position: fixed;
-  left: 14px;
-  bottom: 14px;
+  right: 14px;
+  top: 64px;
   z-index: 9999;
   pointer-events: none; /* <-- wichtig: Container blockiert nichts */
 }

@@ -294,19 +294,18 @@ function setAdminEnabled(v) {
 
 function installAdminCorner() {
   const mount = () => {
-    document.getElementById("admin-corner")?.remove();
-    if (!isAdminEnabled()) return;
+    const btn = document.getElementById("adminBadge");
+    if (!btn) return;
 
-    const el = document.createElement("div");
-    el.id = "admin-corner";
-    el.innerHTML = `<button class="admin-btn" type="button" title="Admin">🛠️</button>`;
-    document.body.appendChild(el);
-
-    el.querySelector(".admin-btn")?.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      location.hash = "admin";
-    });
+    btn.hidden = !isAdminEnabled();
+    if (!btn.__wired) {
+      btn.__wired = true;
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        location.hash = "admin";
+      });
+    }
   };
 
   const header = document.querySelector("header");
