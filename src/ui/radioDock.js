@@ -8,7 +8,7 @@ import { getSetting, setSetting } from "../domain/settings.js";
 const EVT_FEATURE_CHANGED = "tinkeroneo:radioFeatureChanged";
 
 function isFeatureEnabled() {
-  return !!getSetting("radio_feature", false);
+  return !!getSetting("radio_feature", true);
 }
 
 function hasConsent() {
@@ -145,6 +145,8 @@ export function initRadioDock() {
       headerBtn.__wired = true;
       headerBtn.addEventListener("click", (e) => {
         e.preventDefault();
+        // Prevent the global "outside click" handler from immediately closing the panel.
+        e.stopPropagation();
         expanded = !expanded;
         updateUI();
       });

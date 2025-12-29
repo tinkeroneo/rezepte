@@ -314,7 +314,7 @@ export async function initAuthAndSpace() {
       access_token: _session.access_token,
       email: _user?.email,
     });
-  } catch (e) {
+  } catch {
     // keep _session; just mark user/space unknown for now
     _user = null;
     _spaceId = null;

@@ -768,6 +768,30 @@ async function boot() {
     });
   }
 
+  const themeBtn = document.getElementById("themeBadge");
+  if (themeBtn && !themeBtn.__installed) {
+    themeBtn.__installed = true;
+    const applyThemeBtn = () => {
+      const t = readTheme();
+      themeBtn.title = `Theme wechseln (aktuell: ${t})`;
+      themeBtn.textContent = t === "dark" ? "🌙" : (t === "light" ? "☀️" : "🌓");
+    };
+    applyThemeBtn();
+    themeBtn.addEventListener("click", () => {
+      const t = readTheme();
+      const next = t === "system" ? "dark" : (t === "dark" ? "light" : "system");
+      setTheme(next);
+      applyThemeAndOverlay();
+      applyThemeBtn();
+    });
+    window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", () => {
+      if (readTheme() === "system") {
+        applyThemeAndOverlay();
+        applyThemeBtn();
+      }
+    });
+  }
+
   const authBtn = document.getElementById("authBadge");
   if (authBtn && !authBtn.__installed) {
     authBtn.__installed = true;

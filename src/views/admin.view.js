@@ -6,17 +6,14 @@ import { escapeHtml } from "../utils.js";
 export function renderAdminView({ appEl, recipes, setView }) {
   const s = window.__tinkeroneoSettings || {};
 
-  const useBackend = !!s.readUseBackend?.();
+  const cloudEnabled = !!s.readUseBackend?.();
   const auth = s.getAuthContext?.() || null;
   const authedEmail = String(auth?.user?.email || "");
   const activeSpaceId = String(auth?.spaceId || "");
-  const theme = (s.readTheme?.() || "system");
   const winter = !!s.readWinter?.();
-  const radioFeature = !!s.readRadioFeature?.();
   const radioConsent = !!s.readRadioConsent?.();
 
   const ringIntervalMs = Number(s.readTimerRingIntervalMs?.() ?? 2800);
-  const maxRingSeconds = Number(s.readTimerMaxRingSeconds?.() ?? 120);
   const stepHighlight = !!s.readTimerStepHighlight?.();
 
   const timerSoundEnabled = s.readTimerSoundEnabled ? !!s.readTimerSoundEnabled() : true;
@@ -73,32 +70,9 @@ export function renderAdminView({ appEl, recipes, setView }) {
             </div>
           </div>
           <div class="card__bd">
+<hr />
 
-            <div class="row row--spread">
-              <div>
-                <div class="label">Backend (Supabase)</div>
-                <div class="hint">CLOUD nutzt Supabase + RLS/Space. LOCAL nutzt nur LocalStorage.</div>
-              </div>
-              <label class="toggle">
-                <input id="useBackendToggle" type="checkbox" ${useBackend ? "checked" : ""} />
-                <span>Use backend</span>
-              </label>
-            </div>
-
-            <hr />
-
-            <div class="row row--spread">
-              <div>
-                <div class="label">Theme</div>
-                <div class="hint">system | light | dark</div>
-              </div>
-              <select id="themeSelect">
-                <option value="system" ${theme === "system" ? "selected" : ""}>system</option>
-                <option value="light" ${theme === "light" ? "selected" : ""}>light</option>
-                <option value="dark" ${theme === "dark" ? "selected" : ""}>dark</option>
-              </select>
-            </div>
-
+            <!-- Theme is controlled in the topbar -->
             <div class="row row--spread">
               <div>
                 <div class="label">Winter Mode</div>
@@ -113,19 +87,16 @@ export function renderAdminView({ appEl, recipes, setView }) {
             <div class="row row--spread">
               <div>
                 <div class="label">Radio (Drittanbieter)</div>
-                <div class="hint">Optional: egoFM Player. Lädt erst nach Consent. Bei OFF wird nichts extern geladen.</div>
+                <div class="hint">Der Player wird erst nach Consent geladen. Danach ist Radio in der Topbar verfügbar.</div>
               </div>
-              <label class="toggle">
-                <input id="radioToggle" type="checkbox" ${radioFeature ? "checked" : ""} />
-                <span>Radio</span>
-              </label>
+              <div></div>
             </div>
 
             <div class="row" style="gap:.5rem; flex-wrap:wrap;">
               <button class="btn" id="btnRadioResetConsent" type="button" ${radioConsent ? "" : "disabled"}>
                 Consent zurücksetzen
               </button>
-              <div class="hint" style="margin:0;">Status: ${radioFeature ? "aktiv" : "aus"} / Consent: ${radioConsent ? "ja" : "nein"}</div>
+              <div class="hint" style="margin:0;">Consent: ${radioConsent ? "ja" : "nein"}</div>
             </div>
 
           </div>
@@ -156,7 +127,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <div class="card__bd">
             <div class="hint">Einladen per Mail: Die eingeladene Person loggt sich ein und wird automatisch Mitglied. (RLS schützt eure Daten.)</div>
 
-            ${useBackend
+            ${cloudEnabled
               ? `
                 <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:center;">
                   <div class="hint" style="margin:0;">Angemeldet als: <b>${escapeHtml(authedEmail || "-")}</b></div>
@@ -212,14 +183,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
               <input id="ringInterval" type="number" min="125" max="5000" step="25" value="${escapeHtml(ringIntervalMs)}" />
               <div class="hint">125…5000 ms</div>
             </label>
-
-            <label class="field">
-              <div class="label">Max Ring Duration (s)</div>
-              <input id="maxRingSeconds" type="number" min="10" max="600" step="5" value="${escapeHtml(maxRingSeconds)}" disabled />
-              <div class="hint">Wird ignoriert: abgelaufene Timer klingeln bis Bestätigen/Verlängern.</div>
-            </label>
-
-            <div class="row row--spread">
+<div class="row row--spread">
               <div>
                 <div class="label">Step Highlight</div>
                 <div class="hint">Schritt wird hervorgehoben wenn Timer abläuft</div>
@@ -288,8 +252,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
               <pre class="pre">${escapeHtml(
                 [
                   `recipes=${recipeCount}`,
-                  `useBackend=${useBackend}`,
-                  `theme=${theme}`,
                   `winter=${winter}`,
                   `ringIntervalMs=${ringIntervalMs}`,
                   `stepHighlight=${stepHighlight}`,
@@ -319,41 +281,8 @@ export function renderAdminView({ appEl, recipes, setView }) {
   });
 
   // --- Backend toggle (NO reload, awaits setUseBackend) ---
-  const useBackendToggle = q("#useBackendToggle");
-  if (useBackendToggle) {
-    useBackendToggle.addEventListener("change", async () => {
-      const on = !!useBackendToggle.checked;
-      useBackendToggle.disabled = true;
-      setMsg("Switching…");
-
-      try {
-        if (typeof s.setUseBackend !== "function") {
-          throw new Error("setUseBackend fehlt in window.__tinkeroneoSettings");
-        }
-        await s.setUseBackend(on);
-        setMsg("OK ✅", "ok");
-      } catch (e) {
-        setMsg(String(e?.message || e), "bad");
-        // revert checkbox if failed
-        useBackendToggle.checked = !on;
-      } finally {
-        useBackendToggle.disabled = false;
-      }
-    });
-  }
 
   // Theme
-  const themeSelect = q("#themeSelect");
-  if (themeSelect) {
-    themeSelect.addEventListener("change", () => {
-      try {
-        s.setTheme?.(themeSelect.value);
-        location.reload();
-      } catch (e) {
-        setMsg(String(e?.message || e), "bad");
-      }
-    });
-  }
 
   // Winter
   const winterToggle = q("#winterToggle");
@@ -368,19 +297,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
     });
   }
 
-  // Radio (feature + consent)
-  const radioToggle = q("#radioToggle");
-  if (radioToggle) {
-    radioToggle.addEventListener("change", () => {
-      try {
-        s.setRadioFeature?.(!!radioToggle.checked);
-        setMsg("Gespeichert ✅", "ok");
-        location.reload();
-      } catch (e) {
-        setMsg(String(e?.message || e), "bad");
-      }
-    });
-  }
+  // Radio consent
 
   q("#btnRadioResetConsent")?.addEventListener("click", () => {
     try {
@@ -483,7 +400,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
     const invitesEl = q("#invitesList");
     if (!membersEl || !invitesEl) return;
 
-    if (!useBackend) {
+    if (!cloudEnabled) {
       membersEl.textContent = "CLOUD deaktiviert";
       invitesEl.textContent = "CLOUD deaktiviert";
       return;

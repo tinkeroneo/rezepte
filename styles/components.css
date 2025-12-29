@@ -402,3 +402,57 @@ input[type="radio"] {
 }
 .card--flat{ box-shadow: none; }
 .card--tight .card__bd{ padding: 12px 14px; }
+
+
+
+/* === Global timer chip (visible in all non-cook views) === */
+#globalTimersRoot{
+  position: fixed;
+  left: var(--s-5);
+  bottom: calc(var(--s-5) + env(safe-area-inset-bottom));
+  z-index: 1200;
+  pointer-events: none; /* allow only chip to catch clicks */
+}
+#globalTimersRoot > *{ pointer-events: auto; }
+
+.timer-chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  max-width: min(460px, calc(100vw - 2*var(--s-5)));
+}
+
+.timer-chip-time{
+  font-weight: 800;
+  white-space: nowrap;
+}
+.timer-chip-title{
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+  display: none; /* default: compact */
+}
+.timer-chip.show-title .timer-chip-title{ display: inline; }
+
+.timer-chip-more{
+  margin-left: 2px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  font-weight: 800;
+}
+
+.timer-chip.overdue{
+  border-color: rgba(210,179,123,0.55);
+  background: rgba(210,179,123,0.08);
+}

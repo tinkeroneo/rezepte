@@ -3,6 +3,7 @@
 const DEFAULT_TIMERS_KEY = "tinkeroneo_timers_v1";
 import { formatTime, escapeHtml } from "../utils.js";
 import { generateId } from "./id.js";
+import { getAudioCtx, unlockAudio, playGongWarm2s, playWoodblockDeep, playSingingBowlWarmLong, playPulseElectronic } from "../services/timerSounds.js";
 
 /* -------------------- duration normalization -------------------- */
 
@@ -93,8 +94,7 @@ export function getSortedActiveTimers(timers) {
 /* -------------------- beep -------------------- */
 
 // Robust beep helper (works even when AudioContext fails)
-export function createBeep({ soundId = 'gong', volume = 0.7 } = {}) {
-  let ctx = null;
+export function createBeep({ soundId = "gong", volume = 0.7 } = {}) {
   let enabled = true;
   let warned = false;
 
@@ -104,125 +104,64 @@ export function createBeep({ soundId = 'gong', volume = 0.7 } = {}) {
     console.warn("Beep disabled: AudioContext error.", err);
   }
 
-  function ensureCtx() {
-    if (!enabled) return null;
-
-    try {
-      if (!ctx) {
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) {
-          enabled = false;
-          return null;
-        }
-        ctx = new AC();
-
-        // if device/renderer errors out, permanently disable
-        ctx.onstatechange = () => {
-          if (ctx && ctx.state === "closed") enabled = false;
-        };
-      }
-
-      // If the context is already errored/suspended badly, disable
-      if (ctx.state === "closed") {
-        enabled = false;
-        return null;
-      }
-
-      return ctx;
-    } catch (e) {
-      enabled = false;
-      warnOnce(e);
-      return null;
-    }
-  }
-
   async function prime() {
-    const c = ensureCtx();
-    if (!c) return false;
+    if (!enabled) return false;
     try {
-      if (c.state === "suspended") await c.resume();
+      await unlockAudio();
       return true;
-    } catch (e) {
+    } catch (err) {
       enabled = false;
-      warnOnce(e);
+      warnOnce(err);
       return false;
     }
   }
 
-  function beep({ id = soundId } = {}) {
-    if (!enabled) {
-      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
-      return false;
-    }
-
-    const c = ensureCtx();
-    if (!c) {
-      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
-      return false;
+  function playOnce() {
+    if (!enabled) return false;
+    try {
+      // try resume if needed (non-async best-effort)
+      const ctx = getAudioCtx();
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    } catch {
+      // ignore
     }
 
     try {
-      if (c.state === "suspended") {
-        c.resume().catch((e) => { enabled = false; warnOnce(e); });
-        return false;
+      const v = Math.max(0, Math.min(1, Number(volume) || 0));
+      switch (String(soundId || "gong")) {
+        case "wood":
+          playWoodblockDeep({ volume: v });
+          break;
+        case "bowl":
+          playSingingBowlWarmLong({ volume: v });
+          break;
+        case "pulse":
+          playPulseElectronic({ volume: v });
+          break;
+        case "gong":
+        default:
+          playGongWarm2s({ volume: v });
+          break;
       }
-
-      const t0 = c.currentTime;
-
-      // Helper: one voice with envelope
-      function voice({ type = "sine", freq = 440, dur = 0.35, gain = 0.14, detune = 0 } = {}) {
-        const o = c.createOscillator();
-        const g = c.createGain();
-        o.type = type;
-        o.frequency.setValueAtTime(freq, t0);
-        if (detune) o.detune.setValueAtTime(detune, t0);
-
-        // envelope
-        g.gain.setValueAtTime(0.0001, t0);
-        g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gain * volume), t0 + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-
-        o.connect(g);
-        g.connect(c.destination);
-        o.start(t0);
-        o.stop(t0 + dur + 0.03);
-      }
-
-      const sid = String(id || soundId || "gong");
-
-      // Profiles: placeholder but clearly distinct + calm
-      if (sid === "wood") {
-        // warm, short "tok"
-        voice({ type: "triangle", freq: 240, dur: 0.12, gain: 0.18 });
-        voice({ type: "sine", freq: 480, dur: 0.06, gain: 0.06, detune: -12 });
-      } else if (sid === "pulse") {
-        // soft electronic blip
-        voice({ type: "sine", freq: 880, dur: 0.10, gain: 0.10 });
-      } else if (sid === "bowl") {
-        // singing bowl-ish: longer decay + partials
-        voice({ type: "sine", freq: 528, dur: 0.85, gain: 0.06 });
-        voice({ type: "sine", freq: 660, dur: 0.75, gain: 0.05, detune: 6 });
-        voice({ type: "triangle", freq: 396, dur: 0.90, gain: 0.04 });
-      } else {
-        // gong (default): short warm bell
-        voice({ type: "sine", freq: 660, dur: 0.42, gain: 0.07 });
-        voice({ type: "triangle", freq: 440, dur: 0.36, gain: 0.09 });
-        voice({ type: "sine", freq: 990, dur: 0.22, gain: 0.03 });
-      }
-
       return true;
-    } catch (e) {
+    } catch (err) {
       enabled = false;
-      warnOnce(e);
+      warnOnce(err);
       if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
       return false;
     }
   }
-return { prime, beep };
+
+  return {
+    prime,
+    playOnce,
+    // legacy name used in cook.view.js
+    beep: playOnce,
+  };
 }
 
-
 /* -------------------- manager (cook.view.js compatible) -------------------- */
+
 
 export function createTimerManager({
   storageKey = DEFAULT_TIMERS_KEY,

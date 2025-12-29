@@ -130,20 +130,6 @@ function normalizeRedirectToIndexHtml(url) {
   }
 }
 
-/* =========================
-   Debug / utils
-========================= */
-
-function buildDebugText(info) {
-  const lines = [];
-  lines.push(`origin=${location.origin}`);
-  lines.push(`path=${location.pathname}`);
-  lines.push(`hash=${location.hash}`);
-  lines.push(`href=${location.href}`);
-  if (info?.debug) lines.push("", String(info.debug));
-  return lines.join("\n");
-}
-
 function escapeHtml(s) {
   return String(s ?? "")
     .replaceAll("&", "&amp;")

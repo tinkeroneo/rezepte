@@ -1,3 +1,78 @@
+/* --- List: recipe grid must be multi-column --- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--s-4);
+  align-items: start;
+}
+
+.grid-card {
+  min-width: 0;
+}
+
+/* --- Detail: image must be embedded/clipped --- */
+.img-focus-frame {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  border-radius: var(--r-2);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.img-focus-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* --- FAB fixed overlay + menu --- */
+.fab {
+  position: fixed;
+  right: var(--s-5);
+  bottom: calc(var(--s-5) + env(safe-area-inset-bottom));
+  z-index: 1000;
+}
+
+.fab-menu {
+  position: fixed;
+  right: var(--s-5);
+  bottom: calc(var(--s-5) + 56px + env(safe-area-inset-bottom));
+  z-index: 1001;
+  min-width: 180px;
+}
+
+.fab-menu[hidden] {
+  display: none !important;
+}
+
+.fab-menu__item {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+/* subtle open animation (respects reduced motion) */
+.fab-menu {
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.fab-menu.is-open {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab-menu {
+    transition: none;
+    transform: none;
+  }
+}
 /* Winter overlay (optional) */
 body.winter::before{
   content:"";
@@ -56,7 +131,7 @@ body.dark .recipe-cover{ background: linear-gradient(135deg, rgba(210,179,123,.2
   width: 64px;
   height: 64px;
   border-radius: 16px;
-  object-fit: contain;
+  object-fit: cover;
   background: #eee;
   flex: 0 0 auto;
 }
@@ -130,7 +205,7 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
   width: 64px;
   height: 64px;
   border-radius: 14px;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
   background: #eee;
   flex: 0 0 auto;
@@ -194,665 +269,99 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   z-index: 5;
 }
 
-.fab {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  width: 54px;
-  height: 54px;
-  border-radius: 999px;
-  border: 0;
-  background: var(--primary);
-  color: #111;
-  font-size: 26px;
-  line-height: 54px;
-  cursor: pointer;
-  box-shadow: 0 12px 24px rgba(0,0,0,.18);
+
+.fab-menu{
+  position:fixed;
+  right:16px;
+  bottom:84px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  z-index: 40;
+  padding: var(--s-2);
+  min-width: 180px;
+}
+.fab-menu__item{
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+}
+.fab-menu__item:focus{
+  outline: none;
 }
 
-hr { border: 0; border-top: 1px solid var(--border); margin: 1rem 0; }
-h2, h3 { margin: .25rem 0 .5rem; }
-ul, ol { margin: .5rem 0 .5rem 1.2rem; padding: 0; }
-ul li.muted {
-  list-style: none;
-}
-
-.thumb {
-  width: 54px;
-  height: 54px;
-  border-radius: 12px;
-  object-fit: contain;
-  flex: 0 0 54px;
-  background: #eee;
-}
-
-.list-item-left {
-  display: flex;
-  gap: .75rem;
-  align-items: center;
-}
-
-.thumb-placeholder {
-  width: 54px;
-  height: 54px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #eaeaea, #f6f6f6);
-  flex: 0 0 54px;
-}
-
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: .5rem;
-}
-
-.toggle {
-  display: inline-flex;
-  gap: .35rem;
-  align-items: center;
-}
-
-.toggle button {
-  padding: .55rem .7rem;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.toggle button.active {
-  background: rgba(63, 198, 126, 0.14);
-  border-color: rgba(63, 198, 126, 0.35);
-  color: var(--accent);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .75rem;
-}
-
-@media (min-width: 720px) {
-  .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-
-.grid-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.07);
+/* --- Thumbnails: square crops in list + grid --- */
+.li-media{
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  position: relative;
+  border-radius: var(--r-1);
   overflow: hidden;
-  cursor: pointer;
+}
+.li-thumb{
+  width: 100%;
+  height: 100% !important;
+  object-fit: cover;
+  display: block;
 }
 
+/* Grid: square media area (responsive) */
 .grid-media{
   position: relative;
-  overflow: hidden;
-}
-
-.fav-overlay{
-  position: absolute;
-  right: .45rem;
-  bottom: .45rem;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.2rem;
-  height: 2.2rem;
-  border-radius: 999px;
-  border: 1px solid rgba(0,0,0,0.12);
-  background: rgba(255,255,255,0.85);
-  backdrop-filter: blur(6px);
-  color: var(--text);
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-}
-.dark .fav-overlay{ background: rgba(20,20,20,0.65); border-color: rgba(255,255,255,0.16); color: var(--text); }
-.fav-overlay:hover{ filter: brightness(1.03); }
-.fav-overlay:active{ transform: translateY(1px); }
-
-.pending-overlay{
-  position: absolute;
-  left: .45rem;
-  bottom: .45rem;
-  z-index: 3;
-}
-
-.li-media{
-  position: relative;
-  overflow: hidden;
-  border-radius: 12px;
-}
-
-.grid-img {
   width: 100%;
-  height: 120px;
-  /* Prefer letterboxing over cropping (better for non-standard aspect ratios) */
-  object-fit: contain;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+.grid-img{
+  width: 100%;
+  height: 100% !important;
+  object-fit: cover;
   display: block;
-  background: var(--chip);
 }
 
-.grid-body {
-  padding: .75rem .85rem;
-}
 
-.grid-title {
-  font-weight: 750;
-  margin: 0 0 .25rem;
-}
-
-.grid-meta {
-  color: var(--muted);
-  font-size: .95rem;
-}
-
-.cookbar {
-  position: sticky;
-  bottom: 0;
-  z-index: 50;
-  background: var(--card);
-  background: color-mix(in srgb, var(--card) 92%, transparent);
-  backdrop-filter: blur(8px);
-  border-top: 1px solid var(--border);
-  padding: .6rem .75rem;
-}
-
-.cookbar .row {
-  justify-content: space-between;
-  align-items: center;
-}
-
-.sheet-backdrop {
+/* === Bottom Sheet / Overlay === */
+.sheet-backdrop{
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.35);
-  z-index: 80;
+  background: rgba(0,0,0,.45);
+  backdrop-filter: blur(2px);
+  z-index: 1200;
 }
 
-.sheet {
+.sheet{
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 90;
-  background: var(--card);
-  border-radius: 18px 18px 0 0;
-  box-shadow: 0 -12px 30px rgba(0,0,0,0.18);
-  max-height: 78vh;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--s-4) + env(safe-area-inset-bottom));
+  width: min(720px, calc(100% - var(--s-6)*2));
+  max-height: calc(100vh - 120px);
   overflow: auto;
-  padding: 1rem 1rem 1.25rem;
+  z-index: 1201;
+  border-radius: var(--r-3);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow-2);
+  padding: var(--s-4);
 }
 
-.sheet-handle {
-  width: 44px;
-  height: 5px;
+.sheet .toolbar{
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--panel);
+  padding-bottom: var(--s-3);
+  margin-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.sheet-handle{
+  width: 48px;
+  height: 4px;
   border-radius: 999px;
-  background: #d9d9d9;
-  margin: 0 auto .75rem;
+  margin: 0 auto var(--s-4);
+  background: var(--line);
 }
 
-.steps-checklist li {
-  margin-bottom: .75rem;
-}
-
-.step-done {
-  text-decoration: line-through;
-  opacity: 0.65;
-}
-
-/* Timer overdue -> gently draw attention to the associated step */
-.steps-checklist li.step-overdue {
-  /* Champagner-Gold Akzent (nur im abgelaufenen Timer-Fall) */
-  border-left: 6px solid rgba(216, 196, 143, 0.85);
-  padding-left: .75rem;
-  border-radius: 12px;
-  animation: stepPulse 2.1s ease-in-out infinite;
-  box-shadow: 0 0 0 2px rgba(216, 196, 143, 0.08);
-}
-
-@keyframes stepPulse {
-  0% { background: rgba(216, 196, 143, 0.06); box-shadow: 0 0 0 2px rgba(216, 196, 143, 0.06); }
-  50% { background: rgba(216, 196, 143, 0.14); box-shadow: 0 0 0 4px rgba(216, 196, 143, 0.11); }
-  100% { background: rgba(216, 196, 143, 0.06); box-shadow: 0 0 0 2px rgba(216, 196, 143, 0.06); }
-}
-
-body.dark .steps-checklist li.step-overdue {
-  border-left-color: rgba(216, 196, 143, 0.70);
-  box-shadow: 0 0 0 2px rgba(216, 196, 143, 0.14);
-}
-
-.timer-pill {
-  display: inline-flex;
-  gap: .5rem;
-  align-items: center;
-  padding: .35rem .55rem;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--card);
-  font-size: .95rem;
-  margin-top: .35rem;
-}
-
-.timerbar {
-  position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: 76px; /* über cookbar */
-  z-index: 70;
-  background: var(--card);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: .7rem .85rem;
-  box-shadow: 0 10px 22px rgba(0,0,0,0.14);
-}
-
-.timer-overdue {
-  padding: .12rem .45rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.22);
-  font-size: .78rem;
-  font-weight: 750;
-  letter-spacing: .2px;
-  opacity: .95;
-}
-
-/* =========================================================
-   Global Timers Overlay (NEU) – passt zu renderTimersOverlay()
-   Klassen: .timer-stack, .timer-card, .timer-card-main
-   ========================================================= */
-
-
-
-.timer-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  pointer-events: none;
-}
-
-.timer-card {
-  pointer-events: auto;
-  background: rgba(255,255,255,0.96);
-  backdrop-filter: blur(10px);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 10px 22px rgba(0,0,0,0.14);
-  overflow: hidden;
-  transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease, border-color .15s ease;
-}
-
-.timer-card:hover {
-  box-shadow: 0 14px 28px rgba(0,0,0,0.18);
-}
-
-.timer-card-main {
-  display: flex;
-  justify-content: space-between;
-  gap: .75rem;
-  align-items: center;
-  padding: .65rem .75rem;
-}
-
-.timer-card-main .muted {
-  font-size: .9rem;
-}
-
-/* Buttons im Overlay */
-.timer-card-main button {
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 12px;
-  padding: .45rem .6rem;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.timer-card-main button:hover {
-  border-color: rgba(210,179,123,0.35);
-  background: var(--card);
-  color: var(--primary-2);
-}
-
-.timer-stack.expanded .timer-card {
-  transform: none !important; /* expanded: keine Versatz-Illusion */
-}
-
-/* Overdue Styling */
-.timer-card.overdue {
-  border-color: rgba(210,179,123,0.55);
-}
-
-.timer-card.overdue .muted {
-  color: var(--primary-2);
-  font-weight: 750;
-}
-
-/* Sehr dezenter "alive" Hinweis bei overdue */
-@keyframes overduePulse {
-  0% { box-shadow: 0 0 0 rgba(210,179,123,0); }
-  50% { box-shadow: 0 0 0 3px rgba(210,179,123,0.14); }
-  100% { box-shadow: 0 0 0 rgba(210,179,123,0); }
-}
-
-.timer-card.overdue {
-  animation: overduePulse 1.8s ease-in-out infinite;
-}
-
-
-
-@media (min-width: 720px) {
-
-  .timer-card-main {
-    padding: .7rem .85rem;
-  }
-}
-/* --- Timerbar UX upgrades --- */
-
-.timer-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: rgba(210,179,123,0.12);
-  color: var(--primary-2);
-  font-weight: 800;
-  font-size: .82rem;
-  border: 1px solid rgba(210,179,123,0.35);
-}
-
-.timer-toggle {
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: 12px;
-  padding: .45rem .6rem;
-  cursor: pointer;
-}
-
-.timer-toggle:hover {
-  border-color: rgba(210,179,123,0.35);
-  background: rgba(210,179,123,0.12);
-  color: var(--primary-2);
-}
-
-.timer-list {
-  margin-top: .55rem;
-  display: flex;
-  flex-direction: column;
-  gap: .5rem;
-}
-
-.timer-pill {
-  display: flex;
-  justify-content: space-between;
-  gap: .75rem;
-  align-items: center;
-  padding: .55rem .65rem;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--card);
-}
-
-.timer-pill.is-overdue {
-  border-color: rgba(210,179,123,0.55);
-}
-
-.timer-pill.is-overdue .muted {
-  color: var(--primary-2);
-  font-weight: 800;
-}
-
-.timer-pill-title {
-  font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 42vw;
-}
-
-.timer-actions button:active {
-  transform: translateY(1px);
-}
-
-.timer-more-hint {
-  margin-top: .4rem;
-  font-size: .9rem;
-  color: var(--muted);
-}
-
-/* Visible feedback on re-render */
-.timer-flash {
-  animation: timerFlash 160ms ease-out 1;
-}
-@keyframes timerFlash {
-  0% { filter: brightness(1); }
-  50% { filter: brightness(1.12); }
-  100% { filter: brightness(1); }
-}
-/* click feedback: nur kurz auf dem geklickten Element */
-.tap-ack {
-  animation: tapAck 160ms ease-out 1;
-}
-@keyframes tapAck {
-  0% { transform: translateY(0); filter: brightness(1); }
-  50% { transform: translateY(1px); filter: brightness(1.12); }
-  100% { transform: translateY(0); filter: brightness(1); }
-}
-
-/* overdue pulse auf der ZEILE (stoppt automatisch, wenn is-overdue weg ist) */
-.timer-pill.is-overdue {
-  animation: overduePulse 1.8s ease-in-out infinite;
-}
-
-/* --- Global timers overlay header --- */
-
-.timer-overlay {
-  pointer-events: auto;
-}
-
-.timer-overlay-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: .75rem;
-  margin-bottom: .5rem;
-}
-
-.timer-overlay-title {
-  display: inline-flex;
-  gap: .5rem;
-  align-items: center;
-  min-width: 0;
-}
-
-.timer-card-title {
-  font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 52vw;
-}
-/* Global overlay positioning: in cook it sits above cookbar, otherwise closer to bottom */
-#globalTimersRoot {
-  position: fixed;
-  left: 16px;
-  right: 16px;
-  background: var(--card);
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  z-index: 85;
-  pointer-events: none;
-}
-
-
-#globalTimersRoot.has-cookbar {
-  bottom: calc(76px + env(safe-area-inset-bottom));
-}
-
-#globalTimersRoot .timer-overlay {
-  pointer-events: auto;
-}
-#globalTimersRoot.compact-mode {
-  pointer-events: auto;
-}
-.timer-chip {
-  max-width: min(86vw, 420px);
-}
-
-.timer-chip-title {
-  display: none;                 /* standard: nur Zeit */
-  font-weight: 700;
-  color: #1f2322;
-  opacity: .9;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 44vw;
-}
-
-/* Desktop: Hover zeigt Titel */
-.timer-chip:hover .timer-chip-title {
-  display: inline;
-}
-
-/* Mobile/Click: toggled */
-.timer-chip.show-title .timer-chip-title {
-  display: inline;
-}
-
-/* ingredient section headers inside ul without bullets */
-.ingredient-header {
-  list-style: none;
-  padding-left: 0;
-  margin-left: 0;
-  margin-top: .75rem;
-  font-weight: 800;
-  color: var(--muted); /* wie .muted */
-}
-
-/*.ingredient-header {
-  font-weight: 800;
-  margin: .6rem 0 .25rem; 
-}*/
-.ingredient-header:first-child {
-  margin-top: 0;
-}
-.ingredients-ul {
-  padding-left: 1.2rem;
-}
-
-#addToShoppingBtn:hover::after {
-  content: "auf den Einkaufszettel";
-}
-/* --- Category accent (subtil) --- */
-.grid-card,
-.card {
-  position: relative;
-}
-
-.grid-card::before,
-.card::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 10px;
-  bottom: 10px;
-  width: 6px;
-  border-radius: 999px;
-  background: var(--cat-accent, rgba(0,0,0,0.08));
-  opacity: 0.85;
-}
-
-/* ein bisschen Abstand, damit der Streifen nicht "klebt" */
-.grid-card {
-  padding-left: 6px;
-}
-.card {
-  padding-left: 6px;
-}
-
-select {
-  padding: .65rem .75rem;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: white;
-}
-
-
-
-.panel{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:1rem;margin:1rem 0;}
-.kv{display:flex;justify-content:space-between;gap:1rem;padding:.25rem 0;border-bottom:1px dashed rgba(255,255,255,.10);} .kv:last-child{border-bottom:none;}
-.errlist{display:flex;flex-direction:column;gap:.75rem;}
-.erritem{padding:.75rem;border-radius:12px;border:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.15);} .errtime{font-size:.85rem;opacity:.7;margin-bottom:.25rem;} .errstack{white-space:pre-wrap;max-height:220px;overflow:auto;opacity:.85;}
-
-
-/* Admin corner (hidden unless ?admin=1) */
-#admin-corner{position:fixed;right:10px;bottom:10px;z-index:9999;opacity:.35;transition:opacity .15s ease}
-#admin-corner:hover{opacity:1}
-#admin-corner .admin-btn{width:40px;height:40px;border-radius:999px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.9);cursor:pointer}
-#admin-corner .admin-menu{margin-top:8px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.1);display:flex;flex-direction:column;gap:6px;min-width:150px}
-#admin-corner .admin-menu a{text-decoration:none;font-size:14px}
-
-.admin-links{display:flex;gap:.5rem;flex-wrap:wrap}
-.admin-links .chip{display:inline-block;padding:.35rem .6rem;border-radius:999px;border:1px solid rgba(0,0,0,.1);text-decoration:none}
-.admin-toggle{display:flex;align-items:center;justify-content:space-between;gap:1rem;cursor:pointer;padding:.35rem 0}
-.admin-cats{margin-top:1rem;display:flex;flex-direction:column;gap:.6rem}
-.admin-cat-row{display:flex;align-items:center;justify-content:space-between;gap:1rem}
-.admin-cat-name{font-weight:700}
-.admin-color{width:44px;height:34px;border:none;background:transparent;padding:0}
-
-.admin-grid{display:grid;grid-template-columns:1fr;gap:.6rem}
-@media (min-width:720px){.admin-grid{grid-template-columns:1fr 1fr}}
-.admin-field input[type="number"]{width:100%;padding:.6rem .65rem;border-radius:12px;border:1px solid rgba(0,0,0,.14);background: var(--card)}
-
-
-/* Category accent for list items */
-.list-item{position:relative}
-.list-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;border-radius:12px 0 0 12px;background:var(--catColor, rgba(0,0,0,.08))}
-
-/* Admin corner (hidden unless ?admin=1) */
-#admin-corner{position:fixed;right:10px;bottom:10px;z-index:9999;opacity:.35;transition:opacity .15s ease}
-#admin-corner:hover{opacity:1}
-#admin-corner .admin-btn{width:40px;height:40px;border-radius:999px;border:1px solid rgba(0,0,0,.12);background:rgba(255,255,255,.9);cursor:pointer}
-#admin-corner .admin-menu{margin-top:8px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.95);border:1px solid rgba(0,0,0,.10);display:flex;flex-direction:column;gap:6px;min-width:150px}
-#admin-corner .admin-menu a{text-decoration:none;font-size:14px}
-
-.admin-links{display:flex;gap:.5rem;flex-wrap:wrap}
-.admin-links .chip{display:inline-block;padding:.35rem .6rem;border-radius:999px;border:1px solid rgba(0,0,0,.1);text-decoration:none}
-.admin-cats{margin-top:1rem;display:flex;flex-direction:column;gap:.6rem}
-.admin-cat-row{display:flex;align-items:center;justify-content:space-between;gap:1rem}
-.admin-cat-name{font-weight:700}
-.admin-color{width:44px;height:34px;border:none;background:transparent;padding:0}
-
-/* Category accent for list items */
-.list-item{position:relative}
-.list-item::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;border-radius:12px 0 0 12px;background:var(--catColor, rgba(0,0,0,.08))}
-
-.tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;}
-.tag{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid rgba(0,0,0,0.12);background:rgba(0,0,0,0.03);}
-
-
-
-/* Detail image focus/zoom: keep zoom inside frame */
-.img-focus-frame{
-  overflow:hidden;
-  border-radius: var(--r-2);
-  border:1px solid var(--line);
-  background: linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-}
-.detail-img{
-  width:100%;
-  height:260px;
-  display:block;
-  object-fit: contain;
-  object-position: 50% 50%;
-  transform: translateZ(0); /* smoother scaling */
-}

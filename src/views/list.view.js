@@ -13,6 +13,10 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
 
   const tagColors = getTagColors();
 
+  const activeSpaceName = state?.spaces?.active?.name
+    ?? state?.spaces?.activeSpaceName
+    ?? "Mein Space";
+
   const tagChip = (t) => {
     const col = tagColors[t];
     const style = col ? `style="border-color:${escapeHtml(col)}; background:${escapeHtml(col)}22; color:${escapeHtml(col)}"` : "";
@@ -61,10 +65,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
         <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
           <input id="q" type="search" placeholder="Suche… (z.B. Bohnen, scharf, Frühstück)" value="${escapeHtml(state.q)}" />
           <button class="btn btn--ghost" id="shoppingBtn" type="button" title="Einkaufsliste">🧺</button>
-          <button class="btn btn--ghost" id="exportOpenBtn">Export</button>
-          <button class="btn btn--ghost" id="importBtn">Import</button>
-
-        </div>
+                  </div>
       </div>
 
       <div class="card">
@@ -73,13 +74,17 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
             <h2>Rezepte</h2>
             <div class="muted" id="count"></div>
             <div class="row" style="justify-content:space-between; gap:.5rem; margin-top:.65rem; flex-wrap:wrap;">
-              <select id="catFilter">
-                <option value="">Alle Kategorien</option>
-              </select>
+              <button class="btn btn--ghost" id="extraFiltersToggle" type="button" title="Zusätzliche Filter">Filter ▾</button>
 
-              <select id="tagFilter">
-                <option value="">Alle Tags</option>
-              </select>
+              <div id="extraFilters" class="row" style="gap:.5rem; flex-wrap:wrap; display:none;">
+                <select id="catFilter" title="Kategorie">
+                  <option value="">Alle Kategorien</option>
+                </select>
+
+                <select id="tagFilter" title="Tag">
+                  <option value="">Alle Tags</option>
+                </select>
+              </div>
 
               <button class="btn btn--ghost" id="pendingToggle" type="button" style="display:none;"></button>
 
@@ -98,8 +103,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
           </div>
 
           <div class="seg" aria-label="Ansicht umschalten">
-            <button class="seg__btn" id="modeList" type="button">Liste</button>
-            <button class="seg__btn" id="modeGrid" type="button">Grid</button>
+            <button class="seg__btn" id="modeList" type="button" title="Listenansicht" aria-label="Listenansicht">☰</button>
+            <button class="seg__btn" id="modeGrid" type="button" title="Gridansicht" aria-label="Gridansicht">▦</button>
           </div>
 
           <input
@@ -112,27 +117,15 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
       </div>
 
       <div id="results"></div>
+      <div class="card fab-menu" id="fabMenu" role="menu" aria-label="Schnellaktionen" hidden>
+        <button class="btn btn--ghost fab-menu__item" id="fabNew" role="menuitem" type="button" title="Neues Rezept">Neues Rezept</button>
+        <button class="btn btn--ghost fab-menu__item" id="fabImport" role="menuitem" type="button" title="Rezepte importieren">Import</button>
+        <button class="btn btn--ghost fab-menu__item" id="fabExport" role="menuitem" type="button" title="Rezepte exportieren">Export</button>
+      </div>
       <button class="fab" id="addFab" aria-label="Rezept hinzufügen">+</button>
     </div>
   `;
   ;
-
-  const importBtn = qs(appEl, "#importBtn");
-  if (importBtn) {
-    importBtn.addEventListener("click", () => {
-      openImportSheet({
-        useBackend,
-        onImportRecipes
-      });
-    });
-  }
-
-  const exportOpenBtn = qs(appEl, "#exportOpenBtn");
-  if (exportOpenBtn) {
-    exportOpenBtn.addEventListener("click", () => {
-      openExportSheet({ list: getFiltered(qEl.value), partsByParent });
-    });
-  }
 
   const qEl = qs(appEl, "#q");
   const resultsEl = qs(appEl, "#results");
@@ -146,6 +139,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   };
   const catEl = qs(appEl, "#catFilter");
   const tagEl = qs(appEl, "#tagFilter");
+  const extraFiltersBtn = qs(appEl, "#extraFiltersToggle");
+  const extraFiltersWrap = qs(appEl, "#extraFilters");
   const sortEl = qs(appEl, "#sortSelect");
   const sortDirBtn = qs(appEl, "#sortDirBtn");
   const resetEl = qs(appEl, "#resetFilters");
@@ -169,9 +164,35 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   };
   if (sortDir !== "asc" && sortDir !== "desc") sortDir = defaultDirFor(sort);
 
+  const applySortDirUi = () => {
+    if (!sortDirBtn) return;
+    const isAsc = sortDir === "asc";
+    sortDirBtn.textContent = isAsc ? "↑" : "↓";
+    sortDirBtn.title = isAsc ? "Aufsteigend" : "Absteigend";
+  };
+
   // init UI state
   catEl.value = cat;
   tagEl.value = tag;
+
+  // Advanced filters (category/tag) are hidden by default, but auto-open if a filter is active.
+  let extraOpen = !!(cat || tag);
+  const syncExtraFilters = () => {
+    if (!extraFiltersWrap || !extraFiltersBtn) return;
+    extraFiltersWrap.style.display = extraOpen ? "flex" : "none";
+    extraFiltersBtn.setAttribute("aria-expanded", extraOpen ? "true" : "false");
+    extraFiltersBtn.textContent = extraOpen ? "Filter ▴" : "Filter ▾";
+  };
+  syncExtraFilters();
+  if (extraFiltersBtn && !extraFiltersBtn.__wired) {
+    extraFiltersBtn.__wired = true;
+    extraFiltersBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      extraOpen = !extraOpen;
+      syncExtraFilters();
+    });
+  }
+
   const pendingBtn = qs("#pendingToggle", appEl);
   const pendingCount = recipes.filter(r => r._pending).length;
   if (pendingBtn) {
@@ -191,25 +212,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   }
 
   sortEl.value = sort;
-  if (sortDirBtn) {
-    sortDirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
-    sortDirBtn.title = sortDir === "asc" ? "Aufsteigend" : "Absteigend";
-  }
-  if (sortDirBtn) {
-    const applySortDirUi = () => {
-      const isAsc = sortDir === "asc";
-      sortDirBtn.textContent = isAsc ? "↑" : "↓";
-      sortDirBtn.title = isAsc ? "Aufsteigend" : "Absteigend";
-    };
-    applySortDirUi();
-    sortDirBtn.addEventListener("click", () => {
-      sortDir = sortDir === "asc" ? "desc" : "asc";
-      lsSetStr(KEYS.LIST_SORT_DIR, sortDir);
-      lsSet(KEYS.NAV, { ...state, q: qEl.value });
-      applySortDirUi();
-      renderResults();
-    });
-  }
+  applySortDirUi();
 
   // build tag options
   const tags = Array.from(
@@ -525,9 +528,146 @@ function renderResults() {
   });
 
   qs(appEl, "#shoppingBtn").addEventListener("click", () => setView({ name: "shopping", selectedId: null, q: qEl.value }));
-  qs(appEl, "#addFab").addEventListener("click", () => setView({ name: "add", selectedId: null, q: qEl.value }));
+  // FAB speed-dial
+  const fab = qs(appEl, "#addFab");
+  const fabMenu = qs(appEl, "#fabMenu");
+  const fabNew = qs(appEl, "#fabNew");
+  const fabImport = qs(appEl, "#fabImport");
+  const fabExport = qs(appEl, "#fabExport");
 
-  qEl.addEventListener("input", () => {
+  const fabItems = [fabNew, fabImport, fabExport].filter(Boolean);
+  const prefersReducedMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const setRovingTabIndex = (activeIdx) => {
+    fabItems.forEach((el, idx) => {
+      if (!el) return;
+      el.tabIndex = idx === activeIdx ? 0 : -1;
+    });
+  };
+
+  const closeFabMenu = () => {
+    if (!fab || !fabMenu || fabMenu.hidden) return;
+    fab.setAttribute("aria-expanded", "false");
+
+    // animate close (if allowed)
+    fabMenu.classList.remove("is-open");
+    if (prefersReducedMotion()) {
+      fabMenu.hidden = true;
+      fab.focus();
+      return;
+    }
+
+    window.setTimeout(() => {
+      fabMenu.hidden = true;
+      fab.focus();
+    }, 130);
+  };
+
+  const positionFabMenu = () => {
+    if (!fabMenu) return;
+    // reset any overrides
+    fabMenu.style.top = "";
+    fabMenu.style.bottom = "";
+    // default: above FAB
+    fabMenu.style.bottom = `calc(var(--s-5) + 56px + env(safe-area-inset-bottom))`;
+
+    // if the menu would go off the top, pin it to a safe top offset
+    const r = fabMenu.getBoundingClientRect();
+    if (r.top < 8) {
+      fabMenu.style.top = "8px";
+      fabMenu.style.bottom = "auto";
+    }
+  };
+
+  const openFabMenu = () => {
+    if (!fab || !fabMenu || !fabMenu.hidden) return;
+    fabMenu.hidden = false;
+    fab.setAttribute("aria-expanded", "true");
+    setRovingTabIndex(0);
+
+    // allow layout, then animate in
+    positionFabMenu();
+    window.requestAnimationFrame(() => {
+      fabMenu.classList.add("is-open");
+      positionFabMenu();
+      fabItems[0]?.focus();
+    });
+  };
+
+  if (fab && fabMenu) {
+    fab.setAttribute("aria-haspopup", "menu");
+    fab.setAttribute("aria-expanded", "false");
+
+    fab.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (fabMenu.hidden) openFabMenu();
+      else closeFabMenu();
+    });
+
+    // Keep menu open on clicks inside
+    fabMenu.addEventListener("click", (e) => e.stopPropagation());
+
+    // Outside click closes
+    document.addEventListener("click", () => closeFabMenu());
+
+    // Keyboard nav (ESC + arrows)
+    document.addEventListener("keydown", (e) => {
+      if (!fabMenu || fabMenu.hidden) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeFabMenu();
+      }
+    });
+
+    fabMenu.addEventListener("keydown", (e) => {
+      if (!fabItems.length) return;
+
+      const currentIdx = Math.max(0, fabItems.findIndex((el) => el === document.activeElement));
+      const go = (idx) => {
+        const next = (idx + fabItems.length) % fabItems.length;
+        setRovingTabIndex(next);
+        fabItems[next]?.focus();
+      };
+
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        go(currentIdx + 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        go(currentIdx - 1);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        go(0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        go(fabItems.length - 1);
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        (document.activeElement)?.click?.();
+      }
+    });
+
+    if (fabNew) fabNew.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeFabMenu();
+      setView({ name: "add", selectedId: null, q: qEl.value });
+    });
+
+    if (fabImport) fabImport.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeFabMenu();
+      openImportSheet({ useBackend, onImportRecipes });
+    });
+
+    if (fabExport) fabExport.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeFabMenu();
+      openExportSheet({ list: recipes, spaceName: activeSpaceName, useBackend });
+    });
+  }
+
+qEl.addEventListener("input", () => {
     // keep in nav
     lsSet(KEYS.NAV, { ...state, q: qEl.value });
     renderResults();
@@ -566,8 +706,8 @@ function renderResults() {
     sortDirBtn.addEventListener("click", () => {
       sortDir = sortDir === "asc" ? "desc" : "asc";
       lsSetStr(KEYS.LIST_SORT_DIR, sortDir);
-      sortDirBtn.textContent = sortDir === "asc" ? "↑" : "↓";
-      sortDirBtn.title = sortDir === "asc" ? "Aufsteigend" : "Absteigend";
+      lsSet(KEYS.NAV, { ...state, q: qEl.value });
+      applySortDirUi();
       renderResults();
     });
   }
