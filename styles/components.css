@@ -185,6 +185,7 @@ textarea{ min-height: 120px; resize: vertical; }
   max-width: 760px;
   margin: 0 auto;
   padding: 1rem;
+  padding-bottom:  60px;
 }
 
 .row {
@@ -238,7 +239,7 @@ body.dark .btn:hover{ background: rgba(255,255,255,0.05); }
 }
 .btn--solid:hover{ filter: brightness(1.03); }
 
-.btn--ghost{ border-color: transparent; }
+.btn--ghost{ border-color: var(--gold-weak); border-width: 1px;border-left: 0;border-right: 0; border-top:0;}
 .btn--sm{ padding: 7px 10px; font-size: 13px; }
 
 /* Active state for generic buttons (e.g. filter toggles) */
@@ -495,6 +496,7 @@ input[type="radio"] {
   color: var(--text);
   box-shadow: var(--shadow);
   cursor: pointer;
+  pointer-events: auto;
   max-width: min(460px, calc(100vw - 2*var(--s-5)));
 }
 
@@ -527,3 +529,28 @@ input[type="radio"] {
 }
 
 
+.image-toggle summary {
+  cursor: pointer;
+  padding: .5rem 0;
+  font-weight: 600;
+}
+
+
+.cookbar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(730px, 100%);
+  background: var(--card);
+  padding: .75rem 1rem;
+  border-top: 1px solid var(--border);
+  z-index: 2000;
+  max-width:  730px;
+  border-radius: 15px;
+}
+
+.cookbar-row {
+  display: flex;
+  justify-content: space-between;
+}

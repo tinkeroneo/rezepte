@@ -48,21 +48,21 @@ export function renderTimersOverlay({ appEl: _appEl, state, setView: _setView })
 
   const timers = loadTimers();
   const list = getSortedActiveTimers(timers);
-let changed = false;
+  let changed = false;
 
-// Beep exactly once per timer when it hits <= 0
-for (const t of list) {
-  if (t.remainingSec <= 0) {
-    const live = timers[t.id];
-    if (live && !live.beeped) {
-      live.beeped = true;
-      changed = true;
-      audio.beep();
+  // Beep exactly once per timer when it hits <= 0
+  for (const t of list) {
+    if (t.remainingSec <= 0) {
+      const live = timers[t.id];
+      if (live && !live.beeped) {
+        live.beeped = true;
+        changed = true;
+        audio.beep();
+      }
     }
   }
-}
 
-if (changed) saveTimers(timers);
+  if (changed) saveTimers(timers);
 
 
   if (!list.length) {
@@ -97,13 +97,21 @@ if (changed) saveTimers(timers);
 
     const chip = qs(root, "[data-timer-chip]");
     if (chip) {
+
       chip.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
+        const open = e.target.closest("[data-open-recipe]");
+        if (open) {
+          const id = open.dataset.openRecipe;
+          window.location.href = `/cook/${id}`;
+          return;
+        }
+
+        // Normaler Chip-Klick
         ack(chip);
         chip.classList.toggle("show-title");
-      }, true);
+      });
+
+
     }
 
     // jump back to recipe (outside cook view)

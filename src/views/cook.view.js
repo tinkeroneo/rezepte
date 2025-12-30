@@ -48,13 +48,14 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
 
         <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
-
+<details class="image-toggle"> <summary>Bild anzeigen</summary>
         ${r.image_url ? `
           <div style="margin:.75rem 0;">
+          
             <img src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}"
                  style="width:100%; border-radius:12px; display:block;" />
           </div>
-        ` : ""}
+        ` : ""}</details>
 
         <div id="timerRoot"></div>
 
@@ -102,8 +103,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
       </div>
 
       <div class="cookbar">
-        <div class="row">
-          <button class="btn btn--ghost" id="ingredientsBtn">Zutaten</button>
+        <div class="cookbar-row">
+          <button class="btn btn--solid" id="ingredientsBtn">Zutaten</button>
           <button class="btn btn--ghost" id="resetBtn">Reset Steps</button>
         </div>
       </div>

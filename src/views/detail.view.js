@@ -100,7 +100,7 @@ export function renderDetailView({
           <h2>${escapeHtml(r.title)} 
         <button class="btn btn--ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button></h2>
         ${r.time ? `<div class="muted">${escapeHtml(r.time)}` : ""}
-        ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle${escapeHtml(r.source)}</div>` : ""}
+        ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
 
         </div>
       </section>
@@ -109,6 +109,7 @@ export function renderDetailView({
 
         ${r.image_url ? `
           <div style="margin:.75rem 0;">
+
             <div class="img-focus-frame">
               <img id="detailImg" class="detail-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" />
             </div>
@@ -155,6 +156,7 @@ export function renderDetailView({
         ` : ""}
 
         <hr />
+        
         <div class="row" style="justify-content:space-between; align-items:center;">
           <h3 style="margin:0;">Zutaten</h3>
           <button class="btn btn--ghost" id="addToShoppingBtn" >🧺</button>
