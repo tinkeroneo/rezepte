@@ -170,10 +170,16 @@ function setTimerSoundId(id) {
 
 function readTimerSoundVolume() {
   const raw = lsGetStr(KEYS.TIMER_SOUND_VOLUME, "");
-  const n = Number(raw);
+  const v = String(raw ?? "").trim();
+
+  // If missing/empty, use a sensible default (audible but not too loud)
+  if (!v) return 0.7;
+
+  const n = Number(v);
   if (!Number.isFinite(n)) return 0.7;
   return Math.max(0, Math.min(1, n));
 }
+
 function setTimerSoundVolume(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return;
