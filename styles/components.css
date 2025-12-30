@@ -120,6 +120,18 @@ body.dark .badge-btn:hover{ background: rgba(255,255,255,0.05); }
   color: var(--text);
 }
 
+.select-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.select-wrapper .icon {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+
 /* Inputs baseline */
 input, textarea, select, button{ font: inherit; }
 
