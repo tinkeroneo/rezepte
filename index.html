@@ -18,17 +18,23 @@
 </head>
 <body>
   <header>
-    <span id="appTitle">🌱 Rezeptwerk</span>
+    
     <span class="header-badges">
       <button id="modeBadge" class="badge badge-btn" type="button" title="Speicher-Modus (klicken zum Umschalten)">—</button>
-      <button id="themeBadge" class="badge badge-btn" type="button" title="Theme wechseln">🌓</button>
-      <select id="spaceSelect" class="badge badge-select" title="Space wählen" hidden></select>
+      
       <button id="radioHeaderBtn" class="badge badge-btn" type="button" title="Radio" hidden>🎧</button>
-      <span id="syncBadge" class="badge" title="Sync-Status" hidden>⟳</span>
-      <button id="authBadge" class="badge badge-btn" type="button" title="Login/Logout">LOGIN</button>
-      <button id="adminBadge" class="badge badge-btn" type="button" title="Admin" hidden>🛠️</button>
-      <!-- <span id="offlineBadge" class="badge" title="Offline" hidden>Offline</span> -->
-    </span>
+      
+      <button id="shopBadge" class="badge badge-btn"  type="button" title="Einkaufsliste">🧺</button>
+  
+      <button id="userBadge" class="badge badge-btn badge--warn" type="button" title="User Menü" hidden>👤 USER</button>
+      <div id="userMenu" class="popover" hidden>
+      <div><button id="authBadge" class="badge badge-btn" type="button" title="Login/Logout">🔐LOGIN</button></div>
+      <div><button id="adminBadge" class="badge badge-btn" type="button" title="Admin" hidden>🛠️ ADMIN</button></div>
+      <div><button id="themeBadge" class="badge badge-btn" type="button" title="Theme wechseln" hidden>🌓 THEME</button></div>
+      <div><select id="spaceSelect" class="badge badge-select" title="Space wählen" hidden>🔀 SPACE</select></div>
+      <div><span id="syncBadge" class="badge" title="Sync-Status" hidden>⟳ Sync-Status</span></div>
+      </div>
+
   </header>
   <main id="app"></main>
   <div id="radioDockRoot"></div>

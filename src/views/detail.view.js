@@ -99,8 +99,8 @@ export function renderDetailView({
         <div class="card__bd">
           <h2>${escapeHtml(r.title)} 
         <button class="btn btn--ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button></h2>
-        ${r.time ? `<div class="muted">${escapeHtml(r.time)}</div>` : ""}
-        ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
+        ${r.time ? `<div class="muted">${escapeHtml(r.time)}` : ""}
+        ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle${escapeHtml(r.source)}</div>` : ""}
 
         </div>
       </section>
@@ -115,7 +115,6 @@ export function renderDetailView({
 
             <div class="row" style="justify-content:space-between; align-items:center; margin-top:.45rem;">
               <button class="btn btn--ghost" id="imgFocusToggle" type="button">🖼️ Bild anpassen</button>
-              <span class="muted" id="imgFocusHint" style="font-size:.95rem;"></span>
             </div>
 
             <div id="imgFocusPanel" class="card" style="margin-top:.5rem; padding:.75rem; display:none;">
@@ -498,12 +497,7 @@ export function renderDetailView({
     setView({ name: "shopping", selectedId: null, q: state.q });
   });
 
-  qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
-    if (!confirm("Rezept wirklich löschen?")) return;
-    // local deletion is handled in app.js via callback — simplest: reload after delete
-    await sbDelete?.(r.id).catch(() => { });
-    location.reload();
-  });
+
 
   qsa(appEl, "[data-open-child]").forEach(a => {
     a.addEventListener("click", (e) => {

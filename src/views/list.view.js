@@ -61,18 +61,21 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
 
   appEl.innerHTML = `
     <div class="container">
-      <div class="topbar">
-        <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
-          <input id="q" type="search" placeholder="Suche… (z.B. Bohnen, scharf, Frühstück)" value="${escapeHtml(state.q)}" />
-          <button class="btn btn--ghost" id="shoppingBtn" type="button" title="Einkaufsliste">🧺</button>
-                  </div>
-      </div>
-
+  
       <div class="card">
         <div class="toolbar">
           <div>
+          <div class="toolbar-header">
             <h2>Rezepte</h2>
             <div class="muted" id="count"></div>
+
+              <div class="seg" aria-label="Ansicht umschalten">
+                <button class="seg__btn" id="modeList" type="button" title="Listenansicht" aria-label="Listenansicht">☰</button>
+                <button class="seg__btn" id="modeGrid" type="button" title="Gridansicht" aria-label="Gridansicht">▦</button>
+              </div>
+          </div>
+          
+
             <div class="row" style="justify-content:space-between; gap:.5rem; margin-top:.65rem; flex-wrap:wrap;">
               <button class="btn btn--ghost" id="extraFiltersToggle" type="button" title="Zusätzliche Filter">Filter ▾</button>
 
@@ -86,26 +89,27 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
                 </select>
               </div>
 
-              <button class="btn btn--ghost" id="pendingToggle" type="button" style="display:none;"></button>
+              <button class="btn btn--ghost" id="pendingToggle" type="button" style="display:none;">⌛</button>
 
               <select id="sortSelect">
-                <option value="new">Neu/Alt</option>
+                <option value="new">Erstelldatum</option>
                 <option value="az">Name</option>
-                <option value="time">Dauer</option>
+                <option value="time">Kochdauer</option>
                 <option value="lastCooked">Zuletzt gekocht</option>
                 <option value="bestRated">Bewertung</option>
 
               </select>
               <button class="btn btn--ghost" id="sortDirBtn" type="button" title="Sortierung umkehren">↑</button>
               <button class="btn btn--ghost" id="resetFilters" type="button" title="Filter zurücksetzen">↺</button>
+              
             </div>
-
+        <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
+          <input id="q" type="search" placeholder="Suche… (z.B. Bohnen, scharf, Frühstück)" value="${escapeHtml(state.q)}" />
+        </div>
+        
           </div>
 
-          <div class="seg" aria-label="Ansicht umschalten">
-            <button class="seg__btn" id="modeList" type="button" title="Listenansicht" aria-label="Listenansicht">☰</button>
-            <button class="seg__btn" id="modeGrid" type="button" title="Gridansicht" aria-label="Gridansicht">▦</button>
-          </div>
+
 
           <input
             id="importFile"
@@ -297,22 +301,22 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     const stats = buildCookStatsByRecipeId(list.map(r => r.id));
 
 
-const sortTitle = (v) => {
-  const s = String(v ?? "");
-  // strip emojis / pictographs so they don't dominate sorting
-  try {
-    // Avoid misleading character classes: remove in separate passes.
-    return s
-      .replace(/\p{Extended_Pictographic}/gu, "")
-      .replace(/\u200D/g, "")
-      .replace(/\uFE0F/g, "")
-      .trim()
-      .toLowerCase();
-  } catch {
-    // fallback for older engines
-    return s.replace(/[\u{1F300}-\u{1FAFF}]/gu, "").trim().toLowerCase();
-  }
-};
+    const sortTitle = (v) => {
+      const s = String(v ?? "");
+      // strip emojis / pictographs so they don't dominate sorting
+      try {
+        // Avoid misleading character classes: remove in separate passes.
+        return s
+          .replace(/\p{Extended_Pictographic}/gu, "")
+          .replace(/\u200D/g, "")
+          .replace(/\uFE0F/g, "")
+          .trim()
+          .toLowerCase();
+      } catch {
+        // fallback for older engines
+        return s.replace(/[\u{1F300}-\u{1FAFF}]/gu, "").trim().toLowerCase();
+      }
+    };
 
     // 2) sortieren
     const dir = sortDir === "asc" ? 1 : -1;
@@ -348,7 +352,7 @@ const sortTitle = (v) => {
     return "rgb(210, 225, 220)";
   }
 
-  
+
   function renderChunked(containerEl, items, renderer, { chunkSize = 60 } = {}) {
     containerEl.innerHTML = "";
     const frag = document.createDocumentFragment();
@@ -370,7 +374,7 @@ const sortTitle = (v) => {
     pump();
   }
 
-function renderResults() {
+  function renderResults() {
     const filtered = getFiltered(qEl.value);
     countEl.textContent = `${filtered.length} von ${recipes.length}`;
 
@@ -385,9 +389,9 @@ function renderResults() {
               <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
                 <div class="grid-media">
                   ${r.image_url
-                    ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" style="${imgStyleFromFocus(r.image_focus, { height: 120 })}" />`
-                    : coverFallbackHtml(r, "grid-img")
-                  }
+            ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy"  />`
+            : coverFallbackHtml(r, "grid-img")
+          }
                   <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
                   ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
                 </div>
@@ -413,10 +417,11 @@ function renderResults() {
           card.innerHTML = `
             <div class="grid-media">
               ${r.image_url
-                ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" style="${imgStyleFromFocus(r.image_focus, { height: 120 })}" />`
-                : coverFallbackHtml(r, "grid-img")
-              }
-              <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
+              ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+              : coverFallbackHtml(r, "grid-img")
+            }
+              <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button"></button>
+
               ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
             </div>
             <div class="grid-body">
@@ -440,9 +445,9 @@ function renderResults() {
                 <div class="li-left">
                   <div class="li-media">
                     ${r.image_url
-                      ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" style="${imgStyleFromFocus(r.image_focus, { height: 64 })}" />`
-                      : coverFallbackHtml(r, "li-thumb li-thumb--empty")
-                    }
+            ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy"  />`
+            : coverFallbackHtml(r, "li-thumb li-thumb--empty")
+          }
                     <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
                     ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
                   </div>
@@ -450,8 +455,8 @@ function renderResults() {
                     <div class="li-title">${escapeHtml(r.title)}</div>
                     <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
                     ${(Array.isArray(r.tags) && r.tags.length)
-                      ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
-                      : ""}
+            ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
+            : ""}
                   </div>
                 </div>
                 <div class="li-actions"><div class="li-chev" aria-hidden="true">›</div></div>
@@ -471,9 +476,9 @@ function renderResults() {
             <div class="li-left">
               <div class="li-media">
                 ${r.image_url
-                  ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" style="${imgStyleFromFocus(r.image_focus, { height: 64 })}" />`
-                  : coverFallbackHtml(r, "li-thumb li-thumb--empty")
-                }
+              ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy"  />`
+              : coverFallbackHtml(r, "li-thumb li-thumb--empty")
+            }
                 <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
                 ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
               </div>
@@ -481,8 +486,8 @@ function renderResults() {
                 <div class="li-title">${escapeHtml(r.title)}</div>
                 <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
                 ${(Array.isArray(r.tags) && r.tags.length)
-                  ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
-                  : ""}
+              ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
+              : ""}
               </div>
             </div>
             <div class="li-actions"><div class="li-chev" aria-hidden="true">›</div></div>
@@ -527,7 +532,6 @@ function renderResults() {
     renderResults();
   });
 
-  qs(appEl, "#shoppingBtn").addEventListener("click", () => setView({ name: "shopping", selectedId: null, q: qEl.value }));
   // FAB speed-dial
   const fab = qs(appEl, "#addFab");
   const fabMenu = qs(appEl, "#fabMenu");
@@ -667,7 +671,7 @@ function renderResults() {
     });
   }
 
-qEl.addEventListener("input", () => {
+  qEl.addEventListener("input", () => {
     // keep in nav
     lsSet(KEYS.NAV, { ...state, q: qEl.value });
     renderResults();
@@ -761,7 +765,6 @@ qEl.addEventListener("input", () => {
         <div class="muted">Wähle Rezepte & Format</div>
         <div class="muted">Basis: ${safeList.length} sichtbare Rezepte</div>
       </div>
-      <button class="btn btn--ghost" id="exportCloseBtn">Schließen</button>
     </div>
 
     <hr />
@@ -810,7 +813,6 @@ qEl.addEventListener("input", () => {
     document.body.appendChild(sheet);
     backdrop.addEventListener("click", close);
 
-    qs(sheet, "#exportCloseBtn").addEventListener("click", close);
 
     const updateCount = () => {
       const count = selected.size;
@@ -871,7 +873,7 @@ qEl.addEventListener("input", () => {
   function openImportSheet({ useBackend: useBackendFlag, onImportRecipes: onImportFn }) {
     const backdrop = document.createElement("div");
     backdrop.className = "sheet-backdrop";
-    
+
 
     const sheet = document.createElement("div");
     sheet.className = "sheet";
@@ -886,9 +888,7 @@ qEl.addEventListener("input", () => {
     <div class="toolbar">
       <div>
         <h3 style="margin:0;">Import</h3>
-        <div class="muted">${useBackendFlag ? "Ziel: Supabase (Backend) + Local Cache" : "Ziel: nur Local Storage"}</div>
       </div>
-      <button class="btn btn--ghost" id="impClose">Schließen</button>
     </div>
 
     <hr />
@@ -930,7 +930,6 @@ qEl.addEventListener("input", () => {
 
     document.body.appendChild(backdrop);
     document.body.appendChild(sheet);
-    qs(sheet, "#impClose").addEventListener("click", close);
 
     const fileBtn = qs(sheet, "#impPickFile");
     const fileInput = qs(sheet, "#impFile");

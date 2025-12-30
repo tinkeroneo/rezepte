@@ -1,7 +1,7 @@
 import { escapeHtml, qs } from "../utils.js";
 import { compressImageFile } from "../domain/images.js";
 import { generateId } from "../domain/id.js";
-
+import { deleteRecipe as sbDelete } from "../supabase.js";
 export function renderAddView({
   appEl, state, recipes, setView,
   useBackend, upsertRecipe, uploadRecipeImage
@@ -12,20 +12,20 @@ export function renderAddView({
   let pendingFile = null;
   let previewUrl = null;
 
-// dirty tracking (unsaved changes)
-let dirty = false;
-const setDirty = (v) => { dirty = v; };
+  // dirty tracking (unsaved changes)
+  let dirty = false;
+  const setDirty = (v) => { dirty = v; };
 
-// ensure we don’t register multiple handlers across renders
-if (window.__tinkeroneo_beforeunload_add) {
-  window.removeEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
-}
-window.__tinkeroneo_beforeunload_add = (e) => {
-  if (!dirty) return;
-  e.preventDefault();
-  e.returnValue = "";
-};
-window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
+  // ensure we don’t register multiple handlers across renders
+  if (window.__tinkeroneo_beforeunload_add) {
+    window.removeEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
+  }
+  window.__tinkeroneo_beforeunload_add = (e) => {
+    if (!dirty) return;
+    e.preventDefault();
+    e.returnValue = "";
+  };
+  window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
 
 
   const r = existing ? {
@@ -104,6 +104,7 @@ window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
         <textarea id="steps" placeholder="z.B. Bohnen zerdrücken\nZwiebel anbraten\n...">${escapeHtml(stepsText)}</textarea>
 
         <div class="row" style="justify-content:flex-end; margin-top:.75rem;">
+          <button class="btn btn--solid" id="deleteBtn">${isEdit ? "Löschen" : "Löschen"}</button>
           <button class="btn btn--solid" id="saveBtn">${isEdit ? "Speichern" : "Anlegen"}</button>
         </div>
 
@@ -122,18 +123,18 @@ window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
   const previewWrap = qs(appEl, "#imgPreviewWrap");
 
 
-// tags are read via form on save
+  // tags are read via form on save
 
-const markDirty = () => setDirty(true);
-["#title","#category","#time","#source","#image_url","#ingredients","#steps","#tags"].forEach((sel) => {
-  const el = qs(appEl, sel);
-  el.addEventListener("input", markDirty);
-});
-fileEl.addEventListener("change", () => {
-  pendingFile = fileEl.files?.[0] || null;
-  // upload status is handled via UI feedback
-  markDirty();
-});
+  const markDirty = () => setDirty(true);
+  ["#title", "#category", "#time", "#source", "#image_url", "#ingredients", "#steps", "#tags"].forEach((sel) => {
+    const el = qs(appEl, sel);
+    el.addEventListener("input", markDirty);
+  });
+  fileEl.addEventListener("change", () => {
+    pendingFile = fileEl.files?.[0] || null;
+    // upload status is handled via UI feedback
+    markDirty();
+  });
 
 
 
@@ -172,6 +173,14 @@ fileEl.addEventListener("change", () => {
     if (isEdit) setView({ name: "detail", selectedId: r.id, q: state.q });
     else setView({ name: "list", selectedId: null, q: state.q });
   });
+  qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
+    if (!confirm("Rezept wirklich löschen?")) return;
+    // local deletion is handled in app.js via callback — simplest: reload after delete
+    await sbDelete?.(r.id).catch(() => { });
+
+    setView({ name: "list", selectedId: null, q: state.q });
+    location.reload();
+  });
 
   qs(appEl, "#saveBtn").addEventListener("click", async () => {
     const title = qs(appEl, "#title").value.trim();
@@ -186,27 +195,28 @@ fileEl.addEventListener("change", () => {
       .map(s => s.trim())
       .filter(Boolean);
 
-    let image_url = (imageUrlEl.value || "").trim();
+    let image_url = (imageUrlEl.value || "").trim()
+      ;
 
-// Upload selected image on save (no separate upload button)
-if (useBackend && pendingFile) {
-  try {
-    let file = pendingFile;
-    statusEl.textContent = `Komprimiere… (${Math.round(file.size / 1024)} KB)`;
-    file = await compressImageFile(file, { maxSide: 1600, quality: 0.82, mime: "image/jpeg" });
-    statusEl.textContent = `Uploading… (${Math.round(file.size / 1024)} KB)`;
-    const uploadedUrl = await uploadRecipeImage(file, r.id);
-    image_url = uploadedUrl;
-    pendingFile = null;
-    // upload status is handled via UI feedback
-    cleanupPreviewUrl();
-    previewUrl = null;
-    statusEl.textContent = "Upload fertig.";
-  } catch (e) {
-    statusEl.textContent = "";
-    alert(`Bild-Upload fehlgeschlagen.\nFehler: ${e?.message ?? e}`);
-  }
-}
+    // Upload selected image on save (no separate upload button)
+    if (useBackend && pendingFile) {
+      try {
+        let file = pendingFile;
+        statusEl.textContent = `Komprimiere… (${Math.round(file.size / 1024)} KB)`;
+        file = await compressImageFile(file, { maxSide: 1600, quality: 0.82, mime: "image/jpeg" });
+        statusEl.textContent = `Uploading… (${Math.round(file.size / 1024)} KB)`;
+        const uploadedUrl = await uploadRecipeImage(file, r.id);
+        image_url = uploadedUrl;
+        pendingFile = null;
+        // upload status is handled via UI feedback
+        cleanupPreviewUrl();
+        previewUrl = null;
+        statusEl.textContent = "Upload fertig.";
+      } catch (e) {
+        statusEl.textContent = "";
+        alert(`Bild-Upload fehlgeschlagen.\nFehler: ${e?.message ?? e}`);
+      }
+    }
 
 
     const ingredients = qs(appEl, "#ingredients").value.split("\n").map(s => s.trim()).filter(Boolean);

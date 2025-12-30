@@ -50,7 +50,6 @@ import { KEYS, lsGetStr, lsSetStr } from "./storage.js";
 import { installGlobalErrorHandler } from "./services/errors.js";
 import { getRecentErrors, clearRecentErrors } from "./services/errors.js";
 import { runExclusive } from "./services/locks.js";
-
 /* =========================
    CONFIG / STATE
 ========================= */
@@ -354,18 +353,18 @@ function applyThemeAndOverlay() {
 function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
   const mode = document.getElementById("modeBadge");
   if (mode) {
-    mode.textContent = useBackend ? "CLOUD" : "LOCAL";
+    mode.textContent = useBackend ? "☁️" : "🖥️";
     mode.classList.toggle("badge--ok", useBackend);
     mode.classList.toggle("badge--warn", !useBackend);
     mode.title = useBackend
-      ? "CLOUD: Sync + Teilen im Space (Supabase). Klick = auf LOCAL (nur dieses Gerät)."
-      : "LOCAL: nur auf diesem Gerät (offline). Klick = auf CLOUD (Sync + Teilen).";
+      ? "☁️CLOUD: Sync + Teilen im Space (Supabase). Klick = auf LOCAL (nur dieses Gerät)."
+      : "🖥️LOCAL: nur auf diesem Gerät (offline). Klick = auf CLOUD (Sync + Teilen).";
   }
 
   const authBtn = document.getElementById("authBadge");
   if (authBtn) {
     const authed = isAuthenticated?.();
-    authBtn.textContent = authed ? "LOGOUT" : "LOGIN";
+    authBtn.textContent = authed ? "🔐 LOGOUT" : "🔐 LOGIN";
     authBtn.classList.toggle("badge--ok", authed);
     authBtn.classList.toggle("badge--warn", !authed);
     authBtn.title = authed ? "Abmelden" : (useBackend ? "Anmelden per Magic Link" : "Für Login/Sharing: erst auf CLOUD umschalten");
@@ -768,13 +767,39 @@ async function boot() {
     });
   }
 
+
+const userBadge = document.getElementById("userBadge");
+const userMenu = document.getElementById("userMenu");
+
+userBadge.addEventListener("click", (e) => {
+  e.stopPropagation();
+  userMenu.hidden = !userMenu.hidden;
+
+  // Positionieren relativ zum Badge
+  const rect = userBadge.getBoundingClientRect();
+  userMenu.style.position = "absolute";
+  userMenu.style.top = rect.bottom + 6 + "px";
+  userMenu.style.left = rect.right - userMenu.offsetWidth + "px";
+});
+
+// Klick außerhalb schließt das Menü
+document.addEventListener("click", () => {
+  userMenu.hidden = true;
+});
+
+
+
+
+const shoppingBtn = document.getElementById("shopBadge");
+shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" }));
+
   const themeBtn = document.getElementById("themeBadge");
   if (themeBtn && !themeBtn.__installed) {
     themeBtn.__installed = true;
     const applyThemeBtn = () => {
       const t = readTheme();
       themeBtn.title = `Theme wechseln (aktuell: ${t})`;
-      themeBtn.textContent = t === "dark" ? "🌙" : (t === "light" ? "☀️" : "🌓");
+      themeBtn.textContent = t === "dark" ? "🌙 THEME" : (t === "light" ? "☀️THEME" : "🌓 THEME");
     };
     applyThemeBtn();
     themeBtn.addEventListener("click", () => {
