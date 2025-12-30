@@ -150,7 +150,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
                     </select>
                   </label>
 
-                  <button class="btn" id="btnInvite" type="button">Einladen</button>
+                  <button class="btn btn--ghost" id="btnInvite" type="button">Einladen</button>
                 </div>
 
                 <div class="row" style="flex-wrap:wrap; gap:1rem; align-items:flex-start;">
@@ -179,11 +179,13 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <div class="card__bd">
 
             <label class="field">
+            <div class="row row--spread">
               <div class="label">Ring Interval (ms)</div>
               <input id="ringInterval" type="number" min="125" max="5000" step="25" value="${escapeHtml(ringIntervalMs)}" />
-              <div class="hint">125…5000 ms</div>
+              <div class="hint">125…5000 ms</div></div>
             </label>
-<div class="row row--spread">
+            <label class="field">
+              <div class="row row--spread">
               <div>
                 <div class="label">Step Highlight</div>
                 <div class="hint">Schritt wird hervorgehoben wenn Timer abläuft</div>
@@ -193,7 +195,8 @@ export function renderAdminView({ appEl, recipes, setView }) {
                 <span>Highlight</span>
               </label>
             </div>
-
+</label>
+            <label class="field">
             <div class="row row--spread" style="align-items:flex-start; gap: 14px;">
               <div>
                 <div class="label">Timer‑Ton</div>
@@ -204,7 +207,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
                 <span>Ton</span>
               </label>
             </div>
-
+</label>
             <div class="row" style="flex-wrap:wrap; gap: 12px; align-items:flex-end;">
               <label class="field" style="min-width:240px;">
                 <div class="label">Sound</div>

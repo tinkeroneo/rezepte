@@ -221,7 +221,7 @@ textarea{ min-height: 120px; resize: vertical; }
   transition: background .12s ease, transform .06s ease, border-color .12s ease, filter .12s ease;
 }
 .btn:hover{ background: rgba(255,255,255,0.06); }
-body.dark .btn:hover{ background: rgba(255,255,255,0.05); }
+body.dark .btn:hover{ background: var(--primary-2); }
 .btn:active{ transform: translateY(1px); }
 .btn:disabled{ opacity: .55; cursor: not-allowed; }
 
@@ -553,4 +553,57 @@ input[type="radio"] {
 .cookbar-row {
   display: flex;
   justify-content: space-between;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+  position: relative;
+}
+
+.field .label {
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.field .hint {
+  display: none;
+  position: absolute;
+  background: #1a1d24;
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 0.8rem;
+  white-space: nowrap;
+  transform: translateY(4px);
+  z-index: 20;
+}
+
+.field:hover .hint {
+  display: block;
+}
+
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.toggle input {
+  transform: scale(1.2);
+}
+input[type="number"],
+input[type="range"],
+select {
+  background: #1a1d24;
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 0.95rem;
 }
