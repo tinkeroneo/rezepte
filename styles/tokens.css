@@ -17,6 +17,7 @@
   /* radii */
   --r-1: 12px;
   --r-2: 16px;
+  --r-3: 20px;
   --r-pill: 999px;
 
   /* elevation */
@@ -30,6 +31,12 @@
   --text: #171b22;
   --muted: rgba(23,27,34,0.65);
   --border: rgba(0,0,0,0.10);
+
+  /* semantic aliases (used across components/views) */
+  --panel: var(--card);
+  --line: var(--border);
+  --shadow-1: var(--shadow);
+  --shadow-2: var(--shadow-strong);
 
   /* accent: champagner gold */
   --primary: #d2b37b;
