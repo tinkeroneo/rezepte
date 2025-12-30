@@ -30,7 +30,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     if (c.includes("dessert") || c.includes("kuchen") || c.includes("süß")) return "🍰";
     if (c.includes("salat")) return "🥗";
     if (c.includes("suppe")) return "🥣";
-    return "🍲";
+    return "q(°.°)p";
   };
 
   const coverFallbackHtml = (r, cls) => `
@@ -38,24 +38,6 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
       <div class="cover-fallback-emoji">${coverEmoji(r)}</div>
     </div>
   `;
-
-  const imgStyleFromFocus = (focus, { height = 120 } = {}) => {
-    const f = (focus && typeof focus === "object") ? focus : {};
-    const x = Number.isFinite(Number(f.x)) ? Number(f.x) : 50;
-    const y = Number.isFinite(Number(f.y)) ? Number(f.y) : 50;
-    const zoom = Number.isFinite(Number(f.zoom)) ? Math.max(1, Math.min(3, Number(f.zoom))) : 1;
-    const mode = f.mode === "cover" || f.mode === "crop" || f.mode === "manual" ? "cover" : "auto";
-
-    // auto: show full image (contain). manual/cover: crop + position + optional zoom.
-    const fit = mode === "cover" ? "cover" : "contain";
-    const pos = `${x}% ${y}%`;
-    const scale = mode === "cover" ? zoom : 1;
-    const origin = pos;
-
-    return `height:${height}px; object-fit:${fit}; object-position:${pos}; transform:scale(${scale}); transform-origin:${origin};`;
-  };
-
-
 
   let viewMode = lsGetStr(KEYS.VIEWMODE, "grid");
 

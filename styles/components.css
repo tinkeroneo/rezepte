@@ -16,7 +16,10 @@ header{
   box-shadow: var(--shadow);
 }
 
-.header-badges{ display:flex; gap: 8px; align-items:center; }
+.header-badges{ 
+  display:flex; 
+  gap: 8px; 
+}
 
 /* Badges / chips */
 .badge{
@@ -73,18 +76,23 @@ body.dark .badge-btn:hover{ background: rgba(255,255,255,0.05); }
 @keyframes spin{ from{ transform:rotate(0deg);} to{ transform:rotate(360deg);} }
 
 
+
+
 .popover {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  left: 0;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--r-2);
   box-shadow: var(--shadow);
   padding: 6px 0;
-  min-width: 140px;
+ min-width: auto; 
+ width: max-content; /* passt sich dem Inhalt an */
   z-index: 999;
+  text-align: left;
 }
+
 
 .popover-item {
   display: block;
@@ -101,8 +109,16 @@ body.dark .badge-btn:hover{ background: rgba(255,255,255,0.05); }
 .popover-item:hover {
   background: rgba(255,255,255,0.06);
 }
+.popover .badge {
+  justify-content: flex-start;
+}
 
-
+.badge-select select {
+  all: unset; /* optional */
+  appearance: auto;
+  padding: 4px 10px;
+  color: var(--text);
+}
 
 /* Inputs baseline */
 input, textarea, select, button{ font: inherit; }
@@ -165,6 +181,13 @@ textarea{ min-height: 120px; resize: vertical; }
   align-items: center;
 }
 
+.row--spread { justify-content: space-between; }
+.row--right {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: .5rem;
+}
 
 /* ---------- Components ---------- */
 

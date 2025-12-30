@@ -9,7 +9,7 @@ import { formatTime, escapeHtml, qsa, qs } from "../utils.js";
 import { ack } from "../ui/feedback.js";
 const s = window.__tinkeroneoSettings || {};
 const audio = createBeep({
-  soundId: s.readTimerSoundId ? String(s.readTimerSoundId() || 'gong') : 'gong',
+  soundId: s.readTimerSoundId ? String(s.readTimerSoundId() || 'bowl') : 'gong',
   volume: s.readTimerSoundVolume ? Number(s.readTimerSoundVolume() ?? 0.7) : 0.7,
 });
 

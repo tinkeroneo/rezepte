@@ -1,6 +1,6 @@
 // supabase.js
 // Minimaler Supabase REST Client mit Auth + Space Support
-// Voraussetzung: RLS aktiv, space_id = UUID (text), user_spaces gepflegt
+// Voraussetzung: RLS aktiv, space_id = UUID, user_spaces gepflegt
 
 import { getClientId } from "./domain/clientId.js";
 
@@ -113,7 +113,8 @@ async function refreshAccessToken(refresh_token) {
 
 async function listUserSpacesRaw(access_token) {
   const res = await sbFetch(
-    `${SUPABASE_URL}/rest/v1/user_spaces?select=space_id,role,created_at&order=created_at.asc`,
+    `${SUPABASE_URL}/rest/v1/user_spaces?select=space_id,role,is_default,created_at&order=created_at.asc`,
+    
     {
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -134,15 +135,22 @@ async function resolveSpaceId({ access_token, userId }) {
   const rows = await listUserSpacesRaw(access_token);
   if (!rows.length) throw new Error("No space assigned to user");
 
+  // 1) Prefer default space (DB flag)
+  const def = rows.find(r => r?.is_default);
+  if (def?.space_id) return def.space_id;
+
+  // 2) Otherwise prefer stored active space
   const stored = userId ? readStoredActiveSpace(userId) : null;
   if (stored && rows.some(r => r?.space_id === stored)) {
     return stored;
   }
 
+  // 3) Fallback: first membership
   const first = rows?.[0]?.space_id;
   if (!first) throw new Error("No space assigned to user");
   return first;
 }
+
 
 async function provisionDefaultSpace({ access_token, userId }) {
   if (!userId) throw new Error("Missing userId for space provisioning");

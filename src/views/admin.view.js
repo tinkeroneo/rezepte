@@ -17,8 +17,8 @@ export function renderAdminView({ appEl, recipes, setView }) {
   const stepHighlight = !!s.readTimerStepHighlight?.();
 
   const timerSoundEnabled = s.readTimerSoundEnabled ? !!s.readTimerSoundEnabled() : true;
-  const timerSoundId = s.readTimerSoundId ? String(s.readTimerSoundId() || "gong") : "gong";
-  const timerSoundVolume = s.readTimerSoundVolume ? Number(s.readTimerSoundVolume() ?? 0.65) : 0.65;
+  const timerSoundId = s.readTimerSoundId ? String(s.readTimerSoundId() || "bowl") : "gong";
+  const timerSoundVolume = s.readTimerSoundVolume ? Number(s.readTimerSoundVolume(  0.65) ?? 0.65) : 0.65;
 
   const recipeCount = Array.isArray(recipes) ? recipes.length : 0;
 
@@ -70,34 +70,34 @@ export function renderAdminView({ appEl, recipes, setView }) {
             </div>
           </div>
           <div class="card__bd">
-<hr />
+      
 
-            <!-- Theme is controlled in the topbar -->
+
             <div class="row row--spread">
               <div>
-                <div class="label">Winter Mode</div>
-                <div class="hint">Optischer Effekt</div>
+                <div class="label" hint="Winter Mode">Winter Mode</div>
+                
               </div>
               <label class="toggle">
                 <input id="winterToggle" type="checkbox" ${winter ? "checked" : ""} />
-                <span>Winter</span>
               </label>
             </div>
 
             <div class="row row--spread">
               <div>
                 <div class="label">Radio (Drittanbieter)</div>
-                <div class="hint">Der Player wird erst nach Consent geladen. Danach ist Radio in der Topbar verfügbar.</div>
               </div>
               <div></div>
+              <div class="row row--right">
+                <button class="btn" id="btnRadioResetConsent" type="button" ${radioConsent ? "" : "disabled"}>
+                  Consent zurücksetzen
+                </button>
+                <div class="hint" style="margin:0;">Consent: ${radioConsent ? "ja" : "nein"}</div>
+              </div>
+
             </div>
 
-            <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-              <button class="btn" id="btnRadioResetConsent" type="button" ${radioConsent ? "" : "disabled"}>
-                Consent zurücksetzen
-              </button>
-              <div class="hint" style="margin:0;">Consent: ${radioConsent ? "ja" : "nein"}</div>
-            </div>
+            
 
           </div>
         </section>

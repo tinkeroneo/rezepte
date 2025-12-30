@@ -16,7 +16,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
   const settings = window.__tinkeroneoSettings || {};
   const timerSoundEnabled = settings.readTimerSoundEnabled ? !!settings.readTimerSoundEnabled() : true;
-  const timerSoundId = settings.readTimerSoundId ? String(settings.readTimerSoundId() || "gong") : "gong";
+  const timerSoundId = settings.readTimerSoundId ? String(settings.readTimerSoundId() || "bowl") : "gong";
   const timerSoundVolume = settings.readTimerSoundVolume ? Number(settings.readTimerSoundVolume() ?? 0.65) : 0.65;
   const audio = createBeep({ soundId: timerSoundId, volume: timerSoundVolume });
 

@@ -781,11 +781,15 @@ userBadge.addEventListener("click", (e) => {
   userMenu.style.top = rect.bottom + 6 + "px";
   userMenu.style.left = rect.right - userMenu.offsetWidth + "px";
 });
-
 // Klick außerhalb schließt das Menü
-document.addEventListener("click", () => {
-  userMenu.hidden = true;
+document.addEventListener("click", (e) => {
+  if (!userMenu.contains(e.target)) {
+    userMenu.hidden = true;
+  } 
 });
+
+
+
 
 
 
