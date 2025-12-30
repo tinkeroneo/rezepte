@@ -190,7 +190,6 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
   content: "★";
 }
 
-
 .li-body {
   min-width: 0;
 }
@@ -286,6 +285,38 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
 
 .muted { color: var(--muted); font-size: .95rem; }
 
+
+
+/* --- Pills (used for meta + overlays like pending) --- */
+.pill{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  user-select: none;
+}
+body.dark .pill{ background: rgba(255,255,255,0.04); }
+
+.pill-ghost{ background: transparent; }
+
+.pill-warn{
+  color: var(--primary-2);
+  border-color: rgba(210,179,123,0.40);
+  background: rgba(210,179,123,0.10);
+}
+pending-overlay{
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  z-index: 5;
+  line-height: 1;
+}
 /* Legacy button classnames (kept for markup compatibility) */
 .btn-primary { 
   background: var(--primary);

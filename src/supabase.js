@@ -114,7 +114,7 @@ async function refreshAccessToken(refresh_token) {
 async function listUserSpacesRaw(access_token) {
   const res = await sbFetch(
     `${SUPABASE_URL}/rest/v1/user_spaces?select=space_id,role,is_default,created_at&order=created_at.asc`,
-    
+
     {
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -346,15 +346,19 @@ export async function initAuthAndSpace() {
       _spaceId = await provisionDefaultSpace({ access_token: _session.access_token, userId: _user?.id });
     } else {
       // Network / transient errors: don't force a logout.
-      _spaceId = null;
+      // Keep last known active space so offline-queue stays scoped correctly.
+      const fallbackSpace = _user?.id ? readStoredActiveSpace(_user.id) : null;
+      _spaceId = fallbackSpace;
+
       return {
         session: _session,
         user: _user,
         userId: _user?.id || null,
-        spaceId: null,
+        spaceId: _spaceId,
         pendingInvites,
         offline: true,
       };
+
     }
   }
 
@@ -878,8 +882,8 @@ export async function uploadRecipeImage(file, recipeId) {
     (file.type === "image/png"
       ? "png"
       : file.type === "image/webp"
-      ? "webp"
-      : "jpg");
+        ? "webp"
+        : "jpg");
 
   const signRes = await sbFetch(`${SUPABASE_URL}/functions/v1/sign-upload`, {
     method: "POST",
