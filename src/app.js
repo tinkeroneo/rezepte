@@ -211,6 +211,14 @@ rebuildRecipeRepo(useBackend);
 // Global router reference (needed by setUseBackend)
 let router = null;
 
+// --- Global navigation guards / cleanup (Back + unsaved changes) ---
+let dirtyGuard = null;
+function setDirtyGuard(fn) { dirtyGuard = (typeof fn === "function") ? fn : null; }
+
+let viewCleanup = null;
+function setViewCleanup(fn) { viewCleanup = (typeof fn === "function") ? fn : null; }
+
+
 // Expose a single backend switch implementation (used by admin.view.js)
 export async function setUseBackend(next) {
   const on = !!next;
@@ -528,7 +536,12 @@ async function render(view, setView) {
       redirectTo: new URL("index.html", location.href).toString().replace(/#.*$/, ""),
       debug: `origin=${location.origin}\npath=${location.pathname}\nhash=${location.hash}`,
     };
-    return renderLoginView({ appEl, state: view, setView, info });
+    return renderLoginView({
+    appEl,
+    state: view,
+    setView,
+    useBackend,
+    setUseBackend, info });
   }
 
   // Invites confirmation view
@@ -708,7 +721,7 @@ async function render(view, setView) {
   }
 
   if (view.name === "cook") {
-    return renderCookView({ appEl, state: view, recipes, partsByParent, setView });
+    return renderCookView({ appEl, state: view, recipes, partsByParent, setView, setViewCleanup, setDirtyGuard });
   }
 
   if (view.name === "add") {
@@ -718,6 +731,8 @@ async function render(view, setView) {
       recipes,
       setView,
       useBackend,
+      setDirtyGuard,
+      setViewCleanup,
       upsertRecipe: async (rec) => {
         return runExclusive(`upsert:${rec.id}`, async () => {
           recipes = await recipeRepo.upsert(rec, { refresh: useBackend });
@@ -760,10 +775,20 @@ async function boot() {
   // If backend enabled: Auth+Space must be initialized BEFORE any backend call
   // router must exist always (even if we end up in login)
   router = initRouter({
-    onViewChange: (view) => render(view, router.setView),
+    canNavigate: ({ reason }) => {
+      if (!dirtyGuard) return true;
+      return dirtyGuard({ reason }) !== false;
+    },
+    onViewChange: (view) => {
+      if (viewCleanup) {
+        try { viewCleanup(); } catch (e) { console.warn("viewCleanup failed", e); }
+        viewCleanup = null;
+      }
+      dirtyGuard = null;
+      render(view, router.setView);
+    },
   });
-
-  // Header controls: mode toggle + login/logout (router now available)
+// Header controls: mode toggle + login/logout (router now available)
   const modeBtn = document.getElementById("modeBadge");
   if (modeBtn && !modeBtn.__installed) {
     modeBtn.__installed = true;
@@ -917,3 +942,16 @@ shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" })
 }
 
 boot();
+
+
+// Global Back Button
+const __backBtn = document.getElementById("backBtn");
+if (__backBtn && !__backBtn.__installed) {
+  __backBtn.__installed = true;
+  __backBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (dirtyGuard && dirtyGuard({ reason: "headerBack" }) === false) return;
+    if (window.history.length > 1) window.history.back();
+    else router.setView({ name: "list", selectedId: null, q: "" });
+  });
+}

@@ -89,7 +89,6 @@ export function renderDetailView({
       <section class="card">
         <div class="card__hd">
           <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
-            <button class="btn btn--ghost" id="backBtn">← Zurück</button>
             <div class="row" style="gap:.5rem;">
               <button class="btn btn--ghost" id="cookBtn">👨‍🍳 Kochen</button>
               <button class="btn btn--ghost" id="editBtn" title="Rezept bearbeiten">✏️ Bearbeiten</button>
@@ -486,7 +485,6 @@ export function renderDetailView({
       });
     });
   });
-  qs(appEl, "#backBtn").addEventListener("click", () => setView({ name: "list", selectedId: null, q: state.q }));
   qs(appEl, "#cookBtn").addEventListener("click", () => setView({ name: "cook", selectedId: r.id, q: state.q }));
   qs(appEl, "#editBtn").addEventListener("click", () => setView({ name: "add", selectedId: r.id, q: state.q }));
 

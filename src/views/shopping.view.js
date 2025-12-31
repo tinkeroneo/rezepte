@@ -36,7 +36,6 @@ export function renderShoppingView({ appEl, state, setView }) {
     <div class="container">
       <div class="card">
         <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
-          <button class="btn btn--ghost" id="backBtn">← Zurück</button>
           <h2 style="margin:0;">🧺 Einkaufsliste</h2>
           <button class="btn btn--ghost" id="clearShopping">Leeren</button>
         </div>
@@ -112,7 +111,6 @@ export function renderShoppingView({ appEl, state, setView }) {
     </div>
   `;
 
-  qs(appEl, "#backBtn").addEventListener("click", () => setView({ name: "list", selectedId: null, q: state.q }));
 
   qsa(appEl, "[data-item]").forEach(cb => {
     cb.addEventListener("change", () => {

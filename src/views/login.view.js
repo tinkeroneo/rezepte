@@ -1,7 +1,7 @@
 // src/views/login.view.js
 import { requestMagicLink, logout, isAuthenticated } from "../supabase.js";
 
-export function renderLoginView({ appEl, state, setView, info }) {
+export function renderLoginView({ appEl, state, setView, info, useBackend, setUseBackend }) {
   // If we already have a session, don't show login again.
   if (isAuthenticated?.()) {
     setView({ name: "list", selectedId: null, q: state?.q });
@@ -48,7 +48,12 @@ export function renderLoginView({ appEl, state, setView, info }) {
     msgEl.className = "msg " + (kind || "");
   }
 
-  $("#btnBack")?.addEventListener("click", () => {
+  $("#btnBack")?.addEventListener("click", async () => {
+    try {
+      if (useBackend && typeof setUseBackend === "function") {
+        await setUseBackend(false);
+      }
+    } catch { /* ignore */ }
     setView({ name: "list", selectedId: null, q: state?.q });
   });
 

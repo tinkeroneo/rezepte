@@ -4,7 +4,8 @@ import { generateId } from "../domain/id.js";
 import { deleteRecipe as sbDelete } from "../supabase.js";
 export function renderAddView({
   appEl, state, recipes, setView,
-  useBackend, upsertRecipe, uploadRecipeImage
+  useBackend, upsertRecipe, uploadRecipeImage,
+  setDirtyGuard, setViewCleanup
 }) {
   const existing = state.selectedId ? recipes.find(r => r.id === state.selectedId) : null;
   const isEdit = !!existing;
@@ -26,6 +27,27 @@ export function renderAddView({
     e.returnValue = "";
   };
   window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
+
+  // GLOBAL DIRTY GUARD + CLEANUP (navigation/back)
+  if (typeof setDirtyGuard === "function") {
+    setDirtyGuard(() => {
+      if (!dirty) return true;
+      const ok = confirm("Ungespeicherte Änderungen verwerfen?");
+      if (!ok) return false;
+      cleanupPreviewUrl();
+      return true;
+    });
+  }
+
+  if (typeof setViewCleanup === "function") {
+    setViewCleanup(() => {
+      cleanupPreviewUrl();
+      if (window.__tinkeroneo_beforeunload_add) {
+        window.removeEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
+        window.__tinkeroneo_beforeunload_add = null;
+      }
+    });
+  }
 
 
   const r = existing ? {
@@ -58,8 +80,7 @@ export function renderAddView({
   appEl.innerHTML = `
     <div class="container">
       <div class="card">
-        <button class="btn btn--ghost" id="backBtn">← Zurück</button>
-        <h2>${isEdit ? "Rezept bearbeiten" : "Neues Rezept"}</h2>
+                <h2>${isEdit ? "Rezept bearbeiten" : "Neues Rezept"}</h2>
 
         <label class="muted">Titel</label>
         <input id="title" type="text" placeholder="z.B. Bohnen-Rührei Deluxe" value="${escapeHtml(r.title)}" />
@@ -167,12 +188,6 @@ export function renderAddView({
     renderPreview();
   });
 
-  qs(appEl, "#backBtn").addEventListener("click", () => {
-    if (dirty && !confirm("Ungespeicherte Änderungen verwerfen?")) return;
-    cleanupPreviewUrl();
-    if (isEdit) setView({ name: "detail", selectedId: r.id, q: state.q });
-    else setView({ name: "list", selectedId: null, q: state.q });
-  });
   qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
     if (!confirm("Rezept wirklich löschen?")) return;
     // local deletion is handled in app.js via callback — simplest: reload after delete

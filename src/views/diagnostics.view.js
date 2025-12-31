@@ -6,7 +6,6 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
     <div class="container">
       <div class="topbar">
         <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
-          <button class="btn btn--ghost" id="backBtn">← Zurück</button>
           <div class="title">Diagnostics</div>
           <button class="btn btn--ghost" id="refreshBtn">↻</button>
         </div>
@@ -45,7 +44,6 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
     </div>
   `;
 
-  qs(appEl, "#backBtn")?.addEventListener("click", () => setView({ name: "list" }));
   qs(appEl, "#refreshBtn")?.addEventListener("click", () => setView({ name: "diagnostics" }));
   qs(appEl, "#clearErrBtn")?.addEventListener("click", () => {
     info?.onClearErrors?.();

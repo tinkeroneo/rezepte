@@ -10,7 +10,7 @@ import { ack } from "../ui/feedback.js";
 let __audioPrimedOnce = false;
 
 
-export function renderCookView({ appEl, state, recipes, partsByParent, setView }) {
+export function renderCookView({ appEl, state, recipes, partsByParent, setView, setViewCleanup }) {
   const r = recipes.find(x => x.id === state.selectedId);
    if (!r) return setView({ name: "list", selectedId: null, q: state.q });
 
@@ -43,7 +43,6 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
   appEl.innerHTML = `
     <div class="container">
       <div class="card">
-        <button class="btn btn--ghost" id="backBtn">← Zurück</button>
         <h2>👩‍🍳 ${escapeHtml(r.title)}</h2>
 
 
@@ -236,11 +235,6 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView }
 
   // prime audio on any user click inside cook view (mobile reliable)
   appEl.addEventListener("click", audio.prime, { once: true });
-
-  qs(appEl, "#backBtn").addEventListener("click", () => {
-    tm.dispose();
-    setView({ name: "detail", selectedId: r.id, q: state.q });
-  });
 
   qs(appEl, "#ingredientsBtn").addEventListener("click", () => {
     sheetRoot.innerHTML = `

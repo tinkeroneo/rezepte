@@ -26,11 +26,17 @@ function setHash(view) {
   if (location.hash !== next) location.hash = next;
 }
 
-export function initRouter({ onViewChange }) {
+export function initRouter({ onViewChange, canNavigate }) {
   let view = parseHash();
 
   function setView(next) {
-    view = { ...view, ...next };
+  const prev = view;
+  const candidate = { ...view, ...next };
+  if (typeof canNavigate === "function") {
+    const ok = canNavigate({ from: prev, to: candidate, reason: "setView" });
+    if (ok === false) return;
+  }
+  view = candidate;
 
     // persist (optional) – keep your existing NAV behavior
     try { lsSet(KEYS.NAV, view); } catch { /* ignore */ }
@@ -45,10 +51,31 @@ export function initRouter({ onViewChange }) {
     return view;
   }
 
+  let __reverting = false;
+
   window.addEventListener("hashchange", () => {
-    view = parseHash();
+    const nextView = parseHash();
+    const prevView = view;
+
+    if (__reverting) {
+      __reverting = false;
+      view = nextView;
+      onViewChange(view);
+      return;
+    }
+
+    if (typeof canNavigate === "function") {
+      const ok = canNavigate({ from: prevView, to: nextView, reason: "hashchange" });
+      if (ok === false) {
+        __reverting = true;
+        setHash(prevView);
+        return;
+      }
+    }
+
+    view = nextView;
     onViewChange(view);
   });
 
-  return { getView, setView };
+return { getView, setView };
 }

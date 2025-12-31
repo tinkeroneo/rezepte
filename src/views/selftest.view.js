@@ -10,9 +10,7 @@ export function renderSelftestView({ appEl, results, setView }) {
   }).join("");
 
   appEl.innerHTML = `
-    <div class="topbar" style="padding:1rem;">
-      <button class="btn btn--ghost" id="backBtn">← Zurück</button>
-      <h2 style="margin:.75rem 0 .25rem;">Selftest</h2>
+    <div class="topbar" style="padding:1rem;">      <h2 style="margin:.75rem 0 .25rem;">Selftest</h2>
       <div class="muted">Schneller Gesundheitscheck (Storage/Backend/Grundfunktionen).</div>
     </div>
 
