@@ -20,7 +20,12 @@ import {
   listMySpaces,
   setActiveSpaceId,
   acceptInvite,
-  declineInvite
+  declineInvite,
+  getProfile,
+  upsertProfile,
+  updateSpaceName,
+  moveRecipeToSpace,
+  copyRecipeToSpace
 } from "./supabase.js";
 
 import { initRouter } from "./state.js";
@@ -35,6 +40,7 @@ import { renderDetailView } from "./views/detail.view.js";
 import { renderCookView } from "./views/cook.view.js";
 import { renderAddView } from "./views/add.view.js";
 import { renderShoppingView } from "./views/shopping.view.js";
+import { renderVegan101View } from "./views/vegan101.view.js";
 import { renderAdminView } from "./views/admin.view.js";
 import { renderSelftestView } from "./views/selftest.view.js";
 import { renderDiagnosticsView } from "./views/diagnostics.view.js";
@@ -417,6 +423,62 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
   }
 
   // Space selector (only meaningful in CLOUD + authed)
+
+
+const saveProfileBtn = document.getElementById("saveProfileBtn");
+if (saveProfileBtn && !saveProfileBtn.__installed) {
+  saveProfileBtn.__installed = true;
+  saveProfileBtn.addEventListener("click", async () => {
+    if (!(useBackend && isAuthenticated?.())) return;
+    const dn = document.getElementById("profileDisplayName");
+    const display_name = String(dn?.value || "").trim();
+    try {
+      const p = await upsertProfile({ display_name });
+      __profileCache = p;
+      updateHeaderBadges();
+    } catch (e) {
+      alert(`Profil speichern fehlgeschlagen: ${String(e?.message || e)}`);
+    }
+  });
+}
+
+const setDefaultBtn = document.getElementById("setDefaultSpaceBtn");
+if (setDefaultBtn && !setDefaultBtn.__installed) {
+  setDefaultBtn.__installed = true;
+  setDefaultBtn.addEventListener("click", async () => {
+    if (!(useBackend && isAuthenticated?.())) return;
+    const ctx = getAuthContext?.();
+    const sid = String(ctx?.spaceId || "").trim();
+    if (!sid) return;
+    try {
+      const p = await upsertProfile({ default_space_id: sid });
+      __profileCache = p;
+      alert("Default Space gesetzt ✅");
+    } catch (e) {
+      alert(`Default setzen fehlgeschlagen: ${String(e?.message || e)}`);
+    }
+  });
+}
+
+const saveSpaceNameBtn = document.getElementById("saveSpaceNameBtn");
+if (saveSpaceNameBtn && !saveSpaceNameBtn.__installed) {
+  saveSpaceNameBtn.__installed = true;
+  saveSpaceNameBtn.addEventListener("click", async () => {
+    if (!(useBackend && isAuthenticated?.())) return;
+    const ctx = getAuthContext?.();
+    const sid = String(ctx?.spaceId || "").trim();
+    const inp = document.getElementById("spaceNameInput");
+    const name = String(inp?.value || "").trim();
+    if (!sid) return;
+    try {
+      await updateSpaceName({ spaceId: sid, name });
+      await refreshSpaceSelect();
+      alert("Space-Name gespeichert ✅");
+    } catch (e) {
+      alert(`Space-Name speichern fehlgeschlagen: ${String(e?.message || e)}`);
+    }
+  });
+}
   const spaceSel = document.getElementById("spaceSelect");
   if (spaceSel) {
     const authed = isAuthenticated?.();
@@ -559,6 +621,15 @@ async function render(view, setView) {
         // reload invites list
         try {
           const ctx = await initAuthAndSpace();
+      try { await ensureProfileLoaded(); } catch { /* ignore */ }
+      try {
+        if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
+        try {
+          await listRecipes();
+          await upsertProfile({ last_space_id: ctx.spaceId });
+        } catch { /* ignore */ }
+      }
+      } catch { /* ignore */ }
           window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
         } catch {
           window.__tinkeroneoPendingInvites = [];
@@ -579,6 +650,15 @@ async function render(view, setView) {
         }
         try {
           const ctx = await initAuthAndSpace();
+      try { await ensureProfileLoaded(); } catch { /* ignore */ }
+      try {
+        if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
+        try {
+          await listRecipes();
+          await upsertProfile({ last_space_id: ctx.spaceId });
+        } catch { /* ignore */ }
+      }
+      } catch { /* ignore */ }
           window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
         } catch {
           window.__tinkeroneoPendingInvites = [];
@@ -702,6 +782,8 @@ async function render(view, setView) {
       recipeParts,
       setView,
       useBackend,
+      mySpaces,
+      copyRecipeToSpace,
       sbDelete: async (id) => {
         recipes = await recipeRepo.remove(id);
       },
@@ -729,10 +811,23 @@ async function render(view, setView) {
       appEl,
       state: view,
       recipes,
+      activeSpaceId: getAuthContext?.()?.spaceId,
       setView,
       useBackend,
       setDirtyGuard,
+    setDirtyIndicator,
       setViewCleanup,
+      mySpaces,
+      moveRecipeToSpace,
+      upsertProfile,
+      listRecipes,
+      refreshSpaceSelect,
+      upsertSpaceLast: async (sid) => {
+        try {
+          await listRecipes();
+          await upsertProfile({ last_space_id: sid });
+        } catch { /* ignore */ }
+      },
       upsertRecipe: async (rec) => {
         return runExclusive(`upsert:${rec.id}`, async () => {
           recipes = await recipeRepo.upsert(rec, { refresh: useBackend });
@@ -744,6 +839,10 @@ async function render(view, setView) {
 
   if (view.name === "admin") {
     return renderAdminView({ appEl, recipes, setView });
+  }
+
+  if (view.name === "vegan101") {
+    return renderVegan101View({ appEl, setView });
   }
 
   if (view.name === "shopping") {
@@ -785,7 +884,19 @@ async function boot() {
         viewCleanup = null;
       }
       dirtyGuard = null;
-      render(view, router.setView);
+      setDirtyIndicator(false);
+    render(view, router.setView);
+    // Cookbar height -> CSS var for sheets
+    try {
+      const cb = document.querySelector('.cookbar');
+      if (cb) {
+        const h = Math.ceil(cb.getBoundingClientRect().height);
+        document.documentElement.style.setProperty('--cookbar-h', `${h}px`);
+      } else {
+        document.documentElement.style.removeProperty('--cookbar-h');
+      }
+    } catch { /* ignore */ }
+
     },
   });
 // Header controls: mode toggle + login/logout (router now available)
@@ -805,6 +916,7 @@ const userMenu = document.getElementById("userMenu");
 userBadge.addEventListener("click", (e) => {
   e.stopPropagation();
   userMenu.hidden = !userMenu.hidden;
+  if (!userMenu.hidden) refreshProfileUi();
 
   // Positionieren relativ zum Badge
   const rect = userBadge.getBoundingClientRect();
@@ -904,6 +1016,15 @@ shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" })
   if (useBackend) {
     try {
       const ctx = await initAuthAndSpace();
+      try { await ensureProfileLoaded(); } catch { /* ignore */ }
+      try {
+        if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
+        try {
+          await listRecipes();
+          await upsertProfile({ last_space_id: ctx.spaceId });
+        } catch { /* ignore */ }
+      }
+      } catch { /* ignore */ }
       if (ctx?.userId || ctx?.spaceId) {
         setOfflineQueueScope({ userId: ctx.userId || null, spaceId: ctx.spaceId || null });
       }
@@ -954,4 +1075,63 @@ if (__backBtn && !__backBtn.__installed) {
     if (window.history.length > 1) window.history.back();
     else router.setView({ name: "list", selectedId: null, q: "" });
   });
+}
+
+
+// Header: Vegan 101 Button
+const __veganBtn = document.getElementById("vegan101HeaderBtn");
+if (__veganBtn && !__veganBtn.__installed) {
+  __veganBtn.__installed = true;
+  __veganBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    router.setView({ name: "vegan101", selectedId: null, q: "" });
+  });
+}
+
+
+const __dirtyDot = document.getElementById("dirtyDot");
+function setDirtyIndicator(on) {
+  if (!__dirtyDot) return;
+  __dirtyDot.hidden = !on;
+}
+
+
+let __profileCache = null;
+async function ensureProfileLoaded() {
+  if (!(useBackend && isAuthenticated?.())) return null;
+  try {
+    __profileCache = await getProfile();
+    // create empty profile if missing
+    if (!__profileCache) {
+      __profileCache = await upsertProfile({});
+    }
+    return __profileCache;
+  } catch {
+    return null;
+  }
+}
+
+async function refreshProfileUi() {
+  const authed = useBackend && isAuthenticated?.();
+  const dn = document.getElementById("profileDisplayName");
+  const spaceName = document.getElementById("spaceNameInput");
+  if (!authed) {
+    if (dn) dn.value = "";
+    if (spaceName) spaceName.value = "";
+    return;
+  }
+  const p = await ensureProfileLoaded();
+  if (dn) dn.value = String(p?.display_name || "");
+
+  const defBtn = document.getElementById("setDefaultSpaceBtn");
+  const active = getAuthContext?.()?.spaceId;
+  const isDef = !!(active && p?.default_space_id && String(active) === String(p.default_space_id));
+  if (defBtn) {
+    defBtn.textContent = isDef ? "⭐ DEFAULT ✓" : "⭐ DEFAULT";
+    defBtn.title = isDef ? "Default Space entfernen" : "Aktuellen Space als Standard setzen";
+  }
+  // current space label from mySpaces
+  const activeSpaceId = getAuthContext?.()?.spaceId;
+  const current = (mySpaces || []).find(s => String(s?.space_id || "") === String(activeSpaceId || ""));
+  if (spaceName) spaceName.value = String(current?.name || "");
 }

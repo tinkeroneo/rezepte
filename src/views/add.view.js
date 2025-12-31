@@ -3,10 +3,23 @@ import { compressImageFile } from "../domain/images.js";
 import { generateId } from "../domain/id.js";
 import { deleteRecipe as sbDelete } from "../supabase.js";
 export function renderAddView({
-  appEl, state, recipes, setView,
-  useBackend, upsertRecipe, uploadRecipeImage,
-  setDirtyGuard, setViewCleanup
+  appEl,
+  state,
+  recipes,
+  setView,
+  useBackend,
+  activeSpaceId,
+  mySpaces,
+  moveRecipeToSpace,
+  refreshSpaceSelect,
+  upsertSpaceLast,
+  upsertRecipe,
+  uploadRecipeImage,
+  setDirtyGuard,
+  setDirtyIndicator,
+  setViewCleanup,
 }) {
+
   const existing = state.selectedId ? recipes.find(r => r.id === state.selectedId) : null;
   const isEdit = !!existing;
 
@@ -41,6 +54,8 @@ export function renderAddView({
 
   if (typeof setViewCleanup === "function") {
     setViewCleanup(() => {
+    if (typeof setDirtyIndicator === "function") setDirtyIndicator(false);
+
       cleanupPreviewUrl();
       if (window.__tinkeroneo_beforeunload_add) {
         window.removeEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
@@ -243,6 +258,10 @@ export function renderAddView({
 
     // optimistic navigate
     cleanupPreviewUrl();
+    // Nach Edit-Speichern: Edit-View aus History entfernen
+const targetHash = `#detail?id=${encodeURIComponent(r.id)}`;
+window.history.replaceState(null, "", targetHash);
+if (typeof setDirtyIndicator === "function") setDirtyIndicator(false);
     setView({ name: "detail", selectedId: updated.id, q: state.q });
 
     if (!useBackend) return;

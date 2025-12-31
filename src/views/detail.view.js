@@ -268,6 +268,18 @@ export function renderDetailView({
 
       <div id="sheetRoot"></div>
       </div>
+
+      <div id="copySpacePanel" class="card" style="padding: var(--s-3); margin-top: var(--s-3); display:none;">
+        <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Kopieren nach Space</div>
+        <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:flex-end;">
+          <select id="copySpaceSelect" class="input" style="flex:1; min-width:220px;"></select>
+          <label class="muted" style="display:flex; gap:.4rem; align-items:center; white-space:nowrap;">
+            <input id="copyIncludeParts" type="checkbox" checked /> inkl. Parts
+          </label>
+          <button id="doCopyBtn" class="btn btn--solid" type="button">KOPIEREN</button>
+          <button id="cancelCopyBtn" class="btn btn--ghost" type="button">Abbrechen</button>
+        </div>
+      </div>
     </div>
   `;
 
@@ -653,6 +665,18 @@ function openCookRatingDialog({ recipeId, rating, onDone }) {
         <div class="muted" id="cookRateHint">Enter = speichern (ohne Text)</div>
         <button class="btn btn--solid" id="cookRateSave" type="button" title="Speichern">💾 Speichern</button>
       </div>
+
+      <div id="copySpacePanel" class="card" style="padding: var(--s-3); margin-top: var(--s-3); display:none;">
+        <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Kopieren nach Space</div>
+        <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:flex-end;">
+          <select id="copySpaceSelect" class="input" style="flex:1; min-width:220px;"></select>
+          <label class="muted" style="display:flex; gap:.4rem; align-items:center; white-space:nowrap;">
+            <input id="copyIncludeParts" type="checkbox" checked /> inkl. Parts
+          </label>
+          <button id="doCopyBtn" class="btn btn--solid" type="button">KOPIEREN</button>
+          <button id="cancelCopyBtn" class="btn btn--ghost" type="button">Abbrechen</button>
+        </div>
+      </div>
     </div>
   `;
 
@@ -752,6 +776,18 @@ function openEditCookEventDialog({ ev, onSave }) {
       <div class="row" style="justify-content:space-between; margin-top:.6rem;">
         <div class="muted">Enter macht Zeilenumbruch</div>
         <button class="btn btn--solid" id="ceSave" type="button">💾 Speichern</button>
+      </div>
+
+      <div id="copySpacePanel" class="card" style="padding: var(--s-3); margin-top: var(--s-3); display:none;">
+        <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Kopieren nach Space</div>
+        <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:flex-end;">
+          <select id="copySpaceSelect" class="input" style="flex:1; min-width:220px;"></select>
+          <label class="muted" style="display:flex; gap:.4rem; align-items:center; white-space:nowrap;">
+            <input id="copyIncludeParts" type="checkbox" checked /> inkl. Parts
+          </label>
+          <button id="doCopyBtn" class="btn btn--solid" type="button">KOPIEREN</button>
+          <button id="cancelCopyBtn" class="btn btn--ghost" type="button">Abbrechen</button>
+        </div>
       </div>
     </div>
   `;

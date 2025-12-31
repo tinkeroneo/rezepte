@@ -64,6 +64,25 @@ export function createTimer({ title, durationSec, key = null, recipeId = null })
 }
 
 /** Verlängern geht auch nach Ablauf */
+export function adjustTimer(timers, timerId, deltaSeconds) {
+  const t = timers[timerId];
+  if (!t) return timers;
+
+  const d = toFiniteNumber(deltaSeconds);
+  if (!Number.isFinite(d) || d === 0) return timers;
+
+  const now = Date.now();
+  t.endsAt = t.endsAt + Math.round(d) * 1000;
+  t.dismissed = false;
+  // reset ringing state so changes apply immediately
+  t.ringStartedAt = null;
+  t.lastRingAt = 0;
+  // if we moved the end into the future, allow a new beep when it hits again
+  if (t.endsAt > now) t.beeped = false;
+
+  return timers;
+}
+
 export function extendTimer(timers, timerId, seconds) {
   const t = timers[timerId];
   if (!t) return timers;
@@ -226,6 +245,15 @@ export function createTimerManager({
     renderNow();
   }
 
+function adjustTimerBy(id, deltaSeconds) {
+    const timers = loadTimersRaw(storageKey);
+    if (!timers[id]) return false;
+    adjustTimer(timers, id, deltaSeconds);
+    saveTimersRaw(timers, storageKey);
+    renderNow();
+    return true;
+  }
+
   function removeTimer(id) {
     const timers = loadTimersRaw(storageKey);
     if (timers[id]) {
@@ -296,6 +324,7 @@ export function createTimerManager({
     getSnapshot,
     addTimer,
     extendTimer: extendTimerBy,
+    adjustTimer: adjustTimerBy,
     removeTimer,
     tick,
     dispose,
@@ -351,6 +380,8 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
               </div>
 
               <div class="row timer-actions" style="gap:.35rem; flex:0 0 auto;">
+                <button type="button" data-timer-dec="${t.id}" data-sec="60">-1m</button>
+                <button type="button" data-timer-dec="${t.id}" data-sec="300">-5m</button>
                 <button type="button" data-timer-ext="${t.id}" data-sec="60">+1m</button>
                 <button type="button" data-timer-ext="${t.id}" data-sec="300">+5m</button>
                 <button type="button" data-timer-stop="${t.id}" aria-label="Stop timer">✕</button>

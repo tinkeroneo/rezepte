@@ -398,18 +398,18 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   inset: 0;
   background: rgba(0,0,0,.45);
   backdrop-filter: blur(2px);
-  z-index: 1200;
+  z-index: 2499;
 }
 
 .sheet{
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--s-4) + env(safe-area-inset-bottom));
+  bottom: calc(var(--s-4) + env(safe-area-inset-bottom) + var(--cookbar-h, 96px));
   width: min(720px, calc(100% - var(--s-6)*2));
   max-height: calc(100vh - 120px);
   overflow: auto;
-  z-index: 1201;
+  z-index: 2500;
   border-radius: var(--r-3);
   border: 1px solid var(--line);
   background: var(--panel);
@@ -435,3 +435,102 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   background: var(--line);
 }
 
+
+/* Cook: Steps als Cards mit Abstand */
+.steps-checklist{
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.steps-checklist > li{
+  margin: 0 0 var(--s-4);
+  padding: var(--s-4);
+  border-radius: var(--r-3);
+  border: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: var(--shadow-1);
+}
+.steps-checklist > li:last-child{ margin-bottom: 0; }
+
+/* List: Favorit rechts neben Bild, vor Titel */
+.li-title-row{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+}
+.fav-inline{
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: .25rem .35rem;
+  cursor: pointer;
+  border-radius: 10px;
+}
+.fav-inline:hover{ background: rgba(0,0,0,.06); }
+html.dark .fav-inline:hover{ background: rgba(255,255,255,.08); }
+
+
+/* Cookbar Timer Dock */
+#timerDock{ display:flex; justify-content:center; }
+.timerdock-chip{
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 999px;
+  padding: .45rem .65rem;
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  box-shadow: var(--shadow-1);
+}
+.timerdock-label{ font-weight: 900; }
+.timerdock-count{
+  font-size:.85rem;
+  font-weight:900;
+  border-radius:999px;
+  padding:.1rem .45rem;
+  border:1px solid var(--line);
+  background: rgba(0,0,0,.04);
+}
+html.dark .timerdock-count{ background: rgba(255,255,255,.06); }
+
+.timerdock-panel{
+  position: fixed;
+  left: var(--s-4);
+  right: var(--s-4);
+  bottom: calc(var(--s-4) + env(safe-area-inset-bottom) + var(--cookbar-h, 96px));
+  z-index: 2501;
+}
+
+
+/* Timerbar docked inside cookbar */
+.timerroot-dock{
+  flex: 1;
+  display:flex;
+  justify-content:center;
+  min-width: 0;
+}
+.timerroot-dock .timerbar{
+  width: 100%;
+  max-width: 520px;
+  margin: 0;
+  padding: .35rem .5rem;
+}
+.timerroot-dock .timer-list{
+  margin-top: .35rem;
+}
+.timerroot-dock .timer-pill{
+  padding: .45rem .5rem;
+}
+.timerroot-dock .timer-pill-title{
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timerroot-dock .timer-actions button{
+  padding: .25rem .4rem;
+}
+
+.pending-overlay{ position:absolute; top:10px; right:10px; z-index:4; }
+
+.li-media,.grid-media{ position:relative; }

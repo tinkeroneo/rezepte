@@ -3,6 +3,7 @@ import {
   loadTimers,
   saveTimers,
   extendTimer,
+  adjustTimer,
   getSortedActiveTimers, createBeep
 } from "../domain/timers.js";
 import { formatTime, escapeHtml, qsa, qs } from "../utils.js";
@@ -176,6 +177,8 @@ export function renderTimersOverlay({ appEl: _appEl, state, setView: _setView })
                   <div class="muted">${label}</div>
                 </div>
                 <div class="row" style="gap:.35rem; flex:0 0 auto;">
+                  <button type="button" data-dec="${t.id}" data-sec="60">-1m</button>
+                  <button type="button" data-dec="${t.id}" data-sec="300">-5m</button>
                   <button type="button" data-ext="${t.id}" data-sec="60">+1m</button>
                   <button type="button" data-ext="${t.id}" data-sec="300">+5m</button>
                   <button type="button" data-dismiss="${t.id}" aria-label="Dismiss timer">✕</button>
@@ -203,6 +206,21 @@ export function renderTimersOverlay({ appEl: _appEl, state, setView: _setView })
       renderTimersOverlay({ appEl: _appEl, state });
     });
   }
+
+  qsa(root, "[data-dec]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.dec;
+      const sec = parseInt(btn.dataset.sec, 10) || 0;
+      if (!id || !sec) return;
+      // const timers = loadTimers();
+      if (!timers[id]) return;
+      ack(btn.closest(".timer-card") || btn);
+      adjustTimer(timers, id, -sec);
+      saveTimers(timers);
+      renderTimersOverlay({ appEl: _appEl, state });
+    });
+  });
 
   qsa(root, "[data-ext]").forEach((btn) => {
     btn.addEventListener("click", (e) => {

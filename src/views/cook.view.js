@@ -10,6 +10,55 @@ import { ack } from "../ui/feedback.js";
 let __audioPrimedOnce = false;
 
 
+function __parseNumberToken(tok) {
+  const t = String(tok).trim();
+  // ranges like 2-3
+  const range = t.match(/^(\d+(?:[.,]\d+)?|\d+\/\d+)\s*-\s*(\d+(?:[.,]\d+)?|\d+\/\d+)$/);
+  if (range) return { kind: "range", a: __parseNumberToken(range[1]), b: __parseNumberToken(range[2]) };
+
+  const frac = t.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (frac) return { kind: "num", v: (Number(frac[1]) / Number(frac[2])) };
+
+  const num = t.match(/^\d+(?:[.,]\d+)?$/);
+  if (num) return { kind: "num", v: Number(t.replace(",", ".")) };
+
+  return null;
+}
+
+function __formatNumberDE(n) {
+  // keep up to 2 decimals when needed
+  const rounded = Math.round(n * 100) / 100;
+  // avoid scientific notation
+  const out = rounded.toFixed(rounded % 1 === 0 ? 0 : (rounded*10)%1===0 ? 1 : 2);
+  return out.replace(".", ",");
+}
+
+function scaleIngredientLine(line, factor) {
+  const s = String(line || "");
+
+  // match leading number token like "1", "0,5", "1/2", "2-3"
+  const m = s.match(/^\s*([0-9]+(?:[.,][0-9]+)?|[0-9]+\s*\/\s*[0-9]+|[0-9]+(?:[.,][0-9]+)?\s*-\s*[0-9]+(?:[.,][0-9]+)?)(\s+.*)?$/);
+  if (!m) return s;
+  const tok = m[1];
+  const rest = m[2] || "";
+  const parsed = __parseNumberToken(tok.replace(/\s+/g,""));
+  if (!parsed) return s;
+
+  const apply = (p) => {
+    if (p.kind === "num") return __formatNumberDE(p.v * factor);
+    if (p.kind === "range") {
+      const a = apply(p.a);
+      const b = apply(p.b);
+      return `${a}-${b}`;
+    }
+    return tok;
+  };
+
+  return apply(parsed) + rest;
+}
+
+
+
 export function renderCookView({ appEl, state, recipes, partsByParent, setView, setViewCleanup }) {
   const r = recipes.find(x => x.id === state.selectedId);
    if (!r) return setView({ name: "list", selectedId: null, q: state.q });
@@ -55,8 +104,6 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
                  style="width:100%; border-radius:12px; display:block;" />
           </div>
         ` : ""}</details>
-
-        <div id="timerRoot"></div>
 
         <hr />
         <h3>Schritte</h3>
@@ -104,6 +151,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
       <div class="cookbar">
         <div class="cookbar-row">
           <button class="btn btn--solid" id="ingredientsBtn">Zutaten</button>
+          <div id="timerRoot" class="timerroot-dock"></div>
           <button class="btn btn--ghost" id="resetBtn">Reset Steps</button>
         </div>
       </div>
@@ -114,6 +162,57 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
 
   const timerRoot = qs(appEl, "#timerRoot");
   const sheetRoot = qs(appEl, "#sheetRoot");
+
+  function renderIngredientsSheet() {
+    sheetRoot.innerHTML = `
+      <div class="sheet-backdrop" id="sheetBackdrop"></div>
+      <div class="sheet" role="dialog" aria-label="Zutaten">
+        <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
+          <h3 style="margin:0;">Zutaten</h3>
+          <button class="btn btn--ghost" id="closeSheet" type="button" title="Schließen">✕</button>
+        </div>
+        <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:flex-end; margin-top:.5rem;">
+          <div class="field" style="flex:1; min-width:170px;">
+            <div class="muted" style="font-weight:700;">Menge</div>
+            <div class="muted" style="font-size:.9rem;">Basis: ${escapeHtml(r.servings ?? "—")}</div>
+          </div>
+          <div class="field" style="min-width:160px;">
+            <label class="label" for="servingsFactor">Umrechnen</label>
+            <select id="servingsFactor" class="input">
+              <option value="1">1×</option>
+              <option value="0.5">½×</option>
+              <option value="1.5">1,5×</option>
+              <option value="2">2×</option>
+            </select>
+          </div>
+        </div>
+        <div style="margin-top:.75rem;">
+          ${isMenu
+            ? buildMenuIngredients(r, recipes, partsByParent).map(section => `
+              <div class="muted" style="font-weight:900; margin:.75rem 0 .35rem;">${escapeHtml(section.title)}</div>
+              ${renderIngredientsHtml(section.items.map(x => scaleIngredientLine(x, __ingFactor)))}
+            `).join("")
+            : renderIngredientsHtml((r.ingredients ?? []).map(x => scaleIngredientLine(x, __ingFactor)))}
+        </div>
+      </div>
+    `;
+
+    const close = qs(sheetRoot, "#closeSheet");
+    const back = qs(sheetRoot, "#sheetBackdrop");
+    if (close) close.addEventListener("click", () => (sheetRoot.innerHTML = ""));
+    if (back) back.addEventListener("click", () => (sheetRoot.innerHTML = ""));
+
+    const sf = qs(sheetRoot, "#servingsFactor");
+    if (sf) {
+      sf.value = String(__ingFactor);
+      sf.addEventListener("change", () => {
+        __ingFactor = Number(String(sf.value).replace(",", ".")) || 1;
+        renderIngredientsSheet();
+      });
+    }
+  }
+
+  let __ingFactor = 1;
 
 
 
@@ -212,6 +311,19 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
       });
 
 
+      // Shorten (-1m / -5m)
+      qsa(timerRoot, "[data-timer-dec]").forEach(b => {
+        b.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const id = b.dataset.timerDec;
+          const sec = parseInt(b.dataset.sec, 10) || 0;
+          if (!id || !sec) return;
+          ack(b.closest(".timer-pill") || b);
+          tm.adjustTimer(id, -sec);
+          tm.tick();
+        });
+      });
+
       // Extend (+1m / +5m)
       qsa(timerRoot, "[data-timer-ext]").forEach(b => {
         b.addEventListener("click", (e) => {
@@ -237,29 +349,9 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
   appEl.addEventListener("click", audio.prime, { once: true });
 
   qs(appEl, "#ingredientsBtn").addEventListener("click", () => {
-    sheetRoot.innerHTML = `
-      <div class="sheet-backdrop" id="backdrop"></div>
-      <div class="sheet" role="dialog" aria-modal="true">
-        <div class="sheet-handle"></div>
-        <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
-          <h3 style="margin:0;">Zutaten</h3>
-          <button class="btn btn--ghost" id="closeSheet">Schließen</button>
-        </div>
-        <div style="margin-top:.75rem;">
-          ${isMenu
-            ? buildMenuIngredients(r, recipes, partsByParent).map(section => `
-                <div style="margin-bottom:1rem;">
-                  <div class="muted" style="font-weight:800; margin-bottom:.25rem;">${escapeHtml(section.title)}</div>
-                  ${renderIngredientsHtml(section.items)}
-                </div>
-              `).join("")
-            : renderIngredientsHtml(r.ingredients ?? [])
-          }
-        </div>
-      </div>
-    `;
-    qs(sheetRoot, "#backdrop").addEventListener("click", () => sheetRoot.innerHTML = "");
-    qs(sheetRoot, "#closeSheet").addEventListener("click", () => sheetRoot.innerHTML = "");
+    // toggle: zweiter Klick schließt wieder
+    if (sheetRoot.innerHTML && sheetRoot.innerHTML.trim() !== "") { sheetRoot.innerHTML = ""; return; }
+    renderIngredientsSheet();
   });
 
   // Radio ist global (Header-Button + Radio-Dock). In der CookView kein extra Button,

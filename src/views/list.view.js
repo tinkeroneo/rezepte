@@ -6,10 +6,13 @@ import { buildCookStatsByRecipeId } from "../domain/cooklog.js";
 import { isFavorite, toggleFavorite } from "../domain/favorites.js";
 import { getTagColors } from "../domain/tagColors.js";
 import { getColorForCategory } from "../domain/categories.js";
+import { getPendingRecipeIds } from "../domain/offlineQueue.js";
 
 
 
 export function renderListView({ appEl, state, recipes, partsByParent, setView, useBackend, onImportRecipes }) {
+  const __pendingIds = getPendingRecipeIds();
+
 
   const tagColors = getTagColors();
 
@@ -50,7 +53,6 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
           <div class="toolbar-header">
             <h2>Rezepte</h2>
             <div class="muted" id="count"></div>
-
               <div class="seg" aria-label="Ansicht umschalten">
                 <button class="seg__btn" id="modeList" type="button" title="Listenansicht" aria-label="Listenansicht">☰</button>
                 <button class="seg__btn" id="modeGrid" type="button" title="Gridansicht" aria-label="Gridansicht">▦</button>
@@ -116,6 +118,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   const qEl = qs(appEl, "#q");
   const resultsEl = qs(appEl, "#results");
   const countEl = qs(appEl, "#count");
+  const vegan101Btn = qs("#vegan101Btn", appEl);
   const modeListBtn = qs(appEl, "#modeList");
   const modeGridBtn = qs(appEl, "#modeGrid");
 
@@ -180,7 +183,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
   }
 
   const pendingBtn = qs("#pendingToggle", appEl);
-  const pendingCount = recipes.filter(r => r._pending).length;
+  const pendingCount = recipes.filter(r => __pendingIds.has(r.id)).length;
   if (pendingBtn) {
     if (pendingCount > 0) {
       pendingBtn.style.display = "";
@@ -196,6 +199,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
       pendingBtn.style.display = "none";
     }
   }
+
+  if (vegan101Btn) vegan101Btn.onclick = () => setView({ name: "vegan101", selectedId: null, q: state.q });
 
   sortEl.value = sort;
   applySortDirUi();
@@ -261,7 +266,7 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     // 1) filtern
     let list = recipes.filter(r => {
       // optional: show only unsynced (pending) recipes
-      if (state?.ui?.pendingOnly && !r._pending) return false;
+      if (state?.ui?.pendingOnly && !__pendingIds.has(r.id)) return false;
       if (cat && (r.category ?? "") !== cat) return false;
       if (tag) {
         const rt = Array.isArray(r.tags) ? r.tags : [];
@@ -374,8 +379,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
             ? `<img class="grid-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy"  />`
             : coverFallbackHtml(r, "grid-img")
           }
+          ${__pendingIds.has(r.id) ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
                   <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
-                  ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
                 </div>
                 <div class="grid-body">
                   <div class="grid-title"><span>${escapeHtml(r.title)}</span></div>
@@ -404,7 +409,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
             }
               <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button"></button>
 
-              ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
+              ${__pendingIds.has(r.id) ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
+                  <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
             </div>
             <div class="grid-body">
               <div class="grid-title"><span>${escapeHtml(r.title)}</span></div>
@@ -430,11 +436,10 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
             ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy"  />`
             : coverFallbackHtml(r, "li-thumb li-thumb--empty")
           }
-                    <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
-                    ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
-                  </div>
+${__pendingIds.has(r.id) ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
+                   </div>
                   <div class="li-body">
-                    <div class="li-title">${escapeHtml(r.title)}</div>
+                    <div class="li-title-row"><button class="fav-inline" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button><div class="li-title">${escapeHtml(r.title)}</div></div>
                     <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
                     ${(Array.isArray(r.tags) && r.tags.length)
             ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
@@ -461,11 +466,10 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
               ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy"  />`
               : coverFallbackHtml(r, "li-thumb li-thumb--empty")
             }
-                <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button>
-                ${r._pending ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
-              </div>
+${__pendingIds.has(r.id) ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>` : ``}
+                  </div>
               <div class="li-body">
-                <div class="li-title">${escapeHtml(r.title)}</div>
+                <div class="li-title-row"><button class="fav-inline" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">${isFavorite(r.id) ? "★" : "☆"}</button><div class="li-title">${escapeHtml(r.title)}</div></div>
                 <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
                 ${(Array.isArray(r.tags) && r.tags.length)
               ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
@@ -705,6 +709,8 @@ export function renderListView({ appEl, state, recipes, partsByParent, setView, 
     sortDir = defaultDirFor(sort);
     catEl.value = cat;
     tagEl.value = tag;
+    if (vegan101Btn) vegan101Btn.onclick = () => setView({ name: "vegan101", selectedId: null, q: state.q });
+
     sortEl.value = sort;
     if (sortDirBtn) {
       sortDirBtn.textContent = sortDir === "asc" ? "↑" : "↓";

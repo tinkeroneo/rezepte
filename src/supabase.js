@@ -135,6 +135,11 @@ async function resolveSpaceId({ access_token, userId }) {
   const rows = await listUserSpacesRaw(access_token);
   if (!rows.length) throw new Error("No space assigned to user");
 
+  // 0) Prefer profile last/default (global, cross-device)
+  const prof = userId ? await tryFetchProfile({ access_token, userId }) : null;
+  if (prof?.last_space_id && rows.some(r => r?.space_id === prof.last_space_id)) return prof.last_space_id;
+  if (prof?.default_space_id && rows.some(r => r?.space_id === prof.default_space_id)) return prof.default_space_id;
+
   // 1) Prefer default space (DB flag)
   const def = rows.find(r => r?.is_default);
   if (def?.space_id) return def.space_id;
@@ -920,5 +925,287 @@ export async function uploadRecipeImage(file, recipeId) {
   if (!upRes.ok) throw new Error(`upload failed: ${await upRes.text()}`);
 
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
+}
+
+
+
+/* =========================
+   PROFILES (Displayname + Default/Last Space)
+========================= */
+
+async function tryFetchProfile({ access_token, userId }) {
+  try {
+    const uid = String(userId || "").trim();
+    if (!uid) return null;
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/profiles?select=user_id,display_name,default_space_id,last_space_id&user_id=eq.${uid}&limit=1`, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${access_token}`,
+      },
+      timeoutMs: 12000,
+    });
+    if (!res.ok) return null; // table may not exist yet
+    const rows = await res.json();
+    return Array.isArray(rows) && rows[0] ? rows[0] : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function getProfile() {
+  requireAuth();
+  const p = await tryFetchProfile({ access_token: _session.access_token, userId: _user?.id });
+  return p;
+}
+
+export async function upsertProfile(patch) {
+  requireAuth();
+  const body = {
+    user_id: _user?.id,
+    ...patch,
+    updated_at: new Date().toISOString(),
+  };
+  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/profiles`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${_session.access_token}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation",
+    },
+    body: JSON.stringify(body),
+    timeoutMs: 12000,
+  });
+  if (!res.ok) throw new Error(`Profile upsert failed: ${res.status} ${await sbJson(res)}`);
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+export async function updateSpaceName({ spaceId, name }) {
+  requireAuth();
+  const sid = String(spaceId || "").trim();
+  const nm = String(name || "").trim();
+  if (!sid) throw new Error("Invalid spaceId");
+  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/spaces?id=eq.${sid}`, {
+    method: "PATCH",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${_session.access_token}`,
+      "Content-Type": "application/json",
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify({ name: nm }),
+    timeoutMs: 12000,
+  });
+  if (!res.ok) throw new Error(`Space update failed: ${res.status} ${await sbJson(res)}`);
+  const rows = await res.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+
+/* =========================
+   RECIPE: MOVE/COPY TO SPACE
+========================= */
+
+
+
+
+function chunkArray(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+async function fetchRecipesByIds({ access_token, ids }) {
+  const uniq = Array.from(new Set((ids || []).map(x => String(x || "").trim()).filter(Boolean)));
+  if (!uniq.length) return [];
+  const chunks = chunkArray(uniq, 50);
+  const rows = [];
+  for (const ch of chunks) {
+    const q = ch.map(encodeURIComponent).join(",");
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipes?select=*&id=in.(${q})`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${access_token}` },
+      timeoutMs: 20000,
+    });
+    if (!res.ok) throw new Error(`fetchRecipesByIds failed: ${res.status} ${await sbJson(res)}`);
+    rows.push(...(await res.json()));
+  }
+  return rows;
+}
+
+async function fetchRecipePartsEdges({ access_token, spaceId }) {
+  const sid = String(spaceId || "").trim();
+  if (!sid) return [];
+  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipe_parts?select=space_id,parent_id,child_id,sort_order&space_id=eq.${encodeURIComponent(sid)}`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${access_token}` },
+    timeoutMs: 20000,
+  });
+  if (!res.ok) throw new Error(`fetchRecipePartsEdges failed: ${res.status} ${await sbJson(res)}`);
+  return await res.json();
+}
+
+function collectDescendants({ rootId, edges }) {
+  const start = String(rootId || "").trim();
+  if (!start) return [];
+  const byParent = new Map();
+  for (const e of edges || []) {
+    const p = String(e.parent_id || "");
+    const list = byParent.get(p) || [];
+    list.push(String(e.child_id || ""));
+    byParent.set(p, list);
+  }
+  const visited = new Set();
+  const stack = [start];
+  while (stack.length) {
+    const id = stack.pop();
+    if (!id || visited.has(id)) continue;
+    visited.add(id);
+    const kids = byParent.get(id) || [];
+    for (const k of kids) if (!visited.has(k)) stack.push(k);
+  }
+  return Array.from(visited);
+}
+
+
+/* =========================
+   RECIPE: MOVE/COPY TO SPACE (with Parts)
+========================= */
+
+export async function moveRecipeToSpace({ recipeId, targetSpaceId, includeParts = true }) {
+  requireAuth();
+  const rid = String(recipeId || "").trim();
+  const sid = String(targetSpaceId || "").trim();
+  if (!rid || !sid) throw new Error("Invalid recipeId/targetSpaceId");
+
+  const fromSpaceId = getAuthContext()?.spaceId;
+  const access_token = _session.access_token;
+
+  let idsToMove = [rid];
+  let edgesToMove = [];
+  if (includeParts && fromSpaceId) {
+    const edges = await fetchRecipePartsEdges({ access_token, spaceId: fromSpaceId });
+    idsToMove = collectDescendants({ rootId: rid, edges });
+    edgesToMove = edges.filter(e => idsToMove.includes(String(e.parent_id || "")));
+  }
+
+  // 1) move recipes
+  for (const ch of chunkArray(idsToMove, 50)) {
+    const q = ch.map(encodeURIComponent).join(",");
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipes?id=in.(${q})`, {
+      method: "PATCH",
+      headers: {
+        ...sbHeaders(),
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ space_id: sid }),
+      timeoutMs: 20000,
+    });
+    if (!res.ok) throw new Error(`move recipes failed: ${res.status} ${await sbJson(res)}`);
+  }
+
+  // 2) move edges where parent is in moved set
+  if (includeParts && edgesToMove.length && fromSpaceId) {
+    for (const chunkEdges of chunkArray(edgesToMove, 200)) {
+      const parentIds = Array.from(new Set(chunkEdges.map(e => String(e.parent_id))));
+      const q = parentIds.map(encodeURIComponent).join(",");
+      const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(fromSpaceId)}&parent_id=in.(${q})`, {
+        method: "PATCH",
+        headers: {
+          ...sbHeaders(),
+          "Content-Type": "application/json",
+          Prefer: "return=minimal",
+        },
+        body: JSON.stringify({ space_id: sid }),
+        timeoutMs: 20000,
+      });
+      if (!res.ok) throw new Error(`move recipe_parts failed: ${res.status} ${await sbJson(res)}`);
+    }
+  }
+
+  return { movedIds: idsToMove, targetSpaceId: sid };
+}
+
+
+export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = true }) {
+  requireAuth();
+  const sid = String(targetSpaceId || "").trim();
+  if (!sid) throw new Error("Invalid targetSpaceId");
+  if (!recipe?.id) throw new Error("Invalid recipe");
+
+  const fromSpaceId = getAuthContext()?.spaceId;
+  const access_token = _session.access_token;
+
+  let ids = [String(recipe.id)];
+  let edges = [];
+  if (includeParts && fromSpaceId) {
+    edges = await fetchRecipePartsEdges({ access_token, spaceId: fromSpaceId });
+    ids = collectDescendants({ rootId: recipe.id, edges });
+  }
+
+  const srcRows = await fetchRecipesByIds({ access_token, ids });
+  const byId = new Map(srcRows.map(r => [String(r.id), r]));
+
+  const idMap = new Map();
+  for (const id of ids) {
+    idMap.set(id, (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`));
+  }
+
+  const newRows = ids.map(oldId => {
+    const r = byId.get(String(oldId));
+    if (!r) throw new Error(`Missing source recipe: ${oldId}`);
+    const nr = { ...r };
+    nr.id = idMap.get(String(oldId));
+    nr.space_id = sid;
+    delete nr.created_at;
+    delete nr.updated_at;
+    delete nr.deleted_at;
+    delete nr.pending;
+    delete nr.is_pending;
+    return nr;
+  });
+
+  for (const ch of chunkArray(newRows, 50)) {
+    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipes`, {
+      method: "POST",
+      headers: {
+        ...sbHeaders(),
+        Prefer: "return=minimal",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(ch),
+      timeoutMs: 20000,
+    });
+    if (!res.ok) throw new Error(`copy recipes failed: ${res.status} ${await sbJson(res)}`);
+  }
+
+  if (includeParts && edges.length) {
+    const idsSet = new Set(ids.map(String));
+    const edgeRows = edges
+      .filter(e => idsSet.has(String(e.parent_id)) && idsSet.has(String(e.child_id)))
+      .map(e => ({
+        space_id: sid,
+        parent_id: idMap.get(String(e.parent_id)),
+        child_id: idMap.get(String(e.child_id)),
+        sort_order: e.sort_order ?? 0,
+      }));
+
+    for (const ch of chunkArray(edgeRows, 200)) {
+      const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipe_parts`, {
+        method: "POST",
+        headers: {
+          ...sbHeaders(),
+          Prefer: "return=minimal",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(ch),
+        timeoutMs: 20000,
+      });
+      if (!res.ok) throw new Error(`copy recipe_parts failed: ${res.status} ${await sbJson(res)}`);
+    }
+  }
+
+  const newRootId = idMap.get(String(recipe.id));
+  return { newRecipeId: newRootId };
 }
 
