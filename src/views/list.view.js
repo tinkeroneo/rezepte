@@ -28,6 +28,9 @@ import { renderListShell } from "../render/listShell.js";
 
 import { loadListUiState, patchListUiState } from "../services/listUiStateStore.js";
 
+import { renderActiveFilterChips } from "../render/activeFilterChips.js";
+
+
 export function renderListView({
   appEl,
   state,
@@ -132,7 +135,8 @@ let ui = {
 
     const filtered = applyListQuery({
       recipes,
-      query: qEl?.value ?? u.q ?? "",
+      query: u.q ?? (qEl?.value ?? ""),
+
       cat: u.cat,
       tag: u.tag,
       sort: u.sort,
@@ -153,6 +157,13 @@ let ui = {
       renderGridItemHtml,
       renderListItemHtml
     });
+        const chipsEl = qs(appEl, "#activeFilters");
+    if (chipsEl) {
+      chipsEl.innerHTML = renderActiveFilterChips({ ui: u });
+      chipsEl.style.display = chipsEl.innerHTML ? "flex" : "none";
+    }
+
+
   }
 
   // One-time delegated click handlers for results
@@ -168,18 +179,63 @@ let ui = {
   });
 
   // Toolbar controller (wires q/cat/tag/sort/sortDir/reset + builds options)
-  initListToolbar({
-    appEl,
-    state,
-    recipes,
-    getUi,
-    setUi,
-    defaultDirFor,
-    onPersist: (patch) => patchListUiState({ KEYS }, patch),
-    onNavUpdate: (nav) => lsSet(KEYS.NAV, nav),
-    onRender: () => renderResults(),
-    onResetNavigate: () => setView({ name: "list", selectedId: null, q: "" })
-  });
+const toolbarApi = initListToolbar({
+  appEl,
+  state,
+  recipes,
+  getUi,
+  setUi,
+  defaultDirFor,
+  onPersist: (patch) => patchListUiState({ KEYS }, patch),
+  onNavUpdate: (nav) => lsSet(KEYS.NAV, nav),
+  onRender: () => renderResults(),
+  onResetNavigate: () => setView({ name: "list", selectedId: null, q: "" })
+});
+
+  const chipsEl = qs(appEl, "#activeFilters");
+  if (chipsEl && !chipsEl.__wired) {
+    chipsEl.__wired = true;
+
+    chipsEl.addEventListener("click", (ev) => {
+      const btn = ev.target?.closest?.("[data-chip]");
+      if (!btn) return;
+
+      const key = btn.getAttribute("data-chip");
+      const u = getUi();
+
+      if (key === "q") u.q = "";
+      if (key === "cat") u.cat = "";
+      if (key === "tag") u.tag = "";
+      if (key === "pendingOnly") u.pendingOnly = false;
+      if (key === "sort") {
+        u.sort = "new";
+        u.sortDir = defaultDirFor("new");
+      }
+
+      // keep extra filters open if user had it open, but also derive if not explicit
+      if (typeof u.extraOpen !== "boolean") u.extraOpen = !!(u.cat || u.tag);
+
+      setUi(u);
+
+      // persist the relevant fields
+      patchListUiState({ KEYS }, {
+        cat: u.cat,
+        tag: u.tag,
+        sort: u.sort,
+        sortDir: u.sortDir,
+        pendingOnly: u.pendingOnly,
+        extraOpen: u.extraOpen
+      });
+
+      // sync toolbar DOM
+      toolbarApi?.syncFromUi?.(u);
+
+      // ensure nav q is updated too
+      lsSet(KEYS.NAV, { ...state, q: u.q });
+
+      renderResults();
+    });
+  }
 
 
 initPendingToggle({

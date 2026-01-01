@@ -215,5 +215,47 @@ export function initListToolbar({
     });
   }
 
-  return { qEl };
+  const syncFromUi = (nextUi) => {
+    if (!nextUi) return;
+
+    // write values to DOM controls
+    if (qEl && typeof nextUi.q === "string") qEl.value = nextUi.q;
+    if (catEl) catEl.value = nextUi.cat || "";
+    if (tagEl) tagEl.value = nextUi.tag || "";
+    if (sortEl) sortEl.value = nextUi.sort || "new";
+
+    // sort dir arrow
+    if (typeof nextUi.sortDir === "string") {
+      const isAsc = nextUi.sortDir === "asc";
+      if (sortDirBtn) {
+        sortDirBtn.textContent = isAsc ? "↑" : "↓";
+        sortDirBtn.title = isAsc ? "Aufsteigend" : "Absteigend";
+      }
+    }
+
+    // extra filters open state
+    if (typeof nextUi.extraOpen === "boolean") {
+      const open = !!nextUi.extraOpen;
+      if (extraFiltersWrap) extraFiltersWrap.style.display = open ? "flex" : "none";
+      if (extraFiltersBtn) {
+        extraFiltersBtn.setAttribute("aria-expanded", open ? "true" : "false");
+        extraFiltersBtn.textContent = open ? "Filter ▴" : "Filter ▾";
+      }
+    }
+  };
+  return {
+    qEl,
+    syncFromUi,
+    getControls: () => ({
+      qEl,
+      catEl,
+      tagEl,
+      sortEl,
+      sortDirBtn,
+      resetEl,
+      extraFiltersBtn,
+      extraFiltersWrap
+    })
+  };
+
 }

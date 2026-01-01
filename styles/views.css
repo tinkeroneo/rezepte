@@ -148,7 +148,6 @@ h2 {
   margin-right: auto;
 }
 
-
 .li-thumb--empty {
   background: linear-gradient(135deg, #eee, #f7f7f7);
 }
@@ -220,7 +219,6 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
   user-select: none;
 }
 
-
 .list-item::before {
   content: "";
   position: absolute;
@@ -230,13 +228,6 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
   width: 6px;
   background: var(--cat-accent, #dfe);
   opacity: 0.45;
-}
-
-.li-left {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
 }
 
 .li-thumb {
@@ -251,10 +242,6 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
 
 .li-thumb--empty {
   background: #eee;
-}
-
-.li-body {
-  min-width: 0;
 }
 
 .li-title {
@@ -282,10 +269,7 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
   flex: 0 0 auto;
 }
 
-
 .muted { color: var(--muted); font-size: .95rem; }
-
-
 
 /* --- Pills (used for meta + overlays like pending) --- */
 .pill{
@@ -310,7 +294,7 @@ body.dark .pill{ background: rgba(255,255,255,0.04); }
   border-color: rgba(210,179,123,0.40);
   background: rgba(210,179,123,0.10);
 }
-pending-overlay{
+.pending-overlay{
   position: absolute;
   left: 6px;
   bottom: 6px;
@@ -339,7 +323,6 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   padding-top: .75rem;
   z-index: 5;
 }
-
 
 .fab-menu{
   position:fixed;
@@ -393,7 +376,6 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   z-index: 1;
 }
 
-
 /* === Bottom Sheet / Overlay === */
 .sheet-backdrop{
   position: fixed;
@@ -437,7 +419,6 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   background: var(--line);
 }
 
-
 /* Cook: Steps als Cards mit Abstand */
 .steps-checklist{
   list-style: none;
@@ -472,7 +453,6 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
 .fav-inline:hover{ background: rgba(0,0,0,.06); }
 html.dark .fav-inline:hover{ background: rgba(255,255,255,.08); }
 
-
 /* Cookbar Timer Dock */
 #timerDock{ display:flex; justify-content:center; }
 .timerdock-chip{
@@ -504,7 +484,6 @@ html.dark .timerdock-count{ background: rgba(255,255,255,.06); }
   z-index: 2501;
 }
 
-
 /* Timerbar docked inside cookbar */
 .timerroot-dock{
   flex: 1;
@@ -533,6 +512,6 @@ html.dark .timerdock-count{ background: rgba(255,255,255,.06); }
   padding: .25rem .4rem;
 }
 
-.pending-overlay{ position:absolute; top:10px; right:10px; z-index:4; }
+..pending-overlay{ position:absolute; top:10px; right:10px; z-index:4; }
 
 .li-media,.grid-media{ position:relative; }

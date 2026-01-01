@@ -47,6 +47,8 @@ export function renderListShell({ q = "" } = {}) {
             <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
               <input id="q" type="search" placeholder="Suche… (z.B. Bohnen, scharf, Frühstück)" value="${escapeHtml(q)}" />
             </div>
+            
+              <div id="activeFilters" class="row" style="gap:.5rem; flex-wrap:wrap; margin-top:.5rem;"></div>
           </div>
 
           <input
