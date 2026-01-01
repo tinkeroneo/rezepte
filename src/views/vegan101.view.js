@@ -5,7 +5,6 @@ export function renderVegan101View({ appEl, setView }) {
         <div class="toolbar-header" style="align-items:flex-start;">
           <div>
             <h2 style="margin:0;">🌱 Vegan 101</h2>
-            <div class="muted" style="margin-top:.25rem;">Substitutions-Guide (1 Screen)</div>
           </div>
           <button class="btn btn--ghost" id="toListBtn" type="button" title="Zur Liste">☰</button>
         </div>

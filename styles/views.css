@@ -316,6 +316,7 @@ pending-overlay{
   bottom: 6px;
   z-index: 5;
   line-height: 1;
+  z-index: 3;
 }
 /* Legacy button classnames (kept for markup compatibility) */
 .btn-primary { 
@@ -389,6 +390,7 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   height: 100% !important;
   object-fit: cover;
   display: block;
+  z-index: 1;
 }
 
 

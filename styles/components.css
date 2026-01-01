@@ -607,3 +607,6 @@ select {
   border-radius: 6px;
   font-size: 0.95rem;
 }
+
+
+.is-disabled{opacity:.5; cursor:not-allowed;}

@@ -20,7 +20,9 @@ const __pulledCookEvents = new Set(); // recipeId
 
 export function renderDetailView({
   appEl, state, recipes, partsByParent, recipeParts,
-  setView, useBackend,
+  setView,
+  canWrite, useBackend,
+  mySpaces, copyRecipeToSpace, refreshAll,
   sbDelete, removeRecipePart, addRecipePart, listAllRecipeParts,
   onUpdateRecipe,
   addToShopping, rebuildPartsIndexSetter
@@ -91,7 +93,7 @@ export function renderDetailView({
           <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
             <div class="row" style="gap:.5rem;">
               <button class="btn btn--ghost" id="cookBtn">👨‍🍳 Kochen</button>
-              <button class="btn btn--ghost" id="editBtn" title="Rezept bearbeiten">✏️ Bearbeiten</button>
+              ${canWrite ? `<button class="btn btn--ghost" id="editBtn" title="Rezept bearbeiten">✏️ Bearbeiten</button>` : `<button class="btn btn--ghost" id="editBtn" disabled title="Nur Owner/Editor kann bearbeiten" style="opacity:.5;">✏️ Bearbeiten</button>`}
             </div>
           </div>
         </div>
@@ -285,6 +287,77 @@ export function renderDetailView({
 
 
   const sheetRoot = qs(appEl, "#sheetRoot");
+
+  // Copy to space sheet
+  const copyBtn = qs(appEl, "#copyBtn");
+  if (useBackend && copyBtn) {
+    copyBtn.addEventListener("click", () => {
+      const spaces = Array.isArray(mySpaces) ? mySpaces : [];
+      const currentSid = String(r.space_id || "").trim();
+      const options = spaces
+        .filter(s => String(s.space_id || s.id || "") !== currentSid)
+        .map(s => {
+          const sid = String(s.space_id || s.id || "");
+          const name = String(s.space_name || s.name || sid);
+          return `<option value="${escapeHtml(sid)}">${escapeHtml(name)}</option>`;
+        })
+        .join("");
+
+      if (!options) {
+        return alert("Kein anderes Space verfügbar (oder keine Berechtigung).");
+      }
+
+      sheetRoot.innerHTML = `
+        <div class="sheet-backdrop" id="copyBackdrop"></div>
+        <div class="sheet" role="dialog" aria-modal="true">
+          <div class="sheet-handle"></div>
+          <div class="sheet-header">
+            <div style="font-weight:900;">Kopieren nach Space</div>
+            <button class="btn btn--ghost" id="copyCloseBtn" type="button">Schließen</button>
+          </div>
+          <div class="sheet-body">
+            <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:center;">
+              <select id="copySpaceSelect" class="input" style="flex:1; min-width:220px;">
+                ${options}
+              </select>
+              <label class="muted" style="display:flex; gap:.4rem; align-items:center; white-space:nowrap;">
+                <input id="copyIncludeParts" type="checkbox" checked /> inkl. Parts
+              </label>
+              <button id="doCopyBtn" class="btn btn--solid" type="button">Kopieren</button>
+            </div>
+            <div class="muted" style="margin-top:.6rem;">Hinweis: Du brauchst Schreibrechte im Ziel-Space (owner/editor).</div>
+          </div>
+        </div>
+      `;
+
+      const close = () => { sheetRoot.innerHTML = ""; };
+      qs(appEl, "#copyBackdrop")?.addEventListener("click", close);
+      qs(appEl, "#copyCloseBtn")?.addEventListener("click", close);
+
+      qs(appEl, "#doCopyBtn")?.addEventListener("click", async () => {
+        const targetSpaceId = qs(appEl, "#copySpaceSelect").value;
+        const includeParts = !!qs(appEl, "#copyIncludeParts")?.checked;
+        const btn = qs(appEl, "#doCopyBtn");
+        btn.disabled = true;
+        try {
+          const res = await copyRecipeToSpace?.({ recipe: r, targetSpaceId, includeParts });
+          await refreshAll?.();
+          close();
+          if (res?.newRecipeId) {
+            setView({ name: "detail", selectedId: res.newRecipeId, q: state.q });
+          } else {
+            setView({ name: "list", selectedId: null, q: state.q });
+          }
+        } catch (e) {
+          alert(`Kopieren fehlgeschlagen.
+${e?.message ?? e}`);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
 
   // Image lightbox
   const img = qs(appEl, "#detailImg");

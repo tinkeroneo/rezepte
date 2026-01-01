@@ -25,6 +25,9 @@ export const KEYS = {
   TIMER_SOUND_ID: "tinkeroneo_timer_sound_id_v1",
   TIMER_SOUND_ENABLED: "tinkeroneo_timer_sound_enabled_v1",
   TIMER_SOUND_VOLUME: "tinkeroneo_timer_sound_volume_v1",
+  LIST_EXTRA_OPEN: "list_extra_open",
+LIST_PENDING_ONLY: "list_pending_only",
+
 };
 
 export function lsGet(key, fallback = null) {

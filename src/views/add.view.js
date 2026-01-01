@@ -7,6 +7,7 @@ export function renderAddView({
   state,
   recipes,
   setView,
+  canWrite,
   useBackend,
   activeSpaceId,
   mySpaces,
@@ -105,6 +106,15 @@ export function renderAddView({
             <label class="muted">Kategorie</label>
             <input id="category" type="text" placeholder="z.B. Frühstück" value="${escapeHtml(r.category)}" />
           </div>
+          ${useBackend && isEdit ? `
+          <div style="flex:1; min-width:220px;">
+            <label class="muted">Space</label>
+            <select id="spaceMoveSelect"></select>
+            <label class="muted" style="display:flex; gap:.4rem; align-items:center; margin-top:.35rem;">
+              <input id="moveIncludeParts" type="checkbox" checked /> inkl. Parts
+            </label>
+          </div>
+          ` : ``}
           <div style="flex:2; min-width:260px;">
             <label class="muted">Tags (kommagetrennt)</label>
             <input id="tags" type="text" placeholder="z.B. schnell, proteinreich, mealprep" value="${escapeHtml((r.tags || []).join(', '))}" />
@@ -157,6 +167,25 @@ export function renderAddView({
   const imageUrlEl = qs(appEl, "#image_url");
   const statusEl = qs(appEl, "#uploadStatus");
   const previewWrap = qs(appEl, "#imgPreviewWrap");
+  const spaceMoveSelect = qs(appEl, "#spaceMoveSelect");
+  const moveIncludeParts = qs(appEl, "#moveIncludeParts");
+  let targetSpaceId = null;
+  if (useBackend && isEdit && spaceMoveSelect) {
+    const spaces = Array.isArray(mySpaces) ? mySpaces : [];
+    const current = String(r.space_id || activeSpaceId || "");
+    spaceMoveSelect.innerHTML = spaces
+      .map((s) => {
+        const sid = String(s.space_id || s.id || "");
+        const name = String(s.name || s.space_name || sid);
+        const sel = sid === current ? " selected" : "";
+        return `<option value="${sid}"${sel}>${name}</option>`;
+      })
+      .join("");
+    targetSpaceId = spaceMoveSelect.value || null;
+    spaceMoveSelect.addEventListener("change", () => {
+      targetSpaceId = spaceMoveSelect.value || null;
+    });
+  }
 
 
   // tags are read via form on save
@@ -209,7 +238,6 @@ export function renderAddView({
     await sbDelete?.(r.id).catch(() => { });
 
     setView({ name: "list", selectedId: null, q: state.q });
-    location.reload();
   });
 
   qs(appEl, "#saveBtn").addEventListener("click", async () => {
@@ -264,10 +292,14 @@ window.history.replaceState(null, "", targetHash);
 if (typeof setDirtyIndicator === "function") setDirtyIndicator(false);
     setView({ name: "detail", selectedId: updated.id, q: state.q });
 
-    if (!useBackend) return;
-
     try {
       await upsertRecipe(updated);
+
+      // optional move to another space (backend only)
+      if (useBackend && isEdit && targetSpaceId && String(targetSpaceId) !== String(activeSpaceId || updated.space_id || "")) {
+        const includeParts = moveIncludeParts ? !!moveIncludeParts.checked : true;
+        await moveRecipeToSpace?.({ recipeId: updated.id, targetSpaceId, includeParts });
+      }
     } catch (e) {
       alert(`Konnte nicht zum Backend speichern.\nFehler: ${e?.message ?? e}`);
     }

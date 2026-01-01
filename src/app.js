@@ -1,3 +1,11 @@
+// Enable verbose logs by setting: localStorage.setItem("debug", "1")
+const DEBUG = (() => {
+  try {
+    return localStorage.getItem("debug") === "1";
+  } catch {
+    return false;
+  }
+})();
 // src/app.js
 
 
@@ -198,6 +206,10 @@ function setTimerSoundVolume(v) {
 let useBackend = readUseBackend();
 let recipeRepo = null;
 let mySpaces = [];
+
+
+
+
 
 function rebuildRecipeRepo(on) {
   recipeRepo = createRecipeRepo({
@@ -584,14 +596,16 @@ async function loadAll() {
 ========================= */
 
 async function render(view, setView) {
-  console.log("RENDER VIEW:", view);
+  const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId: getAuthContext?.()?.spaceId });
+
+  if (DEBUG) console.log("RENDER VIEW:", view);
   // Keep the screen awake only while cooking
   if (view.name === "cook") Wake.enable();
   else Wake.disable();
 
   // Login view (no timers overlay)
   if (view.name === "login") {
-    console.log("RENDER LOGIN VIEW");
+    if (DEBUG) console.log("RENDER LOGIN VIEW");
 
     const info = {
       // redirect should always land on index.html (avoid directory listing)
@@ -756,6 +770,7 @@ async function render(view, setView) {
       partsByParent,
       setView,
       useBackend,
+      canWrite,
       onImportRecipes: async ({ items, mode }) =>
         runExclusive("importRecipes", async () => {
           await importRecipesIntoApp({
@@ -782,10 +797,13 @@ async function render(view, setView) {
       recipeParts,
       setView,
       useBackend,
+      canWrite,
       mySpaces,
       copyRecipeToSpace,
+      refreshAll: async () => runExclusive("loadAll", () => loadAll()),
       sbDelete: async (id) => {
-        recipes = await recipeRepo.remove(id);
+        await recipeRepo.remove(id);
+        await runExclusive("loadAll", () => loadAll());
       },
       removeRecipePart,
       addRecipePart,
@@ -803,7 +821,8 @@ async function render(view, setView) {
   }
 
   if (view.name === "cook") {
-    return renderCookView({ appEl, state: view, recipes, partsByParent, setView, setViewCleanup, setDirtyGuard });
+    return renderCookView({
+      canWrite, appEl, state: view, recipes, partsByParent, setView, setViewCleanup, setDirtyGuard });
   }
 
   if (view.name === "add") {
@@ -814,6 +833,7 @@ async function render(view, setView) {
       activeSpaceId: getAuthContext?.()?.spaceId,
       setView,
       useBackend,
+      canWrite,
       setDirtyGuard,
     setDirtyIndicator,
       setViewCleanup,
@@ -829,8 +849,10 @@ async function render(view, setView) {
         } catch { /* ignore */ }
       },
       upsertRecipe: async (rec) => {
-        return runExclusive(`upsert:${rec.id}`, async () => {
-          recipes = await recipeRepo.upsert(rec, { refresh: useBackend });
+        const key = `upsert:${rec.id || "new"}`;
+        return runExclusive(key, async () => {
+          await recipeRepo.upsert(rec, { refresh: useBackend });
+          await runExclusive("loadAll", () => loadAll());
         });
       },
       uploadRecipeImage,
@@ -838,11 +860,13 @@ async function render(view, setView) {
   }
 
   if (view.name === "admin") {
-    return renderAdminView({ appEl, recipes, setView });
+    return renderAdminView({
+      canWrite, appEl, recipes, setView });
   }
 
   if (view.name === "vegan101") {
-    return renderVegan101View({ appEl, setView });
+    return renderVegan101View({
+      canWrite, appEl, setView });
   }
 
   if (view.name === "shopping") {
@@ -1025,8 +1049,8 @@ shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" })
         } catch { /* ignore */ }
       }
       } catch { /* ignore */ }
-      if (ctx?.userId || ctx?.spaceId) {
-        setOfflineQueueScope({ userId: ctx.userId || null, spaceId: ctx.spaceId || null });
+      if (ctx?.user?.id || ctx?.spaceId) {
+        setOfflineQueueScope({ userId: ctx.user?.id || null, spaceId: ctx.spaceId || null });
       }
       // pending invites -> user must confirm
       if (Array.isArray(ctx?.pendingInvites) && ctx.pendingInvites.length) {
@@ -1134,4 +1158,17 @@ async function refreshProfileUi() {
   const activeSpaceId = getAuthContext?.()?.spaceId;
   const current = (mySpaces || []).find(s => String(s?.space_id || "") === String(activeSpaceId || ""));
   if (spaceName) spaceName.value = String(current?.name || "");
+}
+
+
+function getActiveSpaceRole({ spaces, spaceId }) {
+  const sid = String(spaceId || "").trim();
+  const spacesList = Array.isArray(spaces) ? spaces : [];
+  const row = spacesList.find(s => String(s?.space_id || "") === sid);
+  return String(row?.role || "").trim() || null;
+}
+
+function canWriteActiveSpace({ spaces, spaceId }) {
+  const role = getActiveSpaceRole({ spaces, spaceId });
+  return role === "owner" || role === "editor";
 }
