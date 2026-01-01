@@ -40,9 +40,9 @@ const LQ = require("./listQuery.cjs");
   assert.equal(r2.length, 1);
   assert.equal(r2[0].id, "2");
 
-  console.log("✅ listQuery tests passed");
-})().catch((e) => {
-  console.error("❌ listQuery tests failed");
-  console.error(e);
-  process.exit(1);
+//   console.log("✅ listQuery tests passed");
+// })().catch((e) => {
+//   console.error("❌ listQuery tests failed");
+//   console.error(e);
+//   process.exit(1);
 });

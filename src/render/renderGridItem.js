@@ -18,9 +18,7 @@ export function renderGridItem(r, ctx) {
           : coverFallbackHtml(r, "grid-img")
         }
 
-        <button class="fav-overlay" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button">
-          ${isFavorite(r.id) ? "★" : "☆"}
-        </button>
+        <button class="fav-overlay ${isFavorite(r.id) ? "is-fav" : ""}"  data-fav="${escapeHtml(r.id)}"  title="Favorit"  type="button"  aria-pressed="${isFavorite(r.id) ? "true" : "false"}" >★</button>
 
         ${isPending
           ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">⏳</span>`

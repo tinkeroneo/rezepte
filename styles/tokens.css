@@ -1,88 +1,112 @@
 /* Theme tokens + component system (silbergrau + champagner-gold)
 
    Rule of thumb:
-   - Components + views must only use CSS variables (no hardcoded colors)
-   - Light/Dark are ONLY token overrides
+   - Components + views should prefer CSS variables (no hardcoded colors)
+   - Light/Dark are ONLY token overrides (if you add a light theme later)
 */
 
 :root{
   /* spacing scale */
   --s-1: 4px;
+  --s-1_5: 6px;
   --s-2: 8px;
+  --s-2_5: 10px;
   --s-3: 12px;
+  --s-3_5: 14px;
   --s-4: 16px;
+  --s-4_25: 18px;
   --s-5: 24px;
   --s-6: 32px;
 
+  --s-0_5: 2px;
+  --s-11: 44px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --s-7: 28px;
   /* radii */
+  --r-xxs: 6px;
+  --r-0: 10px;
   --r-1: 12px;
-  --r-2: 16px;
-  --r-3: 20px;
+  --r-1_5: 14px;
+  --r-1_75: 16px;
+  --r-2: 18px;
+  --r-2_5: 20px;
+  --r-3: 22px;
   --r-pill: 999px;
 
-  /* elevation */
-  --shadow: 0 6px 16px rgba(0,0,0,0.08);
-  --shadow-strong: 0 14px 40px rgba(0,0,0,0.12);
+  /* typography */
+  --fs-1: .75rem;
+  --fs-2: .85rem;
+  --fs-3: .95rem;
+  --fs-4: 1.05rem;
+  --fs-5: 1.2rem;
 
-  /* base palette (light) */
-  color-scheme: light;
-  --bg: #f6f7f8;
-  --card: #ffffff;
-  --text: #171b22;
-  --muted: rgba(23,27,34,0.65);
-  --border: rgba(0,0,0,0.10);
+  /* line-heights */
+  --lh-body: 1.35;
+  --lh-tight: 1.1;
+  --lh-relaxed: 1.5;
 
-  /* semantic aliases (used across components/views) */
-  --panel: var(--card);
-  --line: var(--border);
-  --shadow-1: var(--shadow);
-  --shadow-2: var(--shadow-strong);
+  /* motion */
+  --dur-1: 120ms;
+  --dur-2: 220ms;
+  --ease-standard: cubic-bezier(.2,.8,.2,1);
 
-  /* accent: champagner gold */
-  --primary: #d2b37b;
-  --primary-2: #b8945f;
-  --gold-weak: rgba(210,179,123,0.22);
+  /* control sizing (md defaults) */
+  --ctl-h-sm: 32px;
+  --ctl-h-md: 40px;
+  --ctl-h-lg: 48px;
 
-  /* topbar */
-  --topbar-bg: var(--card);
-  --topbar-text: var(--text);
-  --topbar-border: var(--border);
-}
+  --ctl-px-sm: var(--s-2_5);
+  --ctl-px-md: var(--s-3);
+  --ctl-px-lg: var(--s-3_5);
 
-/* Explicit theme overrides (preferred) */
-:root[data-theme="light"]{
-  color-scheme: light;
-}
+  --ctl-gap: var(--s-2);
 
-:root[data-theme="dark"]{
-  color-scheme: dark;
+  /* focus */
+  --focus-outline: 2px solid var(--primary);
+  --focus-offset: 2px;
+  --focus-shadow: 0 0 0 3px rgba(210,179,123,0.28);
+
+  /* z-index */
+  --z-base: 1;
+  --z-sticky: 10;
+  --z-floating: 50;
+  --z-dock: 55;
+  --z-popover: 56;
+  --z-fab: 60;
+  --z-fabmenu: 65;
+  --z-sheet-backdrop: 80;
+  --z-sheet: 90;
+  --z-toast: 110;
+
+  /* shadows */
+  --shadow: 0 10px 26px rgba(0,0,0,0.40);
+  --shadow-strong: 0 18px 56px rgba(0,0,0,0.55);
+  --shadow-soft: 0 10px 26px rgba(0,0,0,0.30);
+  --shadow-med: 0 12px 34px rgba(0,0,0,0.40);
+  --shadow-pop: 0 16px 46px rgba(0,0,0,0.50);
+  --shadow-1: var(--shadow-soft);
+  --shadow-2: var(--shadow-med);
+
+  /* colors */
   --bg: #0f1114;
+  --panel: #10141b;
   --card: #141820;
   --text: #e7edf6;
   --muted: rgba(231,237,246,0.65);
   --border: rgba(255,255,255,0.10);
 
-  --primary: #d2b37b;
-  --primary-2: #b8945f;
-  --gold-weak: rgba(210,179,123,0.22);
-
-  --shadow: 0 10px 26px rgba(0,0,0,0.40);
-  --shadow-strong: 0 18px 56px rgba(0,0,0,0.55);
-}
-
-/* Back-compat: keep body.dark working (older markup/JS) */
-body.dark{
-  --bg: #0f1114;
-  --card: #141820;
-  --text: #e7edf6;
-  --muted: rgba(231,237,246,0.65);
-  --border: rgba(255,255,255,0.10);
+  /* toast */
+  --toast-bg: rgba(20, 24, 28, .92);
+  --toast-text: #fff;
 
   --primary: #d2b37b;
   --primary-2: #b8945f;
   --gold-weak: rgba(210,179,123,0.22);
 
-  --shadow: 0 10px 26px rgba(0,0,0,0.40);
-  --shadow-strong: 0 18px 56px rgba(0,0,0,0.55);
-}
+  --overlay-bg: rgba(0, 0, 0, .55);
+  --overlay-bg-active: rgba(0, 0, 0, .7);
 
+  --overlay-icon: #fff;
+  --overlay-accent: var(--primary); /* dein Champagner-Gold */
+}

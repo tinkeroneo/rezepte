@@ -10,10 +10,9 @@
 .grid.is-compact {
   grid-template-columns: repeat(3, 1fr);
 }
+
 /* Kompakt: immer 3 Spalten */
-.grid.is-compact {
-  grid-template-columns: repeat(3, 1fr);
-}
+
 .grid-card {
   min-width: 0;
 }
@@ -43,14 +42,14 @@
   position: fixed;
   right: var(--s-5);
   bottom: calc(var(--s-5) + env(safe-area-inset-bottom));
-  z-index: 1000;
+  z-index: var(--z-fab);
 }
 
 .fab-menu {
   position: fixed;
   right: var(--s-5);
   bottom: calc(var(--s-5) + 56px + env(safe-area-inset-bottom));
-  z-index: 1001;
+  z-index: var(--z-fabmenu);
   min-width: 180px;
 }
 
@@ -66,7 +65,7 @@
 /* subtle open animation (respects reduced motion) */
 .fab-menu {
   opacity: 0;
-  transform: translateY(6px);
+  transform: translateY(var(--s-1_5));
   transition: opacity 120ms ease, transform 120ms ease;
 }
 
@@ -91,14 +90,14 @@ body.winter::before{
     radial-gradient(1200px 600px at 50% -150px, rgba(255,255,255,.55), rgba(255,255,255,0) 70%),
     linear-gradient(to bottom, rgba(220,240,255,.18), rgba(0,0,0,0));
   mix-blend-mode: screen;
-  z-index: 5;
+  z-index: var(--z-floating);
 }
 
 /* Step highlighting */
 .step-current{
   outline: 2px solid rgba(210,179,123,0.45);
   outline-offset: 3px;
-  border-radius: 12px;
+  border-radius: var(--r-1);
 }
 body.dark .step-current{ outline-color: rgba(210,179,123,0.55); }
 
@@ -106,7 +105,7 @@ body.dark .step-current{ outline-color: rgba(210,179,123,0.55); }
 .recipe-cover{
   width: 64px;
   height: 64px;
-  border-radius: 14px;
+  border-radius: var(--r-1_5);
   display:flex;
   align-items:center;
   justify-content:center;
@@ -131,7 +130,7 @@ body.dark .recipe-cover{ background: linear-gradient(135deg, rgba(210,179,123,.2
 .li-left {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: var(--s-3_5);
   min-width: 0;
 }
 
@@ -163,31 +162,90 @@ h2 {
 body.dark .cover-fallback{color: rgba(255,255,255,.75)}
 
 .fav-btn{padding:.35rem .55rem; line-height:1}
-.fav-overlay {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
+
+.fav-overlay{
+  position:absolute;
+  top:var(--s-2);
+  right:var(--s-2);
+  width:var(--s-7);
+  height:var(--s-7);
+  border:none;
+  border-radius:50%;
+  background:rgba(0,0,0,.55);
+  cursor:pointer;
+
+  display:grid;
+  place-items:center;
+
+  font-size:18px;
+  line-height:1;
+
+  color: rgba(255,255,255,.85); /* default: nicht-fav */
+  text-shadow: 0 1px 10px rgba(0,0,0,.65);
+
+  transition: background var(--t-fast, 120ms ease), transform var(--t-snappy, 60ms ease), color var(--t-fast, 120ms ease);
+}
+
+.fav-overlay:hover{ background:rgba(0,0,0,.65); }
+.fav-overlay:active{ transform:scale(.96); }
+
+.fav-overlay.is-fav{
+  color: var(--primary, gold); /* fav: golden */
+}
+
+.fav-inline{
   border: none;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.45);
+  background: transparent;
   cursor: pointer;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: .2rem .35rem;
+
+  border-radius: var(--r-0);
+  width: 1.6rem;
+  color: var(--muted);
+  transition:
+    color var(--t-fast, 120ms ease),
+    background var(--t-fast, 120ms ease),
+    transform var(--t-snappy, 60ms ease);
 }
 
-.fav-overlay::before {
-  content: "☆"; /* default */
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 18px;
-  color: gold;
+/* hover: very subtle */
+.fav-inline:hover{
+  background: rgba(0,0,0,.06);
 }
 
-.fav-overlay.is-fav::before {
-  content: "★";
+html.dark .fav-inline:hover{
+  background: rgba(255,255,255,.08);
 }
+
+/* active press */
+.fav-inline:active{
+  transform: scale(.94);
+}
+
+/* favorite state */
+.fav-inline.is-fav{
+  color: var(--primary); /* champagner/gold */
+}
+
+/* optional: nicer focus */
+.fav-inline:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+
+
+
+
+
+
 
 .li-body {
   min-width: 0;
@@ -203,7 +261,7 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
 }
 
 .li-sub {
-  margin-top: 4px;
+  margin-top: var(--s-1);
   color: var(--muted);
   font-size: .95rem;
   white-space: nowrap;
@@ -214,7 +272,7 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
 .li-chev {
   color: #9aa;
   font-size: 1.6rem;
-  padding-left: 8px;
+  padding-left: var(--s-2);
   flex: 0 0 auto;
   user-select: none;
 }
@@ -233,7 +291,7 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
 .li-thumb {
   width: 64px;
   height: 64px;
-  border-radius: 14px;
+  border-radius: var(--r-1_5);
   object-fit: cover;
   display: block;
   background: #eee;
@@ -265,43 +323,11 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
   color: #9aa;
   font-size: 1.6rem;
   line-height: 1;
-  padding-left: 6px;
+  padding-left: var(--s-1_5);
   flex: 0 0 auto;
 }
-
-.muted { color: var(--muted); font-size: .95rem; }
-
 /* --- Pills (used for meta + overlays like pending) --- */
-.pill{
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 8px;
-  border-radius: var(--r-pill);
-  font-size: 12px;
-  font-weight: 700;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  user-select: none;
-}
-body.dark .pill{ background: rgba(255,255,255,0.04); }
 
-.pill-ghost{ background: transparent; }
-
-.pill-warn{
-  color: var(--primary-2);
-  border-color: rgba(210,179,123,0.40);
-  background: rgba(210,179,123,0.10);
-}
-.pending-overlay{
-  position: absolute;
-  left: 6px;
-  bottom: 6px;
-  z-index: 5;
-  line-height: 1;
-  z-index: 3;
-}
 /* Legacy button classnames (kept for markup compatibility) */
 .btn-primary { 
   background: var(--primary);
@@ -321,17 +347,17 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   padding-top: .75rem;
-  z-index: 5;
+  z-index: var(--z-floating);
 }
 
 .fab-menu{
   position:fixed;
-  right:16px;
+  right:var(--s-4);
   bottom:84px;
   display:flex;
   flex-direction:column;
-  gap:8px;
-  z-index: 40;
+  gap:var(--s-2);
+  z-index: calc(var(--z-floating) + 40);
   padding: var(--s-2);
   min-width: 180px;
 }
@@ -373,52 +399,10 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   height: 100% !important;
   object-fit: cover;
   display: block;
-  z-index: 1;
+  z-index: var(--z-base);
 }
 
 /* === Bottom Sheet / Overlay === */
-.sheet-backdrop{
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.45);
-  backdrop-filter: blur(2px);
-  z-index: 2499;
-}
-
-.sheet{
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(var(--s-4) + env(safe-area-inset-bottom) + var(--cookbar-h, 96px));
-  width: min(720px, calc(100% - var(--s-6)*2));
-  max-height: calc(100vh - 120px);
-  overflow: auto;
-  z-index: 2500;
-  border-radius: var(--r-3);
-  border: 1px solid var(--line);
-  background: var(--panel);
-  box-shadow: var(--shadow-2);
-  padding: var(--s-4);
-}
-
-.sheet .toolbar{
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--panel);
-  padding-bottom: var(--s-3);
-  margin-bottom: var(--s-3);
-  border-bottom: 1px solid var(--line);
-}
-
-.sheet-handle{
-  width: 48px;
-  height: 4px;
-  border-radius: 999px;
-  margin: 0 auto var(--s-4);
-  background: var(--line);
-}
-
 /* Cook: Steps als Cards mit Abstand */
 .steps-checklist{
   list-style: none;
@@ -441,24 +425,14 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   align-items:center;
   gap:.5rem;
 }
-.fav-inline{
-  border: none;
-  background: transparent;
-  font-size: 1.1rem;
-  line-height: 1;
-  padding: .25rem .35rem;
-  cursor: pointer;
-  border-radius: 10px;
-}
-.fav-inline:hover{ background: rgba(0,0,0,.06); }
-html.dark .fav-inline:hover{ background: rgba(255,255,255,.08); }
+
 
 /* Cookbar Timer Dock */
 #timerDock{ display:flex; justify-content:center; }
 .timerdock-chip{
   border: 1px solid var(--line);
   background: var(--panel);
-  border-radius: 999px;
+  border-radius: var(--r-pill);
   padding: .45rem .65rem;
   display:flex;
   align-items:center;
@@ -469,7 +443,7 @@ html.dark .fav-inline:hover{ background: rgba(255,255,255,.08); }
 .timerdock-count{
   font-size:.85rem;
   font-weight:900;
-  border-radius:999px;
+  border-radius: var(--r-pill);
   padding:.1rem .45rem;
   border:1px solid var(--line);
   background: rgba(0,0,0,.04);
@@ -481,7 +455,7 @@ html.dark .timerdock-count{ background: rgba(255,255,255,.06); }
   left: var(--s-4);
   right: var(--s-4);
   bottom: calc(var(--s-4) + env(safe-area-inset-bottom) + var(--cookbar-h, 96px));
-  z-index: 2501;
+  z-index: calc(var(--z-sheet) + 1);
 }
 
 /* Timerbar docked inside cookbar */
@@ -512,6 +486,6 @@ html.dark .timerdock-count{ background: rgba(255,255,255,.06); }
   padding: .25rem .4rem;
 }
 
-.pending-overlay{ position:absolute; top:10px; right:10px; z-index:4; }
-
 .li-media,.grid-media{ position:relative; }
+
+

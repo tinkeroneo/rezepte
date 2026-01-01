@@ -116,7 +116,7 @@ export function renderDetailView({
             </div>
 
             <div class="row" style="justify-content:space-between; align-items:center; margin-top:.45rem;">
-              <button class="btn btn--ghost" id="imgFocusToggle" type="button">🖼️ Bild anpassen</button>
+           <!--   <button class="btn btn--ghost" id="imgFocusToggle" type="button">🖼️ Bild anpassen</button>-->
             </div>
 
             <div id="imgFocusPanel" class="card" style="margin-top:.5rem; padding:.75rem; display:none;">
