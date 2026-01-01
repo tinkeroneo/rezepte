@@ -190,7 +190,10 @@ body.dark .cover-fallback{color: rgba(255,255,255,.75)}
 .fav-overlay:active{ transform:scale(.96); }
 
 .fav-overlay.is-fav{
-  color: var(--primary, gold); /* fav: golden */
+  color: var(--primary);
+  text-shadow:
+    0 1px 6px rgba(0,0,0,.6),
+    0 0 8px rgba(227,192,141,.35);
 }
 
 .fav-inline{
@@ -229,10 +232,22 @@ html.dark .fav-inline:hover{
   transform: scale(.94);
 }
 
-/* favorite state */
-.fav-inline.is-fav{
-  color: var(--primary); /* champagner/gold */
+@keyframes fav-pop {
+  0%   { transform: scale(.9); }
+  60%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
 }
+
+.fav-inline.is-fav{
+  color: var(--primary);
+  text-shadow:
+    0 1px 1px rgba(0,0,0,.4),
+    0 0 8px rgba(227,192,141,.45),
+    0 0 14px rgba(227,192,141,.25);
+}
+
+
+
 
 /* optional: nicer focus */
 .fav-inline:focus-visible{
@@ -241,6 +256,10 @@ html.dark .fav-inline:hover{
 }
 
 
+:where(.fav-inline,.fav-overlay){
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
 
 
 
