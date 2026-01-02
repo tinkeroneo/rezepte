@@ -685,7 +685,15 @@ async function loadAll() {
 ========================= */
 
 async function render(view, setView) {
-  const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId: getAuthContext?.()?.spaceId });
+  const activeSpaceId = getAuthContext?.()?.spaceId;
+
+// "write" is determined by the SPACE of the entity you act on, not by the currently selected space.
+// Active-space write is still useful for list/create defaults:
+const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId: activeSpaceId });
+
+// helper for per-recipe permission (fixes "I must switch space to edit")
+const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId });
+
 
   if (DEBUG) console.log("RENDER VIEW:", view);
 
@@ -879,6 +887,9 @@ async function render(view, setView) {
   }
 
   if (view.name === "detail") {
+    const r = recipes.find(x => x.id === view.selectedId);
+    const detailCanWrite = canWriteForSpace(r?.space_id || activeSpaceId);
+
     return renderDetailView({
       appEl,
       state: view,
@@ -887,7 +898,7 @@ async function render(view, setView) {
       recipeParts,
       setView,
       useBackend,
-      canWrite,
+      canWrite: detailCanWrite,
       mySpaces,
       copyRecipeToSpace,
       refreshAll: async () => runExclusive("loadAll", () => loadAll()),
@@ -916,14 +927,17 @@ async function render(view, setView) {
   }
 
   if (view.name === "add") {
+    const existing = view.selectedId ? recipes.find(r => r.id === view.selectedId) : null;
+    const addCanWrite = canWriteForSpace(existing?.space_id || activeSpaceId);
+
     return renderAddView({
       appEl,
       state: view,
       recipes,
-      activeSpaceId: getAuthContext?.()?.spaceId,
+      activeSpaceId,
       setView,
       useBackend,
-      canWrite,
+      canWrite: addCanWrite,
       setDirtyGuard,
       setDirtyIndicator,
       setViewCleanup,
