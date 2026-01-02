@@ -235,6 +235,12 @@ export function renderAddView({
   });
 let draftFocus = normalizeFocus(r.image_focus);
 
+
+const writable = canWriteInSpace({
+  spaceId: existing?.space_id || activeSpaceId,
+  mySpaces
+});
+
 // Focus-Panel nur zeigen, wenn Preview-Bild existiert
 const focusPanelEl = qs(appEl, "#imgFocusPanel");
 

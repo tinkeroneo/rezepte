@@ -7,6 +7,7 @@ import {
   renderCooklogCardHtml,
   bindCooklogCard
 } from "./detail/detail.cooklog.js";
+import { canWriteInSpace } from "../domain/spacePerms.js";
 
 import {
   applyFocusToImg,
@@ -61,7 +62,12 @@ export function renderDetailView({
     return;
   }
 
-  const writable = canWrite === true;
+
+const writable = canWriteInSpace({
+  spaceId: r.space_id,
+  mySpaces
+});
+
 
   // Pull cooklog once, then refresh current view (push:false to avoid history spam)
   ensureCooklogPulledOnce({
