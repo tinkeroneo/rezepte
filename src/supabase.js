@@ -147,6 +147,7 @@ async function listUserSpacesRaw(access_token) {
   return Array.isArray(rows) ? rows : [];
 }
 
+
 async function resolveSpaceId({ access_token, userId }) {
   const rows = await listUserSpacesRaw(access_token);
   if (!rows.length) throw new Error("No space assigned to user");
