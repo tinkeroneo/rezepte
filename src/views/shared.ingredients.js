@@ -8,7 +8,7 @@ export function renderIngredientsHtml(lines) {
     if (!line) continue;
 
     if (isIngredientHeader(line)) {
-      out.push(`<li class="muted" style="margin-top:.55rem; font-weight:750;">${escapeHtml(line.replace(/:$/, ""))}</li>`);
+      out.push(`<li class="muted" style="margin-top:.55rem; font-weight:750; list-style:none; padding-left:0;">${escapeHtml(line.replace(/:$/, ""))}</li>`);
     } else {
       out.push(`<li>${escapeHtml(line)}</li>`);
     }

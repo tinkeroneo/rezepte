@@ -1,6 +1,7 @@
 // src/views/detail/detail.actions.js
 import { qs } from "../../utils.js";
 import { ack } from "../../ui/feedback.js";
+import { buildMenuIngredients, isMenuRecipe } from "../../domain/menu.js";
 
 function cookLinkFor(recipeId) {
   // konsistent zum Router
@@ -14,6 +15,24 @@ async function copyText(text) {
   } catch {
     return false;
   }
+}
+
+function collectShoppingLines({ recipe, recipes, partsByParent }) {
+  const pool = Array.isArray(recipes) ? recipes : [];
+  const pbp = partsByParent;
+
+  // Menü: Ingredients aus allen Sections flatten
+  if (pbp?.get && isMenuRecipe(recipe, pbp)) {
+    const sections = buildMenuIngredients(recipe, pool, pbp);
+    const out = [];
+    for (const sec of sections) {
+      const items = Array.isArray(sec?.items) ? sec.items : [];
+      for (const line of items) out.push(line);
+    }
+    return out;
+  }
+
+  return Array.isArray(recipe?.ingredients) ? recipe.ingredients : [];
 }
 
 export function bindDetailActions({
@@ -55,7 +74,8 @@ export function bindDetailActions({
     if (canShop && !shopBtn.__bound) {
       shopBtn.__bound = true;
       shopBtn.addEventListener("click", () => {
-        addToShopping?.(recipe, { recipes, partsByParent });
+        const lines = collectShoppingLines({ recipe, recipes, partsByParent });
+        addToShopping?.(lines);
         ack(shopBtn);
       });
     }

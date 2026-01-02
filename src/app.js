@@ -203,6 +203,34 @@ let useBackend = readUseBackend();
 let recipeRepo = null;
 let mySpaces = [];
 
+let __permBootstrapInFlight = false;
+let __permBootstrapAttempts = 0;
+
+// Cache spaces to avoid permission flicker on refresh/offline/transient errors.
+// Keyed by userId to prevent cross-user bleed.
+function _spacesCacheKey(userId) {
+  const uid = String(userId || "").trim();
+  return `tinkeroneo:mySpaces:${uid || "anon"}`;
+}
+function _readSpacesCache(userId) {
+  try {
+    const raw = localStorage.getItem(_spacesCacheKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+function _writeSpacesCache(userId, spaces) {
+  try {
+    if (!Array.isArray(spaces)) return;
+    localStorage.setItem(_spacesCacheKey(userId), JSON.stringify(spaces));
+  } catch {
+    /* ignore */
+  }
+}
+
 function rebuildRecipeRepo(on) {
   recipeRepo = createRecipeRepo({
     useBackend: on,
@@ -499,10 +527,24 @@ async function refreshSpaceSelect() {
     return;
   }
 
+  let nextSpaces = null;
   try {
-    mySpaces = await listMySpaces();
+    nextSpaces = await listMySpaces();
   } catch {
-    mySpaces = [];
+    // keep previous mySpaces on transient errors to avoid permission flicker
+    nextSpaces = null;
+  }
+  if (Array.isArray(nextSpaces)) {
+    mySpaces = nextSpaces;
+    const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+    _writeSpacesCache(ctx?.user?.id, mySpaces);
+  } else {
+    // On refresh, mySpaces may still be empty. Try cached spaces for stable permissions/UI.
+    if (!Array.isArray(mySpaces) || mySpaces.length === 0) {
+      const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+      const cached = _readSpacesCache(ctx?.user?.id);
+      if (Array.isArray(cached) && cached.length) mySpaces = cached;
+    }
   }
 
   const ctx = (() => {
@@ -662,8 +704,11 @@ async function loadAll() {
   if (!recipeRepo) rebuildRecipeRepo(useBackend);
 
   const pendingIds = getPendingRecipeIds?.() || new Set();
+  const ctx = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+  const activeSid = String(ctx?.spaceId || "");
   recipes = (await recipeRepo.getAll()).map((r) => ({
     ...r,
+    space_id: r.space_id || activeSid || r.spaceId || "",
     _pending: pendingIds.has(r.id),
   }));
 
@@ -693,6 +738,53 @@ const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId:
 
 // helper for per-recipe permission (fixes "I must switch space to edit")
 const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId });
+
+  // Permissions bootstrap: after refresh/auth, spaceId/mySpaces can be temporarily missing.
+  // Avoid rendering read-only UI during this transient state.
+  if (useBackend && isAuthenticated?.()) {
+    const ctx = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+    const sid = String(ctx?.spaceId || "").trim();
+    const spacesMissing = !Array.isArray(mySpaces) || mySpaces.length === 0;
+
+	    // If permissions/space context are still missing right after refresh, bootstrap them once or twice.
+	    // IMPORTANT: never loop indefinitely — otherwise the app can appear to "hang".
+	    if ((!sid || spacesMissing) && !__permBootstrapInFlight) {
+	      if (__permBootstrapAttempts >= 2) {
+	        // Give up and render normally (read-only may be temporary, but app must remain usable).
+	        if (DEBUG) console.warn("perm bootstrap: giving up", { sid, spacesMissing, attempts: __permBootstrapAttempts });
+	      } else {
+      __permBootstrapInFlight = true;
+	      __permBootstrapAttempts++;
+
+      try {
+        appEl.innerHTML = `
+          <div class="container">
+            <div class="card" style="padding:1rem; text-align:center;">
+              <div style="font-weight:800;">Lade Space-Rechte…</div>
+              <div class="muted" style="margin-top:.35rem;">Einen Moment</div>
+            </div>
+          </div>`;
+      } catch { /* ignore */ }
+
+	      try { await refreshSpaceSelect(); } catch { /* ignore */ }
+      __permBootstrapInFlight = false;
+
+	      // Recompute and only re-render if we actually got something new.
+	      const ctx2 = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+	      const sid2 = String(ctx2?.spaceId || "").trim();
+	      const spacesMissing2 = !Array.isArray(mySpaces) || mySpaces.length === 0;
+	      if (sid2 && !spacesMissing2) {
+	        // Await to keep render serialized and avoid recursive storms.
+	        await runExclusive("render", () => render(view, setView));
+	        return;
+	      }
+
+	      // Still missing → fall through and render normally (no infinite loop).
+	      if (DEBUG) console.warn("perm bootstrap: still missing", { sid2, spacesMissing2 });
+	      }
+    }
+  }
+
 
 
   if (DEBUG) console.log("RENDER VIEW:", view);
@@ -869,8 +961,28 @@ const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ space
       setView,
       useBackend,
       canWrite,
-      onImportRecipes: async ({ items, mode }) =>
+      mySpaces,
+      activeSpaceId,
+      onImportRecipes: async ({ items, mode, targetSpaceId }) =>
         runExclusive("importRecipes", async () => {
+          // optional: import into selected space (backend only)
+          const sid = String(targetSpaceId || "").trim();
+          if (useBackend && sid) {
+            try {
+              setActiveSpaceId(sid);
+              const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+              setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
+              try { await refreshSpaceSelect(); } catch { /* ignore */ }
+              // keep profile hint in sync (best-effort)
+              try {
+                await listRecipes();
+                await upsertProfile({ last_space_id: sid });
+              } catch { /* ignore */ }
+            } catch (e) {
+              alert(String(e?.message || e));
+              return;
+            }
+          }
           await importRecipesIntoApp({
             items,
             mode,
@@ -912,7 +1024,7 @@ const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ space
       onUpdateRecipe: async (rec) => {
         return runExclusive(`upsert:${rec.id}`, async () => {
           recipes = await recipeRepo.upsert(rec, { refresh: useBackend });
-          render(router.getView(), router.setView);
+          runExclusive("render", () => render(router.getView(), router.setView));
         });
       },
       addToShopping,
@@ -995,6 +1107,15 @@ async function boot() {
 
   window.__tinkeroneoUpdateBadges = () => updateHeaderBadges();
 
+
+  // If page was opened via Supabase magic link, consume auth hash BEFORE router touches location.hash.
+  if (useBackend && typeof location !== 'undefined') {
+    const h = String(location.hash || '');
+    if (h.includes('access_token=') && h.includes('refresh_token=')) {
+      try { await initAuthAndSpace(); } catch { /* ignore */ }
+    }
+  }
+
   router = initRouter({
     canNavigate: ({ reason }) => {
       if (!dirtyGuard) return true;
@@ -1008,7 +1129,8 @@ async function boot() {
       dirtyGuard = null;
       setDirtyIndicator(false);
 
-      render(view, router.setView);
+      // Serialize renders to avoid permission/UI flicker due to overlapping async renders.
+      runExclusive("render", () => render(view, router.setView));
 
       try {
         const cb = document.querySelector(".cookbar");
@@ -1050,6 +1172,14 @@ async function boot() {
   if (useBackend) {
     try {
       const ctx = await initAuthAndSpace();
+
+      // Preload cached spaces for this user to stabilize permissions/UI immediately after refresh.
+      // refreshSpaceSelect() will overwrite this if the network call succeeds.
+      if ((!Array.isArray(mySpaces) || mySpaces.length === 0) && ctx?.user?.id) {
+        const cached = _readSpacesCache(ctx.user.id);
+        if (Array.isArray(cached) && cached.length) mySpaces = cached;
+      }
+
       try { await ensureProfileLoaded(); } catch { /* ignore */ }
       try {
         if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
@@ -1089,7 +1219,7 @@ async function boot() {
   await runExclusive("loadAll", () => loadAll());
   updateHeaderBadges({ syncing: false });
 
-  render(router.getView(), router.setView);
+  await runExclusive("render", () => render(router.getView(), router.setView));
 }
 
 boot();

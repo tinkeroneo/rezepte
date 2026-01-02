@@ -50,6 +50,7 @@ export function toLocalShape(r) {
 
   return {
     id: r.id,
+    space_id: normStr(r.space_id ?? r.spaceId),
     title: normStr(r.title),
     category: normStr(r.category),
     time: normStr(r.time),

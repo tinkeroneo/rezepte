@@ -38,6 +38,8 @@ export function renderListView({
   partsByParent,
   setView,
   canWrite,
+  mySpaces,
+  activeSpaceId,
   useBackend, // currently unused here, kept for signature compatibility
   onImportRecipes
 }) {
@@ -269,7 +271,7 @@ onModeChanged: (m) => {
     appEl,
     canWrite: canWriteFlag,
     onNew: () => setView({ name: "add", selectedId: null, q: qEl?.value ?? "" }),
-    onImport: () => openImportSheet({ onImportRecipes }),
+    onImport: () => openImportSheet({ onImportRecipes, spaces: mySpaces, activeSpaceId }),
     onExport: () =>
       openExportSheet({
         list: recipes,
