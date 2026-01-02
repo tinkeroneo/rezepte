@@ -2,6 +2,50 @@ import { escapeHtml, qs } from "../utils.js";
 import { compressImageFile } from "../domain/images.js";
 import { generateId } from "../domain/id.js";
 import { deleteRecipe as sbDelete } from "../supabase.js";
+
+import { createDirtyTracker } from "../ui/dirtyTracker.js";
+import { createImagePicker } from "../ui/imagePicker.js";
+
+function normalizeRecipe(existing) {
+  if (existing) {
+    return {
+      id: existing.id,
+      title: existing.title ?? "",
+      category: existing.category ?? "",
+      time: existing.time ?? "",
+      image_url: existing.image_url ?? "",
+      ingredients: existing.ingredients ?? [],
+      steps: existing.steps ?? [],
+      createdAt: existing.createdAt ?? Date.now(),
+      source: existing.source ?? "",
+      tags: existing.tags ?? [],
+      space_id: existing.space_id,
+    };
+  }
+  return {
+    id: generateId(),
+    title: "",
+    category: "",
+    time: "",
+    image_url: "",
+    ingredients: [],
+    steps: [],
+    createdAt: Date.now(),
+    source: "",
+    tags: [],
+  };
+}
+
+function setFormDisabled(appEl, disabled) {
+  // Disable all inputs/textarea/select + save/delete
+  ["input", "textarea", "select", "button"].forEach((tag) => {
+    appEl.querySelectorAll(tag).forEach((el) => {
+      // allow file input to be disabled too (makes sense)
+      el.disabled = !!disabled;
+    });
+  });
+}
+
 export function renderAddView({
   appEl,
   state,
@@ -12,91 +56,33 @@ export function renderAddView({
   activeSpaceId,
   mySpaces,
   moveRecipeToSpace,
-  refreshSpaceSelect,
-  upsertSpaceLast,
+  refreshSpaceSelect, // unused (kept for API compatibility)
+  upsertSpaceLast, // unused (kept)
   upsertRecipe,
   uploadRecipeImage,
   setDirtyGuard,
   setDirtyIndicator,
   setViewCleanup,
 }) {
-
-  const existing = state.selectedId ? recipes.find(r => r.id === state.selectedId) : null;
+  const existing = state.selectedId ? recipes.find((r) => r.id === state.selectedId) : null;
   const isEdit = !!existing;
-
-  let pendingFile = null;
-  let previewUrl = null;
-
-  // dirty tracking (unsaved changes)
-  let dirty = false;
-  const setDirty = (v) => { dirty = v; };
-
-  // ensure we don’t register multiple handlers across renders
-  if (window.__tinkeroneo_beforeunload_add) {
-    window.removeEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
-  }
-  window.__tinkeroneo_beforeunload_add = (e) => {
-    if (!dirty) return;
-    e.preventDefault();
-    e.returnValue = "";
-  };
-  window.addEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
-
-  // GLOBAL DIRTY GUARD + CLEANUP (navigation/back)
-  if (typeof setDirtyGuard === "function") {
-    setDirtyGuard(() => {
-      if (!dirty) return true;
-      const ok = confirm("Ungespeicherte Änderungen verwerfen?");
-      if (!ok) return false;
-      cleanupPreviewUrl();
-      return true;
-    });
-  }
-
-  if (typeof setViewCleanup === "function") {
-    setViewCleanup(() => {
-    if (typeof setDirtyIndicator === "function") setDirtyIndicator(false);
-
-      cleanupPreviewUrl();
-      if (window.__tinkeroneo_beforeunload_add) {
-        window.removeEventListener("beforeunload", window.__tinkeroneo_beforeunload_add);
-        window.__tinkeroneo_beforeunload_add = null;
-      }
-    });
-  }
-
-
-  const r = existing ? {
-    id: existing.id,
-    title: existing.title ?? "",
-    category: existing.category ?? "",
-    time: existing.time ?? "",
-    image_url: existing.image_url ?? "",
-    ingredients: existing.ingredients ?? [],
-    steps: existing.steps ?? [],
-    createdAt: existing.createdAt ?? Date.now(),
-    source: existing.source ?? "",
-    tags: existing.tags ?? []
-  } : {
-    id: generateId(),
-    title: "",
-    category: "",
-    time: "",
-    image_url: "",
-    ingredients: [],
-    steps: [],
-    createdAt: Date.now(),
-    source: "",
-    tags: []
-  };
+  const r = normalizeRecipe(existing);
 
   const ingredientsText = (r.ingredients ?? []).join("\n");
   const stepsText = (r.steps ?? []).join("\n");
 
+  const writeBlocked = canWrite === false;
+
   appEl.innerHTML = `
     <div class="container">
       <div class="card">
-                <h2>${isEdit ? "Rezept bearbeiten" : "Neues Rezept"}</h2>
+        <h2>${isEdit ? "Rezept bearbeiten" : "Neues Rezept"}</h2>
+
+        ${writeBlocked ? `
+          <div class="muted" style="margin:.25rem 0 .75rem 0;">
+            ✋ Schreibschutz aktiv – du kannst hier nur ansehen (solo lectura).
+          </div>
+        ` : ""}
 
         <label class="muted">Titel</label>
         <input id="title" type="text" placeholder="z.B. Bohnen-Rührei Deluxe" value="${escapeHtml(r.title)}" />
@@ -106,6 +92,7 @@ export function renderAddView({
             <label class="muted">Kategorie</label>
             <input id="category" type="text" placeholder="z.B. Frühstück" value="${escapeHtml(r.category)}" />
           </div>
+
           ${useBackend && isEdit ? `
           <div style="flex:1; min-width:220px;">
             <label class="muted">Space</label>
@@ -115,9 +102,11 @@ export function renderAddView({
             </label>
           </div>
           ` : ``}
+
           <div style="flex:2; min-width:260px;">
             <label class="muted">Tags (kommagetrennt)</label>
-            <input id="tags" type="text" placeholder="z.B. schnell, proteinreich, mealprep" value="${escapeHtml((r.tags || []).join(', '))}" />
+            <input id="tags" type="text" placeholder="z.B. schnell, proteinreich, mealprep"
+              value="${escapeHtml((r.tags || []).join(", "))}" />
           </div>
         </div>
 
@@ -137,7 +126,7 @@ export function renderAddView({
         <label class="muted">Foto</label>
         <div class="row">
           <input id="image_url" type="text" placeholder="https://... oder per Upload setzen" value="${escapeHtml(r.image_url ?? "")}" />
-</div>
+        </div>
 
         <input id="image_file" type="file" accept="image/*" />
         <div class="muted" id="uploadStatus" style="margin-top:.35rem;"></div>
@@ -150,7 +139,7 @@ export function renderAddView({
         <textarea id="steps" placeholder="z.B. Bohnen zerdrücken\nZwiebel anbraten\n...">${escapeHtml(stepsText)}</textarea>
 
         <div class="row" style="justify-content:flex-end; margin-top:.75rem;">
-          <button class="btn btn--solid" id="deleteBtn">${isEdit ? "Löschen" : "Löschen"}</button>
+          ${isEdit ? `<button class="btn btn--solid" id="deleteBtn">Löschen</button>` : ``}
           <button class="btn btn--solid" id="saveBtn">${isEdit ? "Speichern" : "Anlegen"}</button>
         </div>
 
@@ -163,13 +152,25 @@ export function renderAddView({
     </div>
   `;
 
+  // --- DOM refs
+  const titleEl = qs(appEl, "#title");
+  const categoryEl = qs(appEl, "#category");
+  const timeEl = qs(appEl, "#time");
+  const sourceEl = qs(appEl, "#source");
+  const tagsEl = qs(appEl, "#tags");
+  const ingredientsEl = qs(appEl, "#ingredients");
+  const stepsEl = qs(appEl, "#steps");
+
   const fileEl = qs(appEl, "#image_file");
   const imageUrlEl = qs(appEl, "#image_url");
   const statusEl = qs(appEl, "#uploadStatus");
   const previewWrap = qs(appEl, "#imgPreviewWrap");
+
+  // --- Space move
   const spaceMoveSelect = qs(appEl, "#spaceMoveSelect");
   const moveIncludeParts = qs(appEl, "#moveIncludeParts");
   let targetSpaceId = null;
+
   if (useBackend && isEdit && spaceMoveSelect) {
     const spaces = Array.isArray(mySpaces) ? mySpaces : [];
     const current = String(r.space_id || activeSpaceId || "");
@@ -181,122 +182,142 @@ export function renderAddView({
         return `<option value="${sid}"${sel}>${name}</option>`;
       })
       .join("");
+
     targetSpaceId = spaceMoveSelect.value || null;
     spaceMoveSelect.addEventListener("change", () => {
       targetSpaceId = spaceMoveSelect.value || null;
     });
   }
 
-
-  // tags are read via form on save
-
-  const markDirty = () => setDirty(true);
-  ["#title", "#category", "#time", "#source", "#image_url", "#ingredients", "#steps", "#tags"].forEach((sel) => {
-    const el = qs(appEl, sel);
-    el.addEventListener("input", markDirty);
-  });
-  fileEl.addEventListener("change", () => {
-    pendingFile = fileEl.files?.[0] || null;
-    // upload status is handled via UI feedback
-    markDirty();
+  // --- Image picker
+  const img = createImagePicker({
+    fileEl,
+    urlEl: imageUrlEl,
+    previewWrap,
+    statusEl,
   });
 
-
-
-  const cleanupPreviewUrl = () => {
-    if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
-  };
-
-  const renderPreview = () => {
-    const url = (imageUrlEl.value || "").trim();
-    const showUrl = previewUrl || (url ? url : "");
-    if (!showUrl) { previewWrap.innerHTML = ""; return; }
-    previewWrap.innerHTML = `
-      <img src="${escapeHtml(showUrl)}" alt="Preview"
-        style="width:100%; max-height:220px; object-fit:contain; background:linear-gradient(135deg,#eef2ff,#f8fafc); border-radius:12px; display:block;" />
-    `;
-  };
-
-  renderPreview();
-
-  fileEl.addEventListener("change", () => {
-    pendingFile = fileEl.files?.[0] ?? null;
-    // upload status is handled via UI feedback
-    cleanupPreviewUrl();
-    if (pendingFile) previewUrl = URL.createObjectURL(pendingFile);
-    renderPreview();
+  // --- Dirty tracker
+  const dirty = createDirtyTracker({
+    setDirtyIndicator,
+    setDirtyGuard,
+    setViewCleanup,
+    onCleanup: () => img.cleanup(),
+    beforeUnloadKey: "__tinkeroneo_beforeunload_add",
   });
 
-  imageUrlEl.addEventListener("input", () => {
-    if (imageUrlEl.value.trim()) cleanupPreviewUrl();
-    renderPreview();
-  });
+  // If write is blocked, disable form after initial render (but keep preview visible)
+  if (writeBlocked) {
+    setFormDisabled(appEl, true);
+    // Re-enable preview-related elements so the image preview still renders
+    // (it is static HTML anyway, but keep it safe)
+    previewWrap?.querySelectorAll("*").forEach(() => {});
+    return; // No handlers when read-only
+  }
 
+  // Mark dirty on changes
+  [
+    titleEl,
+    categoryEl,
+    timeEl,
+    sourceEl,
+    tagsEl,
+    ingredientsEl,
+    stepsEl,
+    imageUrlEl,
+  ].forEach((el) => el?.addEventListener("input", dirty.markDirty));
+
+  fileEl?.addEventListener("change", dirty.markDirty);
+
+  // --- Delete (edit only)
   qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
     if (!confirm("Rezept wirklich löschen?")) return;
-    // local deletion is handled in app.js via callback — simplest: reload after delete
-    await sbDelete?.(r.id).catch(() => { });
-
+    await sbDelete?.(r.id).catch(() => {});
     setView({ name: "list", selectedId: null, q: state.q });
   });
 
-  qs(appEl, "#saveBtn").addEventListener("click", async () => {
-    const title = qs(appEl, "#title").value.trim();
+  // --- Save
+  qs(appEl, "#saveBtn")?.addEventListener("click", async () => {
+    const title = (titleEl?.value || "").trim();
     if (!title) return alert("Bitte einen Titel angeben.");
 
-    const category = qs(appEl, "#category").value.trim();
-    const time = qs(appEl, "#time").value.trim();
-    const source = qs(appEl, "#source").value.trim();
+    const category = (categoryEl?.value || "").trim();
+    const time = (timeEl?.value || "").trim();
+    const source = (sourceEl?.value || "").trim();
 
-    const tags = String(qs(appEl, "#tags").value || "")
+    const tags = String(tagsEl?.value || "")
       .split(",")
-      .map(s => s.trim())
+      .map((s) => s.trim())
       .filter(Boolean);
 
-    let image_url = (imageUrlEl.value || "").trim()
-      ;
+    let image_url = img.getUrl();
 
-    // Upload selected image on save (no separate upload button)
+    const pendingFile = img.getPendingFile();
     if (useBackend && pendingFile) {
       try {
-        let file = pendingFile;
-        statusEl.textContent = `Komprimiere… (${Math.round(file.size / 1024)} KB)`;
-        file = await compressImageFile(file, { maxSide: 1600, quality: 0.82, mime: "image/jpeg" });
-        statusEl.textContent = `Uploading… (${Math.round(file.size / 1024)} KB)`;
+        img.setStatus(`Komprimiere… (${Math.round(pendingFile.size / 1024)} KB)`);
+        const file = await compressImageFile(pendingFile, {
+          maxSide: 1600,
+          quality: 0.82,
+          mime: "image/jpeg",
+        });
+
+        img.setStatus(`Uploading… (${Math.round(file.size / 1024)} KB)`);
         const uploadedUrl = await uploadRecipeImage(file, r.id);
         image_url = uploadedUrl;
-        pendingFile = null;
-        // upload status is handled via UI feedback
-        cleanupPreviewUrl();
-        previewUrl = null;
-        statusEl.textContent = "Upload fertig.";
+
+        img.clearPendingFile();
+        img.setStatus("Upload fertig.");
       } catch (e) {
-        statusEl.textContent = "";
+        img.setStatus("");
         alert(`Bild-Upload fehlgeschlagen.\nFehler: ${e?.message ?? e}`);
+        return;
       }
     }
 
+    const ingredients = String(ingredientsEl?.value || "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    const ingredients = qs(appEl, "#ingredients").value.split("\n").map(s => s.trim()).filter(Boolean);
-    const steps = qs(appEl, "#steps").value.split("\n").map(s => s.trim()).filter(Boolean);
+    const steps = String(stepsEl?.value || "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
-    const updated = { ...r, title, category, time, source, tags, ingredients, steps, image_url: image_url || "" };
-
-    setDirty(false);
+    const updated = {
+      ...r,
+      title,
+      category,
+      time,
+      source,
+      tags,
+      ingredients,
+      steps,
+      image_url: image_url || "",
+    };
 
     // optimistic navigate
-    cleanupPreviewUrl();
-    // Nach Edit-Speichern: Edit-View aus History entfernen
-const targetHash = `#detail?id=${encodeURIComponent(r.id)}`;
-window.history.replaceState(null, "", targetHash);
-if (typeof setDirtyIndicator === "function") setDirtyIndicator(false);
+    dirty.clearDirty();
+    img.cleanup();
+
+    if (isEdit) {
+      // Edit-View aus History entfernen
+      const targetHash = `#detail?id=${encodeURIComponent(r.id)}`;
+      window.history.replaceState(null, "", targetHash);
+    }
+
     setView({ name: "detail", selectedId: updated.id, q: state.q });
 
     try {
       await upsertRecipe(updated);
 
-      // optional move to another space (backend only)
-      if (useBackend && isEdit && targetSpaceId && String(targetSpaceId) !== String(activeSpaceId || updated.space_id || "")) {
+      if (
+        useBackend &&
+        isEdit &&
+        targetSpaceId &&
+        String(targetSpaceId) !== String(activeSpaceId || updated.space_id || "")
+      ) {
         const includeParts = moveIncludeParts ? !!moveIncludeParts.checked : true;
         await moveRecipeToSpace?.({ recipeId: updated.id, targetSpaceId, includeParts });
       }
