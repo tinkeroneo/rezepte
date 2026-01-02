@@ -28,6 +28,10 @@ import {
   renderStepsSectionHtml
 } from "./detail/detail.templates.js";
 
+// Optional: vorbereitet für Dirty-Guard (Caller kann diese Props später reinreichen)
+// -> bleibt komplett rückwärtskompatibel
+import { createDirtyTracker } from "../ui/dirtyTracker.js";
+
 export function renderDetailView({
   appEl,
   state,
@@ -47,7 +51,12 @@ export function renderDetailView({
   mySpaces,
   copyRecipeToSpace,
 
-  sbDelete
+  sbDelete,
+
+  // optional (nicht zwingend vorhanden)
+  setDirtyGuard,
+  setDirtyIndicator,
+  setViewCleanup,
 }) {
   const r = recipes.find(x => x.id === state.selectedId);
   if (!r) {
@@ -55,6 +64,9 @@ export function renderDetailView({
     return;
   }
 
+  const writable = canWrite === true;
+
+  // Pull cooklog once, then refresh current view (push:false to avoid history spam)
   ensureCooklogPulledOnce({
     recipeId: r.id,
     onPulled: () => setView({ name: "detail", selectedId: r.id, q: state.q }, { push: false })
@@ -72,30 +84,41 @@ export function renderDetailView({
 
   appEl.innerHTML = `
     <div class="container">
-      ${renderDetailHeaderHtml({ r, canWrite })}
+      ${renderDetailHeaderHtml({ r, canWrite: writable })}
       ${renderDetailImageHtml({ r })}
       ${renderIngredientsSectionHtml({ r, recipes, partsByParent })}
       ${renderStepsSectionHtml({ r, recipes, partsByParent })}
       ${renderCooklogCardHtml({ recipeId: r.id, lastStr, avgLabel, avgCount })}
-      ${renderChildrenSectionHtml({ children, canWrite })}
+      ${renderChildrenSectionHtml({ children, canWrite: writable })}
       <div id="sheetRoot"></div>
     </div>
   `;
 
-  // focus
+  // Optionaler Dirty-Tracker (aktuell wird hier nichts "halbfertig" editiert,
+  // aber wir sind vorbereitet, falls du z.B. Fokusänderungen erst "Apply"en willst).
+  // Solange niemand dirty.markDirty() triggert, macht er nix.
+  createDirtyTracker({
+    setDirtyGuard,
+    setDirtyIndicator,
+    setViewCleanup,
+    beforeUnloadKey: "__tinkeroneo_beforeunload_detail",
+    onCleanup: () => {},
+  });
+
+  // --- focus (read-only: Panel ausblenden, Save no-op)
   const img = qs(appEl, "#detailImg");
   if (img) {
     applyFocusToImg(img, r.image_focus);
 
     const panel = qs(appEl, "#imgFocusPanel");
-    if (panel) panel.style.display = canWrite ? "" : "none";
+    if (panel) panel.style.display = writable ? "" : "none";
 
     bindImageFocusPanel({
       appEl,
       imgEl: img,
       initialFocus: r.image_focus,
       onSaveFocus: async (nextFocus) => {
-        if (!canWrite) return;
+        if (!writable) return;
         if (typeof onUpdateRecipe !== "function") return;
         await onUpdateRecipe({ ...r, image_focus: normalizeFocus(nextFocus) });
       },
@@ -103,20 +126,22 @@ export function renderDetailView({
     });
   }
 
-  // actions
+  // --- actions (intern nutzt canWrite)
   bindDetailActions({
     appEl,
     recipe: r,
     state,
     setView,
-    canWrite,
+    canWrite: writable,
     addToShopping,
     recipes,
     partsByParent
   });
 
+  // image click always ok (read-only allowed)
   bindDetailImageClick({ appEl, imageUrl: r.image_url });
 
+  // cooklog is view-only / refresh
   bindCooklogCard({
     appEl,
     recipeId: r.id,
@@ -124,35 +149,42 @@ export function renderDetailView({
     onRefresh: () => setView({ name: "detail", selectedId: r.id, q: state.q }, { push: false })
   });
 
-  bindChildrenSection({
-    appEl,
-    canWrite,
-    parentId: r.id,
-    state,
-    setView,
-    removeRecipePart,
-    rebuildPartsIndexSetter,
-    refreshAll
-  });
+  // --- write actions: nur binden wenn writable (reduziert Risiko & Overhead)
+  if (writable) {
+    bindChildrenSection({
+      appEl,
+      canWrite: writable,
+      parentId: r.id,
+      state,
+      setView,
+      removeRecipePart,
+      rebuildPartsIndexSetter,
+      refreshAll
+    });
 
-  bindCopyToSpace({
-    appEl,
-    useBackend,
-    mySpaces,
-    recipe: r,
-    canWrite,
-    copyRecipeToSpace,
-    onAfterCopy: () => {}
-  });
+    bindCopyToSpace({
+      appEl,
+      useBackend,
+      mySpaces,
+      recipe: r,
+      canWrite: writable,
+      copyRecipeToSpace,
+      onAfterCopy: () => {}
+    });
 
-  bindDeleteRecipe({
-    appEl,
-    recipe: r,
-    canWrite,
-    useBackend,
-    sbDelete,
-    refreshAll,
-    setView,
-    state
-  });
+    bindDeleteRecipe({
+      appEl,
+      recipe: r,
+      canWrite: writable,
+      useBackend,
+      sbDelete,
+      refreshAll,
+      setView,
+      state
+    });
+  } else {
+    // Read-only: Kinder-Sektion darf trotzdem expand/collapse o.ä. haben?
+    // Falls bindChildrenSection reine UI-Bindings enthält, kannst du es hier wieder aktivieren.
+    // Aktuell: write-bindings aus, um wirklich "non-mutating" zu bleiben.
+  }
 }
