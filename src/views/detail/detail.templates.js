@@ -13,6 +13,7 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
   return `
     <section class="card">
       <div class="card__hd">
+      
         <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
             <button class="btn btn--ghost" id="cookBtn" type="button">👨‍🍳 Kochen</button>

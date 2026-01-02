@@ -6,6 +6,11 @@ import { deleteRecipe as sbDelete } from "../supabase.js";
 import { createDirtyTracker } from "../ui/dirtyTracker.js";
 import { createImagePicker } from "../ui/imagePicker.js";
 
+import { ack } from "../ui/feedback.js";
+ 
+import { applyFocusToImg, bindImageFocusPanel, normalizeFocus } from "./detail/detail.focus.js";
+
+
 function normalizeRecipe(existing) {
   if (existing) {
     return {
@@ -20,6 +25,7 @@ function normalizeRecipe(existing) {
       source: existing.source ?? "",
       tags: existing.tags ?? [],
       space_id: existing.space_id,
+       image_focus: existing.image_focus ?? null,
     };
   }
   return {
@@ -33,6 +39,7 @@ function normalizeRecipe(existing) {
     createdAt: Date.now(),
     source: "",
     tags: [],
+    image_focus: null,
   };
 }
 
@@ -130,7 +137,37 @@ export function renderAddView({
 
         <input id="image_file" type="file" accept="image/*" />
         <div class="muted" id="uploadStatus" style="margin-top:.35rem;"></div>
-        <div id="imgPreviewWrap" style="margin-top:.6rem;"></div>
+                 <div id="imgPreviewWrap" style="margin-top:.6rem;"></div>
+
+       <div id="imgFocusPanel" style="margin-top:.6rem; display:none;">
+          <div class="muted" style="margin-bottom:.35rem;">Bild-Fokus</div>
+          <div class="row" style="gap:.6rem; flex-wrap:wrap;">
+            <label class="muted" style="min-width:140px;">
+              Modus
+              <select id="imgFocusMode">
+                <option value="auto">auto (contain)</option>
+                <option value="cover">cover</option>
+              </select>
+            </label>
+            <label class="muted" style="min-width:160px;">
+              X: <span id="imgFocusXVal">50</span>
+              <input id="imgFocusX" type="range" min="0" max="100" value="50" />
+            </label>
+            <label class="muted" style="min-width:160px;">
+              Y: <span id="imgFocusYVal">50</span>
+              <input id="imgFocusY" type="range" min="0" max="100" value="50" />
+            </label>
+            <label class="muted" style="min-width:180px;">
+              Zoom: <span id="imgFocusZoomVal">1.00</span>
+              <input id="imgFocusZoom" type="range" min="1" max="3" step="0.01" value="1" />
+            </label>
+          </div>
+          <div class="row" style="justify-content:flex-end; margin-top:.5rem;">
+            <button type="button" class="btn" id="imgFocusReset">Reset</button>
+            <button type="button" class="btn btn--solid" id="imgFocusSave">Übernehmen</button>
+          </div>
+        </div>
+
 
         <label class="muted">Zutaten (eine pro Zeile)</label>
         <textarea id="ingredients" placeholder="z.B. Weiße Bohnen\nTK-Spinat\nKala Namak">${escapeHtml(ingredientsText)}</textarea>
@@ -196,6 +233,48 @@ export function renderAddView({
     previewWrap,
     statusEl,
   });
+let draftFocus = normalizeFocus(r.image_focus);
+
+// Focus-Panel nur zeigen, wenn Preview-Bild existiert
+const focusPanelEl = qs(appEl, "#imgFocusPanel");
+
+const bindOrRefreshFocus = () => {
+  const imgEl = img.getImgEl?.();
+  if (!focusPanelEl) return;
+
+  if (!imgEl) {
+    focusPanelEl.style.display = "none";
+    return;
+  }
+
+  focusPanelEl.style.display = "";
+  applyFocusToImg(imgEl, draftFocus);
+
+  // bindImageFocusPanel bindet Listener einmal; okay, weil IDs stabil sind.
+  // Wir geben imgEl (stabil dank imagePicker-fix) rein.
+  if (!focusPanelEl.__bound) {
+    focusPanelEl.__bound = true;
+    bindImageFocusPanel({
+      appEl,
+      imgEl,
+      initialFocus: draftFocus,
+      onSaveFocus: async (next) => {
+        draftFocus = normalizeFocus(next);
+        applyFocusToImg(imgEl, draftFocus);
+        dirty.markDirty();
+        ack(qs(appEl, "#imgFocusSave"));
+      },
+      ack
+    });
+  }
+};
+
+// initial
+bindOrRefreshFocus();
+
+// wenn sich Bild ändert: refresh
+fileEl?.addEventListener("change", () => bindOrRefreshFocus());
+imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
 
   // --- Dirty tracker
   const dirty = createDirtyTracker({
@@ -295,6 +374,7 @@ export function renderAddView({
       ingredients,
       steps,
       image_url: image_url || "",
+      image_focus: draftFocus
     };
 
     // optimistic navigate

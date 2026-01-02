@@ -5,6 +5,7 @@ import { ack } from "../../ui/feedback.js";
 const SHEET_BACKDROP_ID = "copySpaceBackdrop";
 const SHEET_ID = "copySpaceSheet";
 
+
 function removeExisting() {
   document.getElementById(SHEET_BACKDROP_ID)?.remove();
   document.getElementById(SHEET_ID)?.remove();
@@ -87,24 +88,31 @@ function openCopySheet({
   qs(sheet, "#copyCloseBtn")?.addEventListener("click", close);
   qs(sheet, "#cancelCopyBtn")?.addEventListener("click", close);
 
-  qs(sheet, "#doCopyBtn")?.addEventListener("click", async () => {
-    const select = qs(sheet, "#copySpaceSelect");
-    const cb = qs(sheet, "#copyIncludeParts");
-    const targetSid = String(select?.value || "").trim();
-    const includeParts = !!cb?.checked;
+qs(sheet, "#doCopyBtn")?.addEventListener("click", async () => {
+  const select = qs(sheet, "#copySpaceSelect");
+  const cb = qs(sheet, "#copyIncludeParts");
+  const targetSid = String(select?.value || "").trim();
+  const includeParts = !!cb?.checked;
 
-    if (!targetSid) return;
+  if (!targetSid) {
+    alert("Bitte einen Ziel-Space auswählen.");
+    return;
+  }
 
-    const btn = qs(sheet, "#doCopyBtn");
-    if (btn) btn.disabled = true;
+  const btn = qs(sheet, "#doCopyBtn");
+  if (btn) btn.disabled = true;
 
-    try {
-      await onConfirm?.({ targetSid, includeParts });
-      close();
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  });
+  try {
+    await onConfirm?.({ targetSid, includeParts });
+    close();
+  } catch (e) {
+    // ⬅️ DAS ist neu
+    alert(e?.message ?? String(e));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+});
+
 }
 
 export function bindCopyToSpace({
@@ -130,8 +138,20 @@ export function bindCopyToSpace({
     openCopySheet({
       mySpaces,
       currentSid: recipe?.space_id,
+
+
       onConfirm: async ({ targetSid, includeParts }) => {
-        await copyRecipeToSpace(recipe.id, targetSid, { includeParts });
+              if (!targetSid) {
+  alert("Ungültiger Ziel-Space.");
+  return;
+}
+await copyRecipeToSpace({
+  recipe,
+  targetSpaceId: targetSid,
+  includeParts
+});
+
+
         ack(btn);
         onAfterCopy?.();
       }
