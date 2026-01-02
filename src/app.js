@@ -8,7 +8,7 @@ const DEBUG = (() => {
 })();
 // src/app.js
 
-import { reportError, showError } from "../services/errors.js";
+import { reportError, showError } from "./services/errors.js";
 import {
   listRecipes,
   upsertRecipe,
