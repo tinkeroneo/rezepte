@@ -58,7 +58,7 @@ export function reportError(err, meta = {}) {
 }
 
 
-function showError(err) {
+export function showError(err) {
   remember(err);
 
   const msg = normalizeErr(err);
