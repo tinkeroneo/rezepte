@@ -17,56 +17,23 @@
 
 </head>
 <body>
-  <header>
-    <span class="header-badges">
-    <button id="backBtn" class="badge badge-btn" type="button" title="Zurück" hidden>← Zurück</button>
-    
-    <button id="vegan101HeaderBtn" class="badge badge-btn badge--gold" type="button" title="Vegan 101">🌱</button>
-    <span id="dirtyDot" class="badge badge-btn" title="Ungespeichert" hidden>●</span>
-    <button id="modeBadge" class="badge badge-btn" type="button" title="Speicher-Modus (klicken zum Umschalten)">—</button>
-    <button id="radioHeaderBtn" class="badge badge-btn" type="button" title="Radio" hidden>🎧</button>
-      
-      <button id="shopBadge" class="badge badge-btn"  type="button" title="Einkaufsliste">🧺</button>
-  
-      <button id="userBadge" class="badge badge-btn badge--warn" type="button" title="User Menü" hidden>👤 USER</button>
-      <div id="userMenu" class="popover" hidden>
-      <div><button id="authBadge" class="badge badge-btn" type="button" title="Login/Logout">🔐LOGIN</button></div>
-      <div><button id="adminBadge" class="badge badge-btn" type="button" title="Admin" hidden>🛠️ ADMIN</button></div>
-      <div><button id="themeBadge" class="badge badge-btn" type="button" title="Theme wechseln" hidden>🌓 THEME</button></div>
-      <div class="select-wrapper">
-      <span class="icon">🔀</span>
-      <select id="spaceSelect" class="badge badge-select" title="Space wählen"></select>
-      </div>
+  <header class="app-header">
+    <div class="header-badges">
+      <button id="backBtn" class="badge badge-btn" type="button" title="Zurück" hidden>←</button>
 
+      <button id="vegan101HeaderBtn" class="badge badge-btn badge--gold" type="button" title="Vegan 101">🌱</button>
 
-      
-      <div style="margin-top:.5rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.5rem;">
-        <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Profil</div>
-        <div class="select-wrapper" style="margin-bottom:.35rem;">
-          <span class="icon">🏷️</span>
-          <input id="profileDisplayName" class="badge badge-select" type="text" placeholder="Username (Displayname)" />
-        </div>
-        <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-          <button id="saveProfileBtn" class="badge badge-btn" type="button" title="Profil speichern">💾 SPEICHERN</button>
-          <button id="setDefaultSpaceBtn" class="badge badge-btn" type="button" title="Aktuellen Space als Standard setzen">⭐ DEFAULT</button>
-        </div>
-      </div>
+      <span id="dirtyDot" class="badge badge-btn" title="Ungespeichert" hidden>●</span>
+      <button id="modeBadge" class="badge badge-btn" type="button" title="Speicher-Modus">—</button>
 
-      <div style="margin-top:.5rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.5rem;">
-        <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Space</div>
-        <div class="select-wrapper" style="margin-bottom:.35rem;">
-          <span class="icon">✏️</span>
-          <input id="spaceNameInput" class="badge badge-select" type="text" placeholder="Space-Name" />
-        </div>
-        <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-          <button id="saveSpaceNameBtn" class="badge badge-btn" type="button" title="Space-Namen speichern">💾 SPACE</button>
-        </div>
-      </div>
+      <button id="radioHeaderBtn" class="badge badge-btn" type="button" title="Radio" hidden>🎧</button>
+      <button id="shopBadge" class="badge badge-btn" type="button" title="Einkaufsliste">🧺</button>
 
-      <div><span id="syncBadge" class="badge" title="Sync-Status" hidden>⟳ Sync-Status</span></div>
-      </div>
-
+      <!-- neu: nur noch 1 Einstieg -->
+      <button id="accountBtn" class="badge badge-btn badge--warn" type="button" title="Account / Einstellungen" hidden>👤</button>
+    </div>
   </header>
+
   <main id="app"></main>
   <div id="radioDockRoot"></div>
 

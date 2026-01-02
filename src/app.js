@@ -8,7 +8,6 @@ const DEBUG = (() => {
 })();
 // src/app.js
 
-
 import {
   listRecipes,
   upsertRecipe,
@@ -55,7 +54,7 @@ import { renderDiagnosticsView } from "./views/diagnostics.view.js";
 import { renderTimersOverlay } from "./views/timers.view.js";
 import { renderLoginView } from "./views/login.view.js";
 import { renderInvitesView } from "./views/invites.view.js";
-
+import { renderAccountView } from "./views/account.view.js";
 import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds } from "./domain/offlineQueue.js";
 
 import { initRadioDock } from "./ui/radioDock.js";
@@ -64,6 +63,7 @@ import { KEYS, lsGetStr, lsSetStr } from "./storage.js";
 import { installGlobalErrorHandler } from "./services/errors.js";
 import { getRecentErrors, clearRecentErrors } from "./services/errors.js";
 import { runExclusive } from "./services/locks.js";
+
 /* =========================
    CONFIG / STATE
 ========================= */
@@ -78,7 +78,7 @@ function readUseBackend() {
   return DEFAULT_USE_BACKEND;
 }
 
-function readTheme() {
+export function readTheme() {
   const v = lsGetStr(KEYS.THEME, "");
   return v || "system"; // system | light | dark
 }
@@ -86,7 +86,7 @@ function setTheme(v) {
   lsSetStr(KEYS.THEME, v || "system");
 }
 
-function readWinter() {
+export function readWinter() {
   const v = lsGetStr(KEYS.WINTER, "");
   if (v === "1") return true;
   if (v === "0") return false;
@@ -185,10 +185,7 @@ function setTimerSoundId(id) {
 function readTimerSoundVolume() {
   const raw = lsGetStr(KEYS.TIMER_SOUND_VOLUME, "");
   const v = String(raw ?? "").trim();
-
-  // If missing/empty, use a sensible default (audible but not too loud)
   if (!v) return 0.7;
-
   const n = Number(v);
   if (!Number.isFinite(n)) return 0.7;
   return Math.max(0, Math.min(1, n));
@@ -202,14 +199,9 @@ function setTimerSoundVolume(v) {
   window.dispatchEvent(new window.Event("tinkeroneo:timerSoundChanged"));
 }
 
-
 let useBackend = readUseBackend();
 let recipeRepo = null;
 let mySpaces = [];
-
-
-
-
 
 function rebuildRecipeRepo(on) {
   recipeRepo = createRecipeRepo({
@@ -236,6 +228,9 @@ function setDirtyGuard(fn) { dirtyGuard = (typeof fn === "function") ? fn : null
 let viewCleanup = null;
 function setViewCleanup(fn) { viewCleanup = (typeof fn === "function") ? fn : null; }
 
+/* =========================
+   BACKEND SWITCH
+========================= */
 
 // Expose a single backend switch implementation (used by admin.view.js)
 export async function setUseBackend(next) {
@@ -366,19 +361,16 @@ function installAdminCorner() {
 
 const appEl = document.getElementById("app");
 
-function applyThemeAndOverlay() {
+export function applyThemeAndOverlay() {
   const theme = readTheme();
   const wantsDark =
     theme === "dark" ||
     (theme === "system" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
 
-  // Preferred: drive theming via tokens on :root[data-theme].
-  // Back-compat: also toggle body.dark (older selectors).
   const resolved = wantsDark ? "dark" : "light";
   document.documentElement.dataset.theme = resolved;
   document.body.classList.toggle("dark", !!wantsDark);
 
-  // Overlay
   document.body.classList.toggle("winter", readWinter());
 }
 
@@ -407,7 +399,6 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
     const pending = (getOfflineQueue?.() || []).length;
     const showPending = navigator.onLine && !syncing && !syncError && pending > 0;
 
-    // Visible when syncing, error, offline, or pending actions exist
     sync.hidden = !syncing && !syncError && navigator.onLine && pending === 0;
 
     if (!navigator.onLine) {
@@ -434,63 +425,62 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
     else sync.title = "Sync ok";
   }
 
-  // Space selector (only meaningful in CLOUD + authed)
+  // Profile buttons live in Account view -> wire here too (safe no-op if not present)
+  const saveProfileBtn = document.getElementById("saveProfileBtn");
+  if (saveProfileBtn && !saveProfileBtn.__installed) {
+    saveProfileBtn.__installed = true;
+    saveProfileBtn.addEventListener("click", async () => {
+      if (!(useBackend && isAuthenticated?.())) return;
+      const dn = document.getElementById("profileDisplayName");
+      const display_name = String(dn?.value || "").trim();
+      try {
+        const p = await upsertProfile({ display_name });
+        __profileCache = p;
+        updateHeaderBadges();
+      } catch (e) {
+        alert(`Profil speichern fehlgeschlagen: ${String(e?.message || e)}`);
+      }
+    });
+  }
 
+  const setDefaultBtn = document.getElementById("setDefaultSpaceBtn");
+  if (setDefaultBtn && !setDefaultBtn.__installed) {
+    setDefaultBtn.__installed = true;
+    setDefaultBtn.addEventListener("click", async () => {
+      if (!(useBackend && isAuthenticated?.())) return;
+      const ctx = getAuthContext?.();
+      const sid = String(ctx?.spaceId || "").trim();
+      if (!sid) return;
+      try {
+        const p = await upsertProfile({ default_space_id: sid });
+        __profileCache = p;
+        alert("Default Space gesetzt ✅");
+      } catch (e) {
+        alert(`Default setzen fehlgeschlagen: ${String(e?.message || e)}`);
+      }
+    });
+  }
 
-const saveProfileBtn = document.getElementById("saveProfileBtn");
-if (saveProfileBtn && !saveProfileBtn.__installed) {
-  saveProfileBtn.__installed = true;
-  saveProfileBtn.addEventListener("click", async () => {
-    if (!(useBackend && isAuthenticated?.())) return;
-    const dn = document.getElementById("profileDisplayName");
-    const display_name = String(dn?.value || "").trim();
-    try {
-      const p = await upsertProfile({ display_name });
-      __profileCache = p;
-      updateHeaderBadges();
-    } catch (e) {
-      alert(`Profil speichern fehlgeschlagen: ${String(e?.message || e)}`);
-    }
-  });
-}
+  const saveSpaceNameBtn = document.getElementById("saveSpaceNameBtn");
+  if (saveSpaceNameBtn && !saveSpaceNameBtn.__installed) {
+    saveSpaceNameBtn.__installed = true;
+    saveSpaceNameBtn.addEventListener("click", async () => {
+      if (!(useBackend && isAuthenticated?.())) return;
+      const ctx = getAuthContext?.();
+      const sid = String(ctx?.spaceId || "").trim();
+      const inp = document.getElementById("spaceNameInput");
+      const name = String(inp?.value || "").trim();
+      if (!sid) return;
+      try {
+        await updateSpaceName({ spaceId: sid, name });
+        await refreshSpaceSelect();
+        alert("Space-Name gespeichert ✅");
+      } catch (e) {
+        alert(`Space-Name speichern fehlgeschlagen: ${String(e?.message || e)}`);
+      }
+    });
+  }
 
-const setDefaultBtn = document.getElementById("setDefaultSpaceBtn");
-if (setDefaultBtn && !setDefaultBtn.__installed) {
-  setDefaultBtn.__installed = true;
-  setDefaultBtn.addEventListener("click", async () => {
-    if (!(useBackend && isAuthenticated?.())) return;
-    const ctx = getAuthContext?.();
-    const sid = String(ctx?.spaceId || "").trim();
-    if (!sid) return;
-    try {
-      const p = await upsertProfile({ default_space_id: sid });
-      __profileCache = p;
-      alert("Default Space gesetzt ✅");
-    } catch (e) {
-      alert(`Default setzen fehlgeschlagen: ${String(e?.message || e)}`);
-    }
-  });
-}
-
-const saveSpaceNameBtn = document.getElementById("saveSpaceNameBtn");
-if (saveSpaceNameBtn && !saveSpaceNameBtn.__installed) {
-  saveSpaceNameBtn.__installed = true;
-  saveSpaceNameBtn.addEventListener("click", async () => {
-    if (!(useBackend && isAuthenticated?.())) return;
-    const ctx = getAuthContext?.();
-    const sid = String(ctx?.spaceId || "").trim();
-    const inp = document.getElementById("spaceNameInput");
-    const name = String(inp?.value || "").trim();
-    if (!sid) return;
-    try {
-      await updateSpaceName({ spaceId: sid, name });
-      await refreshSpaceSelect();
-      alert("Space-Name gespeichert ✅");
-    } catch (e) {
-      alert(`Space-Name speichern fehlgeschlagen: ${String(e?.message || e)}`);
-    }
-  });
-}
   const spaceSel = document.getElementById("spaceSelect");
   if (spaceSel) {
     const authed = isAuthenticated?.();
@@ -526,13 +516,14 @@ async function refreshSpaceSelect() {
     return;
   }
 
-  // Show the current space even if there is only one (better UX than an empty/hidden selector)
   if (mySpaces.length === 1) {
     const s = mySpaces[0];
     const sid = String(s?.space_id || "");
     const name = String(s?.name || sid);
     const role = String(s?.role || "viewer");
-    const esc = (x) => String(x).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+    const esc = (x) => String(x)
+      .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
     sel.innerHTML = `<option value="${esc(sid)}" selected>${esc(`${name} (${role})`)}</option>`;
     sel.disabled = true;
     sel.hidden = false;
@@ -547,12 +538,111 @@ async function refreshSpaceSelect() {
       const name = String(s?.name || sid);
       const role = String(s?.role || "viewer");
       const label = `${name} (${role})`;
-      const esc = (x) => String(x).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+      const esc = (x) => String(x)
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
       return `<option value="${esc(sid)}" ${sid === active ? "selected" : ""}>${esc(label)}</option>`;
     })
     .join("");
 
   sel.hidden = false;
+}
+
+/* =========================
+   ACCOUNT CONTROLS (bind after render)
+========================= */
+
+function wireAccountControls() {
+  // THEME
+  const themeBtn = document.getElementById("themeBadge");
+  if (themeBtn && !themeBtn.__installed) {
+    themeBtn.__installed = true;
+
+    const applyThemeBtn = () => {
+      const t = readTheme();
+      themeBtn.title = `Theme wechseln (aktuell: ${t})`;
+      themeBtn.textContent = t === "dark" ? "🌙 THEME" : (t === "light" ? "☀️THEME" : "🌓 THEME");
+    };
+
+    applyThemeBtn();
+
+    themeBtn.addEventListener("click", () => {
+      const t = readTheme();
+      const next = t === "system" ? "dark" : (t === "dark" ? "light" : "system");
+      setTheme(next);
+      applyThemeAndOverlay();
+      applyThemeBtn();
+    });
+
+    window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", () => {
+      if (readTheme() === "system") {
+        applyThemeAndOverlay();
+        applyThemeBtn();
+      }
+    });
+  }
+
+  // LOGIN / LOGOUT
+  const authBtn = document.getElementById("authBadge");
+  if (authBtn && !authBtn.__installed) {
+    authBtn.__installed = true;
+    authBtn.addEventListener("click", async () => {
+      const authed = isAuthenticated?.();
+
+      if (authed) {
+        try { sbLogout(); } catch { /* ignore */ }
+        updateHeaderBadges();
+        router?.setView?.({ name: "login" });
+        return;
+      }
+
+      if (!useBackend) {
+        await setUseBackend(true);
+      }
+
+      router?.setView?.({ name: "login" });
+      updateHeaderBadges();
+    });
+  }
+
+  // SPACE SELECT
+  const spaceSel = document.getElementById("spaceSelect");
+  if (spaceSel && !spaceSel.__installed) {
+    spaceSel.__installed = true;
+    spaceSel.addEventListener("change", async () => {
+      const sid = String(spaceSel.value || "").trim();
+      if (!sid) return;
+
+      try {
+        setActiveSpaceId(sid);
+        const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+        setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
+
+        updateHeaderBadges({ syncing: true });
+        await runExclusive("loadAll", () => loadAll());
+        updateHeaderBadges({ syncing: false });
+
+        router?.setView?.({ name: "list", selectedId: null, q: "" });
+      } catch (e) {
+        alert(String(e?.message || e));
+      }
+    });
+  }
+
+  // ADMIN NAV
+  const adminBtn = document.getElementById("adminBadge");
+  if (adminBtn && !adminBtn.__wiredNav) {
+    adminBtn.__wiredNav = true;
+    adminBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      location.hash = "admin";
+    });
+  }
+
+  // ensures text/icons are current + wires profile buttons (safe)
+  updateHeaderBadges();
+  installAdminCorner(); // re-mount now that adminBadge exists in DOM (safe no-op)
 }
 
 /* =========================
@@ -577,7 +667,6 @@ async function loadAll() {
     _pending: pendingIds.has(r.id),
   }));
 
-
   if (!useBackend) {
     setParts([]);
     return;
@@ -599,7 +688,7 @@ async function render(view, setView) {
   const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId: getAuthContext?.()?.spaceId });
 
   if (DEBUG) console.log("RENDER VIEW:", view);
-  // Keep the screen awake only while cooking
+
   if (view.name === "cook") Wake.enable();
   else Wake.disable();
 
@@ -608,16 +697,18 @@ async function render(view, setView) {
     if (DEBUG) console.log("RENDER LOGIN VIEW");
 
     const info = {
-      // redirect should always land on index.html (avoid directory listing)
       redirectTo: new URL("index.html", location.href).toString().replace(/#.*$/, ""),
       debug: `origin=${location.origin}\npath=${location.pathname}\nhash=${location.hash}`,
     };
+
     return renderLoginView({
-    appEl,
-    state: view,
-    setView,
-    useBackend,
-    setUseBackend, info });
+      appEl,
+      state: view,
+      setView,
+      useBackend,
+      setUseBackend,
+      info
+    });
   }
 
   // Invites confirmation view
@@ -627,28 +718,22 @@ async function render(view, setView) {
       appEl,
       invites: inv,
       onAccept: async (inviteId) => {
-        try {
-          await acceptInvite(inviteId);
-        } catch (e) {
-          alert(String(e?.message || e));
-        }
-        // reload invites list
+        try { await acceptInvite(inviteId); } catch (e) { alert(String(e?.message || e)); }
         try {
           const ctx = await initAuthAndSpace();
-      try { await ensureProfileLoaded(); } catch { /* ignore */ }
-      try {
-        if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
-        try {
-          await listRecipes();
-          await upsertProfile({ last_space_id: ctx.spaceId });
-        } catch { /* ignore */ }
-      }
-      } catch { /* ignore */ }
+          try { await ensureProfileLoaded(); } catch { /* ignore */ }
+          try {
+            if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
+              try {
+                await listRecipes();
+                await upsertProfile({ last_space_id: ctx.spaceId });
+              } catch { /* ignore */ }
+            }
+          } catch { /* ignore */ }
           window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
         } catch {
           window.__tinkeroneoPendingInvites = [];
         }
-        // if none left, continue
         if (!(window.__tinkeroneoPendingInvites || []).length) {
           await runExclusive("loadAll", () => loadAll());
           setView({ name: "list", selectedId: null, q: "" });
@@ -657,22 +742,18 @@ async function render(view, setView) {
         render({ name: "invites" }, setView);
       },
       onDecline: async (inviteId) => {
-        try {
-          await declineInvite(inviteId);
-        } catch (e) {
-          alert(String(e?.message || e));
-        }
+        try { await declineInvite(inviteId); } catch (e) { alert(String(e?.message || e)); }
         try {
           const ctx = await initAuthAndSpace();
-      try { await ensureProfileLoaded(); } catch { /* ignore */ }
-      try {
-        if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
-        try {
-          await listRecipes();
-          await upsertProfile({ last_space_id: ctx.spaceId });
-        } catch { /* ignore */ }
-      }
-      } catch { /* ignore */ }
+          try { await ensureProfileLoaded(); } catch { /* ignore */ }
+          try {
+            if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
+              try {
+                await listRecipes();
+                await upsertProfile({ last_space_id: ctx.spaceId });
+              } catch { /* ignore */ }
+            }
+          } catch { /* ignore */ }
           window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
         } catch {
           window.__tinkeroneoPendingInvites = [];
@@ -762,6 +843,15 @@ async function render(view, setView) {
     return renderDiagnosticsView({ appEl, state: view, info, setView });
   }
 
+  if (view.name === "account") {
+    renderAccountView({ appEl, state: view, setView });
+    await refreshSpaceSelect();
+    await refreshProfileUi();
+    wireAccountControls();
+    return;
+  }
+
+
   if (view.name === "list") {
     return renderListView({
       appEl,
@@ -811,7 +901,6 @@ async function render(view, setView) {
       onUpdateRecipe: async (rec) => {
         return runExclusive(`upsert:${rec.id}`, async () => {
           recipes = await recipeRepo.upsert(rec, { refresh: useBackend });
-          // ensure current view keeps updated recipe
           render(router.getView(), router.setView);
         });
       },
@@ -822,7 +911,8 @@ async function render(view, setView) {
 
   if (view.name === "cook") {
     return renderCookView({
-      canWrite, appEl, state: view, recipes, partsByParent, setView, setViewCleanup, setDirtyGuard });
+      canWrite, appEl, state: view, recipes, partsByParent, setView, setViewCleanup, setDirtyGuard
+    });
   }
 
   if (view.name === "add") {
@@ -835,7 +925,7 @@ async function render(view, setView) {
       useBackend,
       canWrite,
       setDirtyGuard,
-    setDirtyIndicator,
+      setDirtyIndicator,
       setViewCleanup,
       mySpaces,
       moveRecipeToSpace,
@@ -860,20 +950,17 @@ async function render(view, setView) {
   }
 
   if (view.name === "admin") {
-    return renderAdminView({
-      canWrite, appEl, recipes, setView });
+    return renderAdminView({ canWrite, appEl, recipes, setView });
   }
 
   if (view.name === "vegan101") {
-    return renderVegan101View({
-      canWrite, appEl, setView });
+    return renderVegan101View({ canWrite, appEl, setView });
   }
 
   if (view.name === "shopping") {
     return renderShoppingView({ appEl, state: view, setView });
   }
 
-  // fallback
   setView({ name: "list", selectedId: null, q: view.q });
 }
 
@@ -887,7 +974,6 @@ async function boot() {
   applyThemeAndOverlay();
   updateHeaderBadges();
 
-  // persistent mini radio (does not reset on route changes)
   initRadioDock();
 
   window.addEventListener("online", () => updateHeaderBadges());
@@ -895,8 +981,6 @@ async function boot() {
 
   window.__tinkeroneoUpdateBadges = () => updateHeaderBadges();
 
-  // If backend enabled: Auth+Space must be initialized BEFORE any backend call
-  // router must exist always (even if we end up in login)
   router = initRouter({
     canNavigate: ({ reason }) => {
       if (!dirtyGuard) return true;
@@ -909,21 +993,22 @@ async function boot() {
       }
       dirtyGuard = null;
       setDirtyIndicator(false);
-    render(view, router.setView);
-    // Cookbar height -> CSS var for sheets
-    try {
-      const cb = document.querySelector('.cookbar');
-      if (cb) {
-        const h = Math.ceil(cb.getBoundingClientRect().height);
-        document.documentElement.style.setProperty('--cookbar-h', `${h}px`);
-      } else {
-        document.documentElement.style.removeProperty('--cookbar-h');
-      }
-    } catch { /* ignore */ }
 
+      render(view, router.setView);
+
+      try {
+        const cb = document.querySelector(".cookbar");
+        if (cb) {
+          const h = Math.ceil(cb.getBoundingClientRect().height);
+          document.documentElement.style.setProperty("--cookbar-h", `${h}px`);
+        } else {
+          document.documentElement.style.removeProperty("--cookbar-h");
+        }
+      } catch { /* ignore */ }
     },
   });
-// Header controls: mode toggle + login/logout (router now available)
+
+  // Header controls
   const modeBtn = document.getElementById("modeBadge");
   if (modeBtn && !modeBtn.__installed) {
     modeBtn.__installed = true;
@@ -933,146 +1018,53 @@ async function boot() {
     });
   }
 
-
-const userBadge = document.getElementById("userBadge");
-const userMenu = document.getElementById("userMenu");
-
-userBadge.addEventListener("click", (e) => {
-  e.stopPropagation();
-  userMenu.hidden = !userMenu.hidden;
-  if (!userMenu.hidden) refreshProfileUi();
-
-  // Positionieren relativ zum Badge
-  const rect = userBadge.getBoundingClientRect();
-  userMenu.style.position = "absolute";
-  userMenu.style.top = rect.bottom + 6 + "px";
-  userMenu.style.left = rect.right - userMenu.offsetWidth + "px";
-});
-// Klick außerhalb schließt das Menü
-document.addEventListener("click", (e) => {
-  if (!userMenu.contains(e.target)) {
-    userMenu.hidden = true;
-  } 
-});
-
-
-
-
-
-
-
-const shoppingBtn = document.getElementById("shopBadge");
-shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" }));
-
-  const themeBtn = document.getElementById("themeBadge");
-  if (themeBtn && !themeBtn.__installed) {
-    themeBtn.__installed = true;
-    const applyThemeBtn = () => {
-      const t = readTheme();
-      themeBtn.title = `Theme wechseln (aktuell: ${t})`;
-      themeBtn.textContent = t === "dark" ? "🌙 THEME" : (t === "light" ? "☀️THEME" : "🌓 THEME");
-    };
-    applyThemeBtn();
-    themeBtn.addEventListener("click", () => {
-      const t = readTheme();
-      const next = t === "system" ? "dark" : (t === "dark" ? "light" : "system");
-      setTheme(next);
-      applyThemeAndOverlay();
-      applyThemeBtn();
-    });
-    window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", () => {
-      if (readTheme() === "system") {
-        applyThemeAndOverlay();
-        applyThemeBtn();
-      }
+  const accountBtn = document.getElementById("accountBtn");
+  if (accountBtn && !accountBtn.__installed) {
+    accountBtn.__installed = true;
+    accountBtn.addEventListener("click", () => {
+      location.hash = "#account";
     });
   }
 
-  const authBtn = document.getElementById("authBadge");
-  if (authBtn && !authBtn.__installed) {
-    authBtn.__installed = true;
-    authBtn.addEventListener("click", async () => {
-      const authed = isAuthenticated?.();
-
-      // If already authenticated, allow logout regardless of LOCAL/CLOUD.
-      if (authed) {
-        try { sbLogout(); } catch { /* ignore */ }
-        updateHeaderBadges();
-        router.setView({ name: "login" });
-        return;
-      }
-
-      // Not authenticated:
-      // If we're local-only, switch to cloud and open login.
-      if (!useBackend) {
-        await setUseBackend(true);
-      }
-
-      router.setView({ name: "login" });
-      updateHeaderBadges();
-    });
+  const shoppingBtn = document.getElementById("shopBadge");
+  if (shoppingBtn && !shoppingBtn.__installed) {
+    shoppingBtn.__installed = true;
+    shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" }));
   }
 
-  const spaceSel = document.getElementById("spaceSelect");
-  if (spaceSel && !spaceSel.__installed) {
-    spaceSel.__installed = true;
-    spaceSel.addEventListener("change", async () => {
-      const sid = String(spaceSel.value || "").trim();
-      if (!sid) return;
-      try {
-        setActiveSpaceId(sid);
-        const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
-        setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
-
-        updateHeaderBadges({ syncing: true });
-        await runExclusive("loadAll", () => loadAll());
-        updateHeaderBadges({ syncing: false });
-        router.setView({ name: "list", selectedId: null, q: "" });
-      } catch (e) {
-        alert(String(e?.message || e));
-      }
-    });
-  }
-
-  // Now that router exists, we can init auth.
-  // Important: do NOT bounce users to Login just because network/RLS is temporarily failing.
-  // We keep LOCAL usable offline and keep auth tokens in storage.
+  // If backend enabled: init auth before backend calls
   if (useBackend) {
     try {
       const ctx = await initAuthAndSpace();
       try { await ensureProfileLoaded(); } catch { /* ignore */ }
       try {
         if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
-        try {
-          await listRecipes();
-          await upsertProfile({ last_space_id: ctx.spaceId });
-        } catch { /* ignore */ }
-      }
+          try {
+            await listRecipes();
+            await upsertProfile({ last_space_id: ctx.spaceId });
+          } catch { /* ignore */ }
+        }
       } catch { /* ignore */ }
       if (ctx?.user?.id || ctx?.spaceId) {
         setOfflineQueueScope({ userId: ctx.user?.id || null, spaceId: ctx.spaceId || null });
       }
-      // pending invites -> user must confirm
       if (Array.isArray(ctx?.pendingInvites) && ctx.pendingInvites.length) {
         window.__tinkeroneoPendingInvites = ctx.pendingInvites;
         router.setView({ name: "invites" });
       } else if (!ctx?.spaceId && !isAuthenticated?.()) {
         router.setView({ name: "login" });
       } else if (!ctx?.spaceId && isAuthenticated?.()) {
-        // Session ok but space unresolved => stay usable in LOCAL
         try { await setUseBackend(false); } catch { /* ignore */ }
       }
 
       await refreshSpaceSelect();
     } catch (e) {
       console.error("Auth/Space init failed:", e);
-      // If offline or backend hiccup: fall back to LOCAL but keep session.
       try {
         if (!navigator.onLine) {
           await setUseBackend(false);
         }
       } catch { /* ignore */ }
-      // Only force login when we truly have no session.
       if (!isAuthenticated?.()) {
         router.setView({ name: "login" });
       }
@@ -1088,7 +1080,6 @@ shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" })
 
 boot();
 
-
 // Global Back Button
 const __backBtn = document.getElementById("backBtn");
 if (__backBtn && !__backBtn.__installed) {
@@ -1101,7 +1092,6 @@ if (__backBtn && !__backBtn.__installed) {
   });
 }
 
-
 // Header: Vegan 101 Button
 const __veganBtn = document.getElementById("vegan101HeaderBtn");
 if (__veganBtn && !__veganBtn.__installed) {
@@ -1112,20 +1102,17 @@ if (__veganBtn && !__veganBtn.__installed) {
   });
 }
 
-
 const __dirtyDot = document.getElementById("dirtyDot");
 function setDirtyIndicator(on) {
   if (!__dirtyDot) return;
   __dirtyDot.hidden = !on;
 }
 
-
 let __profileCache = null;
 async function ensureProfileLoaded() {
   if (!(useBackend && isAuthenticated?.())) return null;
   try {
     __profileCache = await getProfile();
-    // create empty profile if missing
     if (!__profileCache) {
       __profileCache = await upsertProfile({});
     }
@@ -1154,12 +1141,11 @@ async function refreshProfileUi() {
     defBtn.textContent = isDef ? "⭐ DEFAULT ✓" : "⭐ DEFAULT";
     defBtn.title = isDef ? "Default Space entfernen" : "Aktuellen Space als Standard setzen";
   }
-  // current space label from mySpaces
+
   const activeSpaceId = getAuthContext?.()?.spaceId;
   const current = (mySpaces || []).find(s => String(s?.space_id || "") === String(activeSpaceId || ""));
   if (spaceName) spaceName.value = String(current?.name || "");
 }
-
 
 function getActiveSpaceRole({ spaces, spaceId }) {
   const sid = String(spaceId || "").trim();
