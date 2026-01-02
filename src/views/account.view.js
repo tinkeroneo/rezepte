@@ -23,6 +23,15 @@ export function renderAccountView({ appEl }) {
         <div class="select-wrapper" style="margin-bottom:.5rem;">
           <span class="icon">🔀</span>
           <select id="spaceSelect" class="badge badge-select" title="Space wählen"></select>
+                      <button
+  id="setDefaultSpaceBtn"
+  class="fav-overlay"
+  type="button"
+  title="Als Default-Space setzen/entfernen"
+  aria-label="Default-Space umschalten"
+  aria-pressed="false"
+  style="position:static; inset:auto; margin-left:.25rem;"
+>★</button>
         </div>
 
         <div style="margin-top:.5rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.75rem;">
@@ -31,7 +40,8 @@ export function renderAccountView({ appEl }) {
             <span class="icon">🏷️</span>
             <input id="profileDisplayName" class="badge badge-select" type="text" placeholder="Username (Displayname)" />
             <button id="saveProfileBtn" class="badge badge-btn" type="button">💾</button>
-            <button id="setDefaultSpaceBtn" class="badge badge-btn" type="button">⭐ Default</button>
+
+
           </div>
         </div>
 

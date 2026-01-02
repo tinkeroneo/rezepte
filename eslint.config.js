@@ -66,6 +66,7 @@ export default [
       "build/**",
       "node_modules/**",
       ".github/**",
+      ".venv/**",
       "**/*.min.js",
     ],
   },

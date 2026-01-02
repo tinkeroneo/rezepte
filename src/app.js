@@ -479,13 +479,25 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
       const ctx = getAuthContext?.();
       const sid = String(ctx?.spaceId || "").trim();
       if (!sid) return;
+      const p = await ensureProfileLoaded();
+      const wasDef = !!(p?.default_space_id && String(p.default_space_id) === sid);
+
+      // optimistic UI
+      setDefaultBtn.classList.toggle("is-fav", !wasDef);
+      setDefaultBtn.setAttribute("aria-pressed", String(!wasDef));
+
       try {
-        const p = await upsertProfile({ default_space_id: sid });
-        __profileCache = p;
-        alert("Default Space gesetzt ✅");
+        const nextProfile = await upsertProfile({
+          default_space_id: wasDef ? null : sid
+        });
+        __profileCache = nextProfile;
       } catch (e) {
-        alert(`Default setzen fehlgeschlagen: ${String(e?.message || e)}`);
+        // revert UI on error
+        setDefaultBtn.classList.toggle("is-fav", wasDef);
+        setDefaultBtn.setAttribute("aria-pressed", String(wasDef));
+        alert(`Default-Space Änderung fehlgeschlagen: ${String(e?.message || e)}`);
       }
+
     });
   }
 
@@ -732,12 +744,12 @@ async function loadAll() {
 async function render(view, setView) {
   const activeSpaceId = getAuthContext?.()?.spaceId;
 
-// "write" is determined by the SPACE of the entity you act on, not by the currently selected space.
-// Active-space write is still useful for list/create defaults:
-const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId: activeSpaceId });
+  // "write" is determined by the SPACE of the entity you act on, not by the currently selected space.
+  // Active-space write is still useful for list/create defaults:
+  const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId: activeSpaceId });
 
-// helper for per-recipe permission (fixes "I must switch space to edit")
-const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId });
+  // helper for per-recipe permission (fixes "I must switch space to edit")
+  const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId });
 
   // Permissions bootstrap: after refresh/auth, spaceId/mySpaces can be temporarily missing.
   // Avoid rendering read-only UI during this transient state.
@@ -746,42 +758,42 @@ const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ space
     const sid = String(ctx?.spaceId || "").trim();
     const spacesMissing = !Array.isArray(mySpaces) || mySpaces.length === 0;
 
-	    // If permissions/space context are still missing right after refresh, bootstrap them once or twice.
-	    // IMPORTANT: never loop indefinitely — otherwise the app can appear to "hang".
-	    if ((!sid || spacesMissing) && !__permBootstrapInFlight) {
-	      if (__permBootstrapAttempts >= 2) {
-	        // Give up and render normally (read-only may be temporary, but app must remain usable).
-	        if (DEBUG) console.warn("perm bootstrap: giving up", { sid, spacesMissing, attempts: __permBootstrapAttempts });
-	      } else {
-      __permBootstrapInFlight = true;
-	      __permBootstrapAttempts++;
+    // If permissions/space context are still missing right after refresh, bootstrap them once or twice.
+    // IMPORTANT: never loop indefinitely — otherwise the app can appear to "hang".
+    if ((!sid || spacesMissing) && !__permBootstrapInFlight) {
+      if (__permBootstrapAttempts >= 2) {
+        // Give up and render normally (read-only may be temporary, but app must remain usable).
+        if (DEBUG) console.warn("perm bootstrap: giving up", { sid, spacesMissing, attempts: __permBootstrapAttempts });
+      } else {
+        __permBootstrapInFlight = true;
+        __permBootstrapAttempts++;
 
-      try {
-        appEl.innerHTML = `
+        try {
+          appEl.innerHTML = `
           <div class="container">
             <div class="card" style="padding:1rem; text-align:center;">
               <div style="font-weight:800;">Lade Space-Rechte…</div>
               <div class="muted" style="margin-top:.35rem;">Einen Moment</div>
             </div>
           </div>`;
-      } catch { /* ignore */ }
+        } catch { /* ignore */ }
 
-	      try { await refreshSpaceSelect(); } catch { /* ignore */ }
-      __permBootstrapInFlight = false;
+        try { await refreshSpaceSelect(); } catch { /* ignore */ }
+        __permBootstrapInFlight = false;
 
-	      // Recompute and only re-render if we actually got something new.
-	      const ctx2 = (() => { try { return getAuthContext?.(); } catch { return null; } })();
-	      const sid2 = String(ctx2?.spaceId || "").trim();
-	      const spacesMissing2 = !Array.isArray(mySpaces) || mySpaces.length === 0;
-	      if (sid2 && !spacesMissing2) {
-	        // Await to keep render serialized and avoid recursive storms.
-	        await runExclusive("render", () => render(view, setView));
-	        return;
-	      }
+        // Recompute and only re-render if we actually got something new.
+        const ctx2 = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+        const sid2 = String(ctx2?.spaceId || "").trim();
+        const spacesMissing2 = !Array.isArray(mySpaces) || mySpaces.length === 0;
+        if (sid2 && !spacesMissing2) {
+          // Await to keep render serialized and avoid recursive storms.
+          await runExclusive("render", () => render(view, setView));
+          return;
+        }
 
-	      // Still missing → fall through and render normally (no infinite loop).
-	      if (DEBUG) console.warn("perm bootstrap: still missing", { sid2, spacesMissing2 });
-	      }
+        // Still missing → fall through and render normally (no infinite loop).
+        if (DEBUG) console.warn("perm bootstrap: still missing", { sid2, spacesMissing2 });
+      }
     }
   }
 
@@ -1282,8 +1294,10 @@ async function refreshProfileUi() {
   const active = getAuthContext?.()?.spaceId;
   const isDef = !!(active && p?.default_space_id && String(active) === String(p.default_space_id));
   if (defBtn) {
-    defBtn.textContent = isDef ? "⭐ DEFAULT ✓" : "⭐ DEFAULT";
-    defBtn.title = isDef ? "Default Space entfernen" : "Aktuellen Space als Standard setzen";
+    defBtn.classList.toggle("is-fav", isDef);
+defBtn.setAttribute("aria-pressed", String(isDef));
+defBtn.title = isDef ? "Default-Space entfernen" : "Als Default-Space setzen";
+
   }
 
   const activeSpaceId = getAuthContext?.()?.spaceId;

@@ -6,6 +6,8 @@ node_modules/
 .env.*
 !.env.example
 
+.venv
+
 # logs
 npm-debug.log*
 yarn-debug.log*
@@ -19,5 +21,14 @@ Thumbs.db
 .vscode/
 .idea/
 
+
+.vite-url
+_chat.patch
 # optional caches
 .cache/
+
+DEV_WORKFLOW.md
+apply.ps1
+default_space_star.patch
+dev.ps1
+repo_agent.py
