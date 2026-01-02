@@ -24,6 +24,21 @@ const BUCKET = "recipe-images";
 ========================= */
 
 const LS_AUTH_KEY = "tinkeroneo_sb_auth_v1";
+const LS_FORCE_DEFAULT_ONCE = "tinkeroneo_force_default_space_once_v1";
+
+function markForceDefaultOnce() {
+  try { localStorage.setItem(LS_FORCE_DEFAULT_ONCE, "1"); } catch { /* ignore */ }
+}
+function consumeForceDefaultOnce() {
+  try {
+    const v = localStorage.getItem(LS_FORCE_DEFAULT_ONCE);
+    if (v) localStorage.removeItem(LS_FORCE_DEFAULT_ONCE);
+    return !!v;
+  } catch {
+    return false;
+  }
+}
+
 
 let _session = null; // { access_token, refresh_token, expires_at }
 let _spaceId = null;
@@ -52,6 +67,7 @@ function readAuthFromHash() {
 
   // Hash bereinigen (Router bleibt sauber)
   window.history.replaceState(null, "", location.pathname + location.search);
+markForceDefaultOnce();
 
   return { access_token, refresh_token, expires_at };
 }
@@ -135,22 +151,28 @@ async function resolveSpaceId({ access_token, userId }) {
   const rows = await listUserSpacesRaw(access_token);
   if (!rows.length) throw new Error("No space assigned to user");
 
-  // 0) Prefer profile last/default (global, cross-device)
+  const has = (id) => !!id && rows.some((r) => r?.space_id === id);
+
   const prof = userId ? await tryFetchProfile({ access_token, userId }) : null;
-  if (prof?.last_space_id && rows.some(r => r?.space_id === prof.last_space_id)) return prof.last_space_id;
-  if (prof?.default_space_id && rows.some(r => r?.space_id === prof.default_space_id)) return prof.default_space_id;
+  const dbDefault = rows.find((r) => r?.is_default)?.space_id || null;
 
-  // 1) Prefer default space (DB flag)
-  const def = rows.find(r => r?.is_default);
-  if (def?.space_id) return def.space_id;
-
-  // 2) Otherwise prefer stored active space
-  const stored = userId ? readStoredActiveSpace(userId) : null;
-  if (stored && rows.some(r => r?.space_id === stored)) {
-    return stored;
+  // One-shot: after a fresh login, always prefer default (NOT last-used)
+  if (consumeForceDefaultOnce()) {
+    if (has(prof?.default_space_id)) return prof.default_space_id;
+    if (has(dbDefault)) return dbDefault;
+    return rows?.[0]?.space_id || null;
   }
 
-  // 3) Fallback: first membership
+  // Normal (refresh / ongoing use): keep last-used on this device
+  const stored = userId ? readStoredActiveSpace(userId) : null;
+  if (has(stored)) return stored;
+
+  // Cross-device preferences (nice fallback)
+  if (has(prof?.last_space_id)) return prof.last_space_id;
+  if (has(prof?.default_space_id)) return prof.default_space_id;
+
+  // DB default, otherwise first membership
+  if (has(dbDefault)) return dbDefault;
   const first = rows?.[0]?.space_id;
   if (!first) throw new Error("No space assigned to user");
   return first;
