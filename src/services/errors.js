@@ -40,6 +40,24 @@ export function installGlobalErrorHandler() {
   });
 }
 
+const ERR_KEY = "tinkeroneo_errors_v1";
+
+export function reportError(err, meta = {}) {
+  try {
+    const list = JSON.parse(localStorage.getItem(ERR_KEY) || "[]");
+    list.unshift({
+      ts: Date.now(),
+      message: String(err?.message || err),
+      stack: err?.stack || null,
+      ...meta,
+    });
+    localStorage.setItem(ERR_KEY, JSON.stringify(list.slice(0, 50)));
+  } catch {
+    // niemals weiterwerfen
+  }
+}
+
+
 function showError(err) {
   remember(err);
 

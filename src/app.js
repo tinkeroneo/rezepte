@@ -8,6 +8,7 @@ const DEBUG = (() => {
 })();
 // src/app.js
 
+import { reportError, showError } from "../services/errors.js";
 import {
   listRecipes,
   upsertRecipe,
@@ -343,7 +344,9 @@ function isAdminEnabled() {
   return byParam || byFlag;
 }
 function setAdminEnabled(v) {
-  try { localStorage.setItem(ADMIN_FLAG_KEY, v ? "1" : "0"); } catch { /* ignore */ }
+  try { localStorage.setItem(ADMIN_FLAG_KEY, v ? "1" : "0"); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
 }
 
 function installAdminCorner() {
@@ -458,54 +461,29 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
   if (saveProfileBtn && !saveProfileBtn.__installed) {
     saveProfileBtn.__installed = true;
     saveProfileBtn.addEventListener("click", async () => {
-      if (!(useBackend && isAuthenticated?.())) return;
+      if (!(useBackend && isAuthenticated?.())) { alert("Nicht eingeloggt oder Backend aus (useBackend=false)."); return; }
+
       const dn = document.getElementById("profileDisplayName");
       const display_name = String(dn?.value || "").trim();
       try {
         const p = await upsertProfile({ display_name });
         __profileCache = p;
         updateHeaderBadges();
-      } catch (e) {
-        alert(`Profil speichern fehlgeschlagen: ${String(e?.message || e)}`);
+      } catch (err) {
+          reportError(err, { scope: "app.js", action: "Save Profile" });
+          showError("Profil speichern fehlgeschlagen");
+        alert(`Profil speichern fehlgeschlagen: ${String(err?.message || err)}`);
       }
     });
   }
-
-  const setDefaultBtn = document.getElementById("setDefaultSpaceBtn");
-  if (setDefaultBtn && !setDefaultBtn.__installed) {
-    setDefaultBtn.__installed = true;
-    setDefaultBtn.addEventListener("click", async () => {
-      if (!(useBackend && isAuthenticated?.())) return;
-      const ctx = getAuthContext?.();
-      const sid = String(ctx?.spaceId || "").trim();
-      if (!sid) return;
-      const p = await ensureProfileLoaded();
-      const wasDef = !!(p?.default_space_id && String(p.default_space_id) === sid);
-
-      // optimistic UI
-      setDefaultBtn.classList.toggle("is-fav", !wasDef);
-      setDefaultBtn.setAttribute("aria-pressed", String(!wasDef));
-
-      try {
-        const nextProfile = await upsertProfile({
-          default_space_id: wasDef ? null : sid
-        });
-        __profileCache = nextProfile;
-      } catch (e) {
-        // revert UI on error
-        setDefaultBtn.classList.toggle("is-fav", wasDef);
-        setDefaultBtn.setAttribute("aria-pressed", String(wasDef));
-        alert(`Default-Space Änderung fehlgeschlagen: ${String(e?.message || e)}`);
-      }
-
-    });
-  }
+  
 
   const saveSpaceNameBtn = document.getElementById("saveSpaceNameBtn");
   if (saveSpaceNameBtn && !saveSpaceNameBtn.__installed) {
     saveSpaceNameBtn.__installed = true;
     saveSpaceNameBtn.addEventListener("click", async () => {
-      if (!(useBackend && isAuthenticated?.())) return;
+      if (!(useBackend && isAuthenticated?.())) { alert("Nicht eingeloggt oder Backend aus (useBackend=false)."); return; }
+
       const ctx = getAuthContext?.();
       const sid = String(ctx?.spaceId || "").trim();
       const inp = document.getElementById("spaceNameInput");
@@ -515,8 +493,10 @@ function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
         await updateSpaceName({ spaceId: sid, name });
         await refreshSpaceSelect();
         alert("Space-Name gespeichert ✅");
-      } catch (e) {
-        alert(`Space-Name speichern fehlgeschlagen: ${String(e?.message || e)}`);
+      } catch (err) {
+        reportError(err, { scope: "app.js", action: "Save Space Name" });
+        showError("space Name speichern fehlgeschlagen");
+        alert(`Space-Name speichern fehlgeschlagen: ${String(err?.message || err)}`);
       }
     });
   }
@@ -644,7 +624,9 @@ function wireAccountControls() {
       const authed = isAuthenticated?.();
 
       if (authed) {
-        try { sbLogout(); } catch { /* ignore */ }
+        try { sbLogout(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
         updateHeaderBadges();
         router?.setView?.({ name: "login" });
         return;
@@ -678,7 +660,34 @@ function wireAccountControls() {
 
         router?.setView?.({ name: "list", selectedId: null, q: "" });
       } catch (e) {
+        reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
         alert(String(e?.message || e));
+      }
+    });
+  }
+
+
+  // DEFAULT SPACE SELECT (Profile)
+  const defSel = document.getElementById("defaultSpaceSelect");
+  if (defSel && !defSel.__installed) {
+    defSel.__installed = true;
+    defSel.addEventListener("change", async () => {
+      if (!(useBackend && isAuthenticated?.())) return;
+
+      const sid = String(defSel.value || "").trim();
+      const nextDefault = sid ? sid : null;
+
+      try {
+        updateHeaderBadges({ syncing: true });
+        const p = await upsertProfile({ default_space_id: nextDefault });
+        __profileCache = p;
+        updateHeaderBadges({ syncing: false });
+      } catch (e) {
+        reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+        updateHeaderBadges({ syncing: false });
+        alert(`Default-Space speichern fehlgeschlagen: ${String(e?.message || e)}`);
       }
     });
   }
@@ -776,9 +785,13 @@ async function render(view, setView) {
               <div class="muted" style="margin-top:.35rem;">Einen Moment</div>
             </div>
           </div>`;
-        } catch { /* ignore */ }
+        } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
 
-        try { await refreshSpaceSelect(); } catch { /* ignore */ }
+        try { await refreshSpaceSelect(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
         __permBootstrapInFlight = false;
 
         // Recompute and only re-render if we actually got something new.
@@ -833,15 +846,39 @@ async function render(view, setView) {
         try { await acceptInvite(inviteId); } catch (e) { alert(String(e?.message || e)); }
         try {
           const ctx = await initAuthAndSpace();
-          try { await ensureProfileLoaded(); } catch { /* ignore */ }
+          try { await ensureProfileLoaded(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      // Apply default space (profile.default_space_id) on login/session init
+      try {
+        const p = __profileCache;
+        const defSid = String(p?.default_space_id || "").trim();
+        if (defSid && String(ctx?.spaceId || "") !== defSid) {
+          setActiveSpaceId(defSid);
+          // keep offline queue scoped to new active space
+          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
+          // refresh ctx reference if callers use it later
+          try { ctx.spaceId = defSid; } catch (e) { 
+        reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+           }
+        }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+
           try {
             if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
               try {
                 await listRecipes();
                 await upsertProfile({ last_space_id: ctx.spaceId });
-              } catch { /* ignore */ }
+              } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
             }
-          } catch { /* ignore */ }
+          } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
           window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
         } catch {
           window.__tinkeroneoPendingInvites = [];
@@ -854,18 +891,44 @@ async function render(view, setView) {
         render({ name: "invites" }, setView);
       },
       onDecline: async (inviteId) => {
-        try { await declineInvite(inviteId); } catch (e) { alert(String(e?.message || e)); }
+        try { await declineInvite(inviteId); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+        alert(String(e?.message || e)); }
         try {
           const ctx = await initAuthAndSpace();
-          try { await ensureProfileLoaded(); } catch { /* ignore */ }
+          try { await ensureProfileLoaded(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      // Apply default space (profile.default_space_id) on login/session init
+      try {
+        const p = __profileCache;
+        const defSid = String(p?.default_space_id || "").trim();
+        if (defSid && String(ctx?.spaceId || "") !== defSid) {
+          setActiveSpaceId(defSid);
+          // keep offline queue scoped to new active space
+          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
+          // refresh ctx reference if callers use it later
+          try { ctx.spaceId = defSid; } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+        }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+
           try {
             if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
               try {
                 await listRecipes();
                 await upsertProfile({ last_space_id: ctx.spaceId });
-              } catch { /* ignore */ }
+              } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
             }
-          } catch { /* ignore */ }
+          } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
           window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
         } catch {
           window.__tinkeroneoPendingInvites = [];
@@ -897,6 +960,8 @@ async function render(view, setView) {
       localStorage.removeItem(k);
       results.push({ name: "LocalStorage read/write", ok: v === "1" });
     } catch (e) {
+              reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
       results.push({ name: "LocalStorage read/write", ok: false, detail: String(e?.message || e) });
     }
 
@@ -905,6 +970,8 @@ async function render(view, setView) {
         await listRecipes();
         results.push({ name: "Backend erreichbar (listRecipes)", ok: true });
       } catch (e) {
+                reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
         results.push({ name: "Backend erreichbar (listRecipes)", ok: false, detail: String(e?.message || e) });
       }
     } else {
@@ -984,13 +1051,19 @@ async function render(view, setView) {
               setActiveSpaceId(sid);
               const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
               setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
-              try { await refreshSpaceSelect(); } catch { /* ignore */ }
+              try { await refreshSpaceSelect(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
               // keep profile hint in sync (best-effort)
               try {
                 await listRecipes();
                 await upsertProfile({ last_space_id: sid });
-              } catch { /* ignore */ }
+              } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
             } catch (e) {
+                      reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
               alert(String(e?.message || e));
               return;
             }
@@ -1074,7 +1147,9 @@ async function render(view, setView) {
         try {
           await listRecipes();
           await upsertProfile({ last_space_id: sid });
-        } catch { /* ignore */ }
+        } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
       },
       upsertRecipe: async (rec) => {
         const key = `upsert:${rec.id || "new"}`;
@@ -1124,7 +1199,9 @@ async function boot() {
   if (useBackend && typeof location !== 'undefined') {
     const h = String(location.hash || '');
     if (h.includes('access_token=') && h.includes('refresh_token=')) {
-      try { await initAuthAndSpace(); } catch { /* ignore */ }
+      try { await initAuthAndSpace(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
     }
   }
 
@@ -1135,7 +1212,10 @@ async function boot() {
     },
     onViewChange: (view) => {
       if (viewCleanup) {
-        try { viewCleanup(); } catch (e) { console.warn("viewCleanup failed", e); }
+        try { viewCleanup(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+        console.warn("viewCleanup failed", e); }
         viewCleanup = null;
       }
       dirtyGuard = null;
@@ -1152,7 +1232,9 @@ async function boot() {
         } else {
           document.documentElement.style.removeProperty("--cookbar-h");
         }
-      } catch { /* ignore */ }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
     },
   });
 
@@ -1192,15 +1274,38 @@ async function boot() {
         if (Array.isArray(cached) && cached.length) mySpaces = cached;
       }
 
-      try { await ensureProfileLoaded(); } catch { /* ignore */ }
+      try { await ensureProfileLoaded(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      // Apply default space (profile.default_space_id) on login/session init
+      try {
+        const p = __profileCache;
+        const defSid = String(p?.default_space_id || "").trim();
+        if (defSid && String(ctx?.spaceId || "") !== defSid) {
+          setActiveSpaceId(defSid);
+          // keep offline queue scoped to new active space
+          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
+          // refresh ctx reference if callers use it later
+          try { ctx.spaceId = defSid; } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+        }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+
       try {
         if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
           try {
             await listRecipes();
             await upsertProfile({ last_space_id: ctx.spaceId });
-          } catch { /* ignore */ }
+          } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
         }
-      } catch { /* ignore */ }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
       if (ctx?.user?.id || ctx?.spaceId) {
         setOfflineQueueScope({ userId: ctx.user?.id || null, spaceId: ctx.spaceId || null });
       }
@@ -1210,17 +1315,23 @@ async function boot() {
       } else if (!ctx?.spaceId && !isAuthenticated?.()) {
         router.setView({ name: "login" });
       } else if (!ctx?.spaceId && isAuthenticated?.()) {
-        try { await setUseBackend(false); } catch { /* ignore */ }
+        try { await setUseBackend(false); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
       }
 
       await refreshSpaceSelect();
     } catch (e) {
+              reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
       console.error("Auth/Space init failed:", e);
       try {
         if (!navigator.onLine) {
           await setUseBackend(false);
         }
-      } catch { /* ignore */ }
+      } catch (err) { 
+                  reportError(err, { scope: "app.js", action: String(err?.message) });
+        showError(String(err?.message)); }
       if (!isAuthenticated?.()) {
         router.setView({ name: "login" });
       }
@@ -1278,6 +1389,32 @@ async function ensureProfileLoaded() {
   }
 }
 
+async function refreshDefaultSpaceSelect() {
+  const sel = document.getElementById("defaultSpaceSelect");
+  if (!sel) return;
+
+  const authed = useBackend && isAuthenticated?.();
+  if (!authed) {
+    sel.innerHTML = "";
+    sel.disabled = true;
+    return;
+  }
+
+  const p = await ensureProfileLoaded();
+  const spaces = mySpaces || [];
+
+  sel.innerHTML = `
+    <option value="">— kein Default —</option>
+    ${spaces.map(s =>
+      `<option value="${s.space_id}">${s.name}</option>`
+    ).join("")}
+  `;
+
+  sel.value = p?.default_space_id || "";
+  sel.disabled = false;
+}
+
+
 async function refreshProfileUi() {
   const authed = useBackend && isAuthenticated?.();
   const dn = document.getElementById("profileDisplayName");
@@ -1285,23 +1422,17 @@ async function refreshProfileUi() {
   if (!authed) {
     if (dn) dn.value = "";
     if (spaceName) spaceName.value = "";
+    await refreshDefaultSpaceSelect();
     return;
   }
+
   const p = await ensureProfileLoaded();
   if (dn) dn.value = String(p?.display_name || "");
 
-  const defBtn = document.getElementById("setDefaultSpaceBtn");
-  const active = getAuthContext?.()?.spaceId;
-  const isDef = !!(active && p?.default_space_id && String(active) === String(p.default_space_id));
-  if (defBtn) {
-    defBtn.classList.toggle("is-fav", isDef);
-defBtn.setAttribute("aria-pressed", String(isDef));
-defBtn.title = isDef ? "Default-Space entfernen" : "Als Default-Space setzen";
-
-  }
+  await refreshDefaultSpaceSelect();
 
   const activeSpaceId = getAuthContext?.()?.spaceId;
-  const current = (mySpaces || []).find(s => String(s?.space_id || "") === String(activeSpaceId || ""));
+  const current = (mySpaces || []).find((s) => String(s?.space_id || "") === String(activeSpaceId || ""));
   if (spaceName) spaceName.value = String(current?.name || "");
 }
 

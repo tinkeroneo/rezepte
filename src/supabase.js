@@ -667,11 +667,32 @@ function sbHeaders() {
    FETCH HELPERS
 ========================= */
 
-async function sbFetch(url, { timeoutMs = DEFAULT_TIMEOUT_MS, ...opts } = {}) {
+
+async function sbFetch(
+  url,
+  { timeoutMs = DEFAULT_TIMEOUT_MS, signal: externalSignal, ...opts } = {}
+) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+  // Wenn ein externes Signal existiert → mitziehen
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      ctrl.abort();
+    } else {
+      externalSignal.addEventListener(
+        "abort",
+        () => ctrl.abort(),
+        { once: true }
+      );
+    }
+  }
+
   try {
-    return await fetch(url, { ...opts, signal: ctrl.signal });
+    return await fetch(url, {
+      ...opts,
+      signal: ctrl.signal,
+    });
   } catch (e) {
     if (e?.name === "AbortError") {
       throw new Error("Timeout: Backend antwortet nicht rechtzeitig.");
@@ -681,6 +702,7 @@ async function sbFetch(url, { timeoutMs = DEFAULT_TIMEOUT_MS, ...opts } = {}) {
     clearTimeout(t);
   }
 }
+
 
 async function sbJson(res) {
   const text = await res.text();

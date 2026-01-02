@@ -21,18 +21,22 @@ export function renderAccountView({ appEl }) {
       <div class="card">
         <div class="card-title">Space</div>
         <div class="select-wrapper" style="margin-bottom:.5rem;">
-          <span class="icon">🔀</span>
+          <span class="icon">🔀 Wechseln</span>
           <select id="spaceSelect" class="badge badge-select" title="Space wählen"></select>
-                      <button
-  id="setDefaultSpaceBtn"
-  class="fav-overlay"
-  type="button"
-  title="Als Default-Space setzen/entfernen"
-  aria-label="Default-Space umschalten"
-  aria-pressed="false"
-  style="position:static; inset:auto; margin-left:.25rem;"
->★</button>
         </div>
+
+        <div class="muted" style="font-weight:900; margin-bottom:.35rem;"></div>
+        <div class="select-wrapper" style="margin-bottom:.35rem;">
+          <span class="icon">⭐ Standard:</span>
+          <select id="defaultSpaceSelect" class="badge badge-select" title="Default-Space (beim Login)"></select>
+        </div>        
+
+        <div class="muted" style="font-weight:900; margin-bottom:.35rem;"></div>
+        <div class="select-wrapper" style="margin-bottom:.35rem;">
+          <span class="icon">✏️ (Um)benennen</span>
+          <input id="spaceNameInput" class="badge badge-select" type="text" placeholder="Space-Name" />
+          <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">💾</button>
+        </div>  
 
         <div style="margin-top:.5rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.75rem;">
           <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Profil</div>
@@ -45,14 +49,7 @@ export function renderAccountView({ appEl }) {
           </div>
         </div>
 
-        <div style="margin-top:.75rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.75rem;">
-          <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Space-Name</div>
-          <div class="select-wrapper" style="margin-bottom:.35rem;">
-            <span class="icon">✏️</span>
-            <input id="spaceNameInput" class="badge badge-select" type="text" placeholder="Space-Name" />
-            <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">💾</button>
-          </div>
-        </div>
+
 
         <div style="margin-top:.75rem;">
           <span id="syncBadge" class="badge" title="Sync-Status" hidden>⟳ Sync-Status</span>

@@ -32,3 +32,4 @@ apply.ps1
 default_space_star.patch
 dev.ps1
 repo_agent.py
+commit.ps1

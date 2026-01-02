@@ -1,6 +1,6 @@
 // src/ui/importSheet.js
 import { qs } from "../utils.js";
-
+import { reportError, showError } from "../services/errors.js";
 function esc(s) {
   return String(s)
     .replaceAll("&", "&amp;")
@@ -44,14 +44,14 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
       <div style="font-weight:800;">Ziel-Space</div>
       <select id="impSpace">
         ${spaces.map(s => {
-          const sid = String(s?.space_id || s?.id || "").trim();
-          if (!sid) return "";
-          const name = String(s?.name || sid);
-          const role = String(s?.role || "viewer");
-          const label = `${name} (${role})`;
-          const sel = sid === String(activeSpaceId || "") ? "selected" : "";
-          return `<option value="${esc(sid)}" ${sel}>${esc(label)}</option>`;
-        }).join("")}
+    const sid = String(s?.space_id || s?.id || "").trim();
+    if (!sid) return "";
+    const name = String(s?.name || sid);
+    const role = String(s?.role || "viewer");
+    const label = `${name} (${role})`;
+    const sel = sid === String(activeSpaceId || "") ? "selected" : "";
+    return `<option value="${esc(sid)}" ${sel}>${esc(label)}</option>`;
+  }).join("")}
       </select>
       <div class="muted" style="margin-top:.35rem;">Importiert Rezepte in den ausgewählten Space.</div>
     </div>
@@ -109,6 +109,9 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
       if (obj && typeof obj === "object" && (obj.id || obj.title || obj.ingredients || obj.steps)) return { items: [obj], error: "" };
       return { items: [], error: "JSON erkannt, aber kein Recipe-Format." };
     } catch (e) {
+      reportError(e, { scope: "importSheet", action: "parse" });
+      showError("Import fehlgeschlagen");
+
       return { items: [], error: "Kein gültiges JSON." };
     }
   };
@@ -149,6 +152,8 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
       location.reload();
     } catch (e) {
       console.error(e);
+      reportError(e, { scope: "importSheet", action: "parse" });
+      showError("Import fehlgeschlagen");
       alert("Import fehlgeschlagen");
       doBtn.disabled = false;
       doBtn.textContent = "Import starten";
