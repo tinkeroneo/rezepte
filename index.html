@@ -16,33 +16,30 @@
 
   <body>
     <header class="app-header">
-      <div class="header-badges">
-        <button id="backBtn" class="badge badge-btn" type="button" title="Zurück" hidden>
-          ←
-        </button>
+      <div class="header-grid">
+        <div class="header-row header-row--top">
+          <button id="backBtn" class="badge badge-btn" type="button" title="Zurück" hidden>←</button>
 
-        <button id="vegan101HeaderBtn" class="badge badge-btn badge--gold" type="button" title="Vegan 101">
-          🌱
-        </button>
+          <button id="vegan101HeaderBtn" class="badge badge-btn badge--gold" type="button" title="Vegan 101">🌱</button>
 
-        <span id="dirtyDot" class="badge badge-btn" title="Ungespeichert" hidden>●</span>
-        <button id="modeBadge" class="badge badge-btn" type="button" title="Speicher-Modus">—</button>
+          <span id="dirtyDot" class="badge badge-btn" title="Ungespeichert" hidden>●</span>
+          <button id="modeBadge" class="badge badge-btn" type="button" title="Speicher-Modus">—</button>
+        </div>
 
-        <button id="radioHeaderBtn" class="badge badge-btn" type="button" title="Radio" hidden>
-          🎧
-        </button>
-        <button id="shopBadge" class="badge badge-btn" type="button" title="Einkaufsliste">🧺</button>
+        <div class="header-row header-row--bottom">
+          <div class="header-space">
+            <span class="header-space__icon" aria-hidden="true">🔀</span>
+            <select id="headerSpaceSelect" class="badge badge-select badge--space" title="Space wählen"></select>
+          </div>
 
-        <!-- neu: nur noch 1 Einstieg -->
-        <button
-          id="accountBtn"
-          class="badge badge-btn badge--warn"
-          type="button"
-          title="Account / Einstellungen"
-          hidden
-        >
-          👤
-        </button>
+          <div class="header-actions">
+            <button id="radioHeaderBtn" class="badge badge-btn" type="button" title="Radio" hidden>🎧</button>
+            <button id="shopBadge" class="badge badge-btn" type="button" title="Einkaufsliste">🧺</button>
+
+            <!-- neu: nur noch 1 Einstieg -->
+            <button id="accountBtn" class="badge badge-btn badge--warn" type="button" title="Account / Einstellungen" hidden>👤</button>
+          </div>
+        </div>
       </div>
     </header>
 
@@ -63,7 +60,7 @@
       </div>
     </div>
 
-    <script type="module" src="./src/app.js"></script>
+  <script type="module" src="./src/entry.js"></script>
 
     <script>
       // Service Worker: App-Shell Cache + Update-Toast (priorisiert, kein Reload während aktiver Timer)

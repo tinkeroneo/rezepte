@@ -96,11 +96,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
 
 
         <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
-        <details class="image-toggle"> 
-        <summary>Bild anzeigen 
-          <button class="btn btn--ghost" id="resetBtn">Reset Steps</button> 
-        </summary>
-
+<details class="image-toggle"> <summary>Bild anzeigen</summary>
         ${r.image_url ? `
           <div style="margin:.75rem 0;">
           
@@ -110,7 +106,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
         ` : ""}</details>
 
         <hr />
-        <h3>Schritte          </h3>
+        <h3>Schritte</h3>
         <div>
           ${cookSections.map(sec => `
             <div style="margin-top:.75rem;">
@@ -156,7 +152,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
         <div class="cookbar-row">
           <button class="btn btn--solid" id="ingredientsBtn">Zutaten</button>
           <div id="timerRoot" class="timerroot-dock"></div>
-
+          <button class="btn btn--ghost" id="resetBtn">Reset Steps</button>
         </div>
       </div>
 

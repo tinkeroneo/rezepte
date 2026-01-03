@@ -92,10 +92,19 @@ import {
 
 import { applyThemeAndOverlay } from "./ui/theme.js";
 import { installHeaderWiring } from "./ui/header.js";
+import { wireHeaderSpaceSelect } from "./ui/headerSpaceSelect.js";
 import { createDirtyIndicator } from "./ui/dirty.js";
 import { wireAccountControls } from "./ui/accountControls.js";
+import { createHeaderBadgesUpdater } from "./ui/headerBadges.js";
 import { installAdminCorner } from "./adminCorner.js";
-import { readSpacesCache, writeSpacesCache } from "./app/spaces/readSpacesCache.js";
+import { refreshSpaceSelect, getActiveSpaceRole } from "./spaces/spaces.js";
+import {
+  ensureProfileLoaded,
+  refreshProfileUi,
+  getProfileCache,
+  setProfileCache,
+} from "./profile/profile.js";
+
 /* =========================
    CONFIG / STATE
 ========================= */
@@ -103,7 +112,6 @@ import { readSpacesCache, writeSpacesCache } from "./app/spaces/readSpacesCache.
 let useBackend = readUseBackend();
 appState.useBackend = useBackend;
 let recipeRepo = null;
-let mySpaces = appState.mySpaces;
 
 let __permBootstrapInFlight = false;
 let __permBootstrapAttempts = 0;
@@ -217,182 +225,12 @@ window.__tinkeroneoSettings = {
 
 const appEl = document.getElementById("app");
 
-function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
-  const mode = document.getElementById("modeBadge");
-  if (mode) {
-    mode.textContent = useBackend ? "☁️" : "🖥️";
-    mode.classList.toggle("badge--ok", useBackend);
-    mode.classList.toggle("badge--warn", !useBackend);
-    mode.title = useBackend
-      ? "☁️CLOUD: Sync + Teilen im Space (Supabase). Klick = auf LOCAL (nur dieses Gerät)."
-      : "🖥️LOCAL: nur auf diesem Gerät (offline). Klick = auf CLOUD (Sync + Teilen).";
-  }
-
-  const authBtn = document.getElementById("authBadge");
-  if (authBtn) {
-    const authed = isAuthenticated?.();
-    authBtn.textContent = authed ? "🔐 LOGOUT" : "🔐 LOGIN";
-    authBtn.classList.toggle("badge--ok", authed);
-    authBtn.classList.toggle("badge--warn", !authed);
-    authBtn.title = authed ? "Abmelden" : (useBackend ? "Anmelden per Magic Link" : "Für Login/Sharing: erst auf CLOUD umschalten");
-  }
-
-  const sync = document.getElementById("syncBadge");
-  if (sync) {
-    const pending = (getOfflineQueue?.() || []).length;
-    const showPending = navigator.onLine && !syncing && !syncError && pending > 0;
-
-    sync.hidden = !syncing && !syncError && navigator.onLine && pending === 0;
-
-    if (!navigator.onLine) {
-      sync.textContent = "OFFLINE";
-      sync.classList.add("badge--warn");
-      sync.classList.remove("badge--ok", "badge--bad");
-    } else if (syncError) {
-      sync.textContent = "SYNC";
-      sync.classList.add("badge--bad");
-      sync.classList.remove("badge--ok", "badge--warn");
-    } else if (showPending) {
-      sync.textContent = `PENDING ${pending}`;
-      sync.classList.add("badge--warn");
-      sync.classList.remove("badge--ok", "badge--bad");
-    } else {
-      sync.textContent = "⟳";
-      sync.classList.add("badge--ok");
-      sync.classList.remove("badge--warn", "badge--bad");
-    }
-
-    if (!navigator.onLine) sync.title = "Offline: Änderungen bleiben lokal und werden später synchronisiert";
-    else if (syncError) sync.title = "Sync-Fehler: bitte später nochmal";
-    else if (showPending) sync.title = `${pending} Änderung(en) warten auf Sync`;
-    else sync.title = "Sync ok";
-  }
-
-  // Profile buttons live in Account view -> wire here too (safe no-op if not present)
-  const saveProfileBtn = document.getElementById("saveProfileBtn");
-  if (saveProfileBtn && !saveProfileBtn.__installed) {
-    saveProfileBtn.__installed = true;
-    saveProfileBtn.addEventListener("click", async () => {
-      if (!(useBackend && isAuthenticated?.())) { alert("Nicht eingeloggt oder Backend aus (useBackend=false)."); return; }
-
-      const dn = document.getElementById("profileDisplayName");
-      const display_name = String(dn?.value || "").trim();
-      try {
-        const p = await upsertProfile({ display_name });
-        __profileCache = p;
-        updateHeaderBadges();
-      } catch (err) {
-          reportError(err, { scope: "app.js", action: "Save Profile" });
-          showError("Profil speichern fehlgeschlagen");
-        alert(`Profil speichern fehlgeschlagen: ${String(err?.message || err)}`);
-      }
-    });
-  }
-  
-
-  const saveSpaceNameBtn = document.getElementById("saveSpaceNameBtn");
-  if (saveSpaceNameBtn && !saveSpaceNameBtn.__installed) {
-    saveSpaceNameBtn.__installed = true;
-    saveSpaceNameBtn.addEventListener("click", async () => {
-      if (!(useBackend && isAuthenticated?.())) { alert("Nicht eingeloggt oder Backend aus (useBackend=false)."); return; }
-
-      const ctx = getAuthContext?.();
-      const sid = String(ctx?.spaceId || "").trim();
-      const inp = document.getElementById("spaceNameInput");
-      const name = String(inp?.value || "").trim();
-      if (!sid) return;
-      try {
-        await updateSpaceName({ spaceId: sid, name });
-        await refreshSpaceSelect();
-        alert("Space-Name gespeichert ✅");
-      } catch (err) {
-        reportError(err, { scope: "app.js", action: "Save Space Name" });
-        showError("space Name speichern fehlgeschlagen");
-        alert(`Space-Name speichern fehlgeschlagen: ${String(err?.message || err)}`);
-      }
-    });
-  }
-
-  const spaceSel = document.getElementById("spaceSelect");
-  if (spaceSel) {
-    const authed = isAuthenticated?.();
-    spaceSel.hidden = !authed || !Array.isArray(mySpaces) || mySpaces.length === 0;
-  }
-}
-
-async function refreshSpaceSelect() {
-  const sel = document.getElementById("spaceSelect");
-  if (!sel) return;
-
-  if (!(useBackend && isAuthenticated?.())) {
-    mySpaces = [];
-    sel.innerHTML = "";
-    sel.hidden = true;
-    return;
-  }
-
-  let nextSpaces = null;
-  try {
-    nextSpaces = await listMySpaces();
-  } catch {
-    // keep previous mySpaces on transient errors to avoid permission flicker
-    nextSpaces = null;
-  }
-  if (Array.isArray(nextSpaces)) {
-    mySpaces = nextSpaces;
-    const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
-    writeSpacesCache(ctx?.user?.id, mySpaces);
-  } else {
-    // On refresh, mySpaces may still be empty. Try cached spaces for stable permissions/UI.
-    if (!Array.isArray(mySpaces) || mySpaces.length === 0) {
-      const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
-      const cached = readSpacesCache(ctx?.user?.id);
-      if (Array.isArray(cached) && cached.length) mySpaces = cached;
-    }
-  }
-
-  const ctx = (() => {
-    try { return getAuthContext(); } catch { return null; }
-  })();
-  const active = String(ctx?.spaceId || "");
-
-  if (!Array.isArray(mySpaces) || mySpaces.length === 0) {
-    sel.innerHTML = "";
-    sel.hidden = true;
-    return;
-  }
-
-  if (mySpaces.length === 1) {
-    const s = mySpaces[0];
-    const sid = String(s?.space_id || "");
-    const name = String(s?.name || sid);
-    const role = String(s?.role || "viewer");
-    const esc = (x) => String(x)
-      .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-    sel.innerHTML = `<option value="${esc(sid)}" selected>${esc(`${name} (${role})`)}</option>`;
-    sel.disabled = true;
-    sel.hidden = false;
-    return;
-  }
-
-  sel.disabled = false;
-
-  sel.innerHTML = mySpaces
-    .map(s => {
-      const sid = String(s?.space_id || "");
-      const name = String(s?.name || sid);
-      const role = String(s?.role || "viewer");
-      const label = `${name} (${role})`;
-      const esc = (x) => String(x)
-        .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-      return `<option value="${esc(sid)}" ${sid === active ? "selected" : ""}>${esc(label)}</option>`;
-    })
-    .join("");
-
-  sel.hidden = false;
-}
+const updateHeaderBadges = createHeaderBadgesUpdater({
+  getUseBackend: () => useBackend,
+  isAuthenticated,
+  getOfflineQueue,
+  getMySpaces: () => appState.mySpaces,
+});
 
 /* =========================
    DATA STATE
@@ -441,17 +279,17 @@ async function render(view, setView) {
 
   // "write" is determined by the SPACE of the entity you act on, not by the currently selected space.
   // Active-space write is still useful for list/create defaults:
-  const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId: activeSpaceId });
+  const canWrite = !useBackend || canWriteActiveSpace({ spaces: appState.mySpaces, spaceId: activeSpaceId });
 
   // helper for per-recipe permission (fixes "I must switch space to edit")
-  const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId });
+  const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ spaces: appState.mySpaces, spaceId });
 
   // Permissions bootstrap: after refresh/auth, spaceId/mySpaces can be temporarily missing.
   // Avoid rendering read-only UI during this transient state.
   if (useBackend && isAuthenticated?.()) {
     const ctx = (() => { try { return getAuthContext?.(); } catch { return null; } })();
     const sid = String(ctx?.spaceId || "").trim();
-    const spacesMissing = !Array.isArray(mySpaces) || mySpaces.length === 0;
+    const spacesMissing = !Array.isArray(appState.mySpaces) || appState.mySpaces.length === 0;
 
     // If permissions/space context are still missing right after refresh, bootstrap them once or twice.
     // IMPORTANT: never loop indefinitely — otherwise the app can appear to "hang".
@@ -475,7 +313,7 @@ async function render(view, setView) {
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
 
-        try { await refreshSpaceSelect(); } catch (e) { 
+        try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
         __permBootstrapInFlight = false;
@@ -483,7 +321,7 @@ async function render(view, setView) {
         // Recompute and only re-render if we actually got something new.
         const ctx2 = (() => { try { return getAuthContext?.(); } catch { return null; } })();
         const sid2 = String(ctx2?.spaceId || "").trim();
-        const spacesMissing2 = !Array.isArray(mySpaces) || mySpaces.length === 0;
+        const spacesMissing2 = !Array.isArray(appState.mySpaces) || appState.mySpaces.length === 0;
         if (sid2 && !spacesMissing2) {
           // Await to keep render serialized and avoid recursive storms.
           await runExclusive("render", () => render(view, setView));
@@ -532,12 +370,12 @@ async function render(view, setView) {
         try { await acceptInvite(inviteId); } catch (e) { alert(String(e?.message || e)); }
         try {
           const ctx = await initAuthAndSpace();
-          try { await ensureProfileLoaded(); } catch (e) { 
+          try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
       // Apply default space (profile.default_space_id) on login/session init
       try {
-        const p = __profileCache;
+        const p = getProfileCache?.();
         const defSid = String(p?.default_space_id || "").trim();
         if (defSid && String(ctx?.spaceId || "") !== defSid) {
           setActiveSpaceId(defSid);
@@ -583,12 +421,12 @@ async function render(view, setView) {
         alert(String(e?.message || e)); }
         try {
           const ctx = await initAuthAndSpace();
-          try { await ensureProfileLoaded(); } catch (e) { 
+          try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
       // Apply default space (profile.default_space_id) on login/session init
       try {
-        const p = __profileCache;
+        const p = getProfileCache?.();
         const defSid = String(p?.default_space_id || "").trim();
         if (defSid && String(ctx?.spaceId || "") !== defSid) {
           setActiveSpaceId(defSid);
@@ -710,8 +548,8 @@ async function render(view, setView) {
 
   if (view.name === "account") {
     renderAccountView({ appEl, state: view, setView });
-    await refreshSpaceSelect();
-    await refreshProfileUi();
+    await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated });
+    await refreshProfileUi({ getAuthContext, getProfile, upsertProfile, isAuthenticated });
     wireAccountControls({
       readTheme,
       setTheme,
@@ -730,10 +568,15 @@ async function render(view, setView) {
       reportError,
       showError,
       upsertProfile,
-      getProfileCache: () => __profileCache,
-      setProfileCache: (p) => { __profileCache = p; },
+      getProfileCache,
+      setProfileCache,
+
+      refreshSpaceSelect: () => refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }),
+      refreshProfileUi: () => refreshProfileUi({ getAuthContext, getProfile, upsertProfile, isAuthenticated }),
+      updateSpaceName,
       installAdminCorner,
     });
+
     return;
   }
 
@@ -747,7 +590,7 @@ async function render(view, setView) {
       setView,
       useBackend,
       canWrite,
-      mySpaces,
+      mySpaces: appState.mySpaces,
       activeSpaceId,
       onImportRecipes: async ({ items, mode, targetSpaceId }) =>
         runExclusive("importRecipes", async () => {
@@ -758,7 +601,7 @@ async function render(view, setView) {
               setActiveSpaceId(sid);
               const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
               setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
-              try { await refreshSpaceSelect(); } catch (e) { 
+              try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
               // keep profile hint in sync (best-effort)
@@ -803,7 +646,7 @@ async function render(view, setView) {
       setView,
       useBackend,
       canWrite: detailCanWrite,
-      mySpaces,
+      mySpaces: appState.mySpaces,
       copyRecipeToSpace,
       refreshAll: async () => runExclusive("loadAll", () => loadAll()),
       sbDelete: async (id) => {
@@ -845,11 +688,11 @@ async function render(view, setView) {
       setDirtyGuard,
       setDirtyIndicator,
       setViewCleanup,
-      mySpaces,
+      mySpaces: appState.mySpaces,
       moveRecipeToSpace,
       upsertProfile,
       listRecipes,
-      refreshSpaceSelect,
+      refreshSpaceSelect: () => refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }),
       upsertSpaceLast: async (sid) => {
         try {
           await listRecipes();
@@ -961,6 +804,18 @@ async function boot() {
   // Share router for modules (header/back, etc.)
   appState.router = router;
 
+  // Header: Space selector (always visible)
+  wireHeaderSpaceSelect({
+    router,
+    setActiveSpaceId,
+    getAuthContext,
+    setOfflineQueueScope,
+    updateHeaderBadges,
+    runExclusive,
+    loadAll,
+    reportError,
+  });
+
   // Header controls
   const modeBtn = document.getElementById("modeBadge");
   if (modeBtn && !modeBtn.__installed) {
@@ -990,19 +845,18 @@ async function boot() {
     try {
       const ctx = await initAuthAndSpace();
 
-      // Preload cached spaces for this user to stabilize permissions/UI immediately after refresh.
-      // refreshSpaceSelect() will overwrite this if the network call succeeds.
-      if ((!Array.isArray(mySpaces) || mySpaces.length === 0) && ctx?.user?.id) {
-        const cached = readSpacesCache(ctx.user.id);
-        if (Array.isArray(cached) && cached.length) mySpaces = cached;
+      // Load spaces (network, with local cache fallback) before any permission-dependent UI.
+      try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) {
+        reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
       }
 
-      try { await ensureProfileLoaded(); } catch (e) { 
+      let p = null;
+      try { p = await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
       // Apply default space (profile.default_space_id) on login/session init
       try {
-        const p = __profileCache;
         const defSid = String(p?.default_space_id || "").trim();
         if (defSid && String(ctx?.spaceId || "") !== defSid) {
           setActiveSpaceId(defSid);
@@ -1012,6 +866,12 @@ async function boot() {
           try { ctx.spaceId = defSid; } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
+
+          // refresh spaces/UI after switching space
+          try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) {
+            reportError(e, { scope: "app.js", action: String(e?.message) });
+            showError(String(e?.message));
+          }
         }
       } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
@@ -1043,7 +903,7 @@ async function boot() {
         showError(String(e?.message)); }
       }
 
-      await refreshSpaceSelect();
+      await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated });
     } catch (e) {
               reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message));
@@ -1067,76 +927,6 @@ async function boot() {
 
   await runExclusive("render", () => render(router.getView(), router.setView));
 }
-
-
-let __profileCache = null;
-async function ensureProfileLoaded() {
-  if (!(useBackend && isAuthenticated?.())) return null;
-  try {
-    __profileCache = await getProfile();
-    if (!__profileCache) {
-      __profileCache = await upsertProfile({});
-    }
-    return __profileCache;
-  } catch {
-    return null;
-  }
-}
-
-async function refreshDefaultSpaceSelect() {
-  const sel = document.getElementById("defaultSpaceSelect");
-  if (!sel) return;
-
-  const authed = useBackend && isAuthenticated?.();
-  if (!authed) {
-    sel.innerHTML = "";
-    sel.disabled = true;
-    return;
-  }
-
-  const p = await ensureProfileLoaded();
-  const spaces = mySpaces || [];
-
-  sel.innerHTML = `
-    <option value="">— kein Default —</option>
-    ${spaces.map(s =>
-      `<option value="${s.space_id}">${s.name}</option>`
-    ).join("")}
-  `;
-
-  sel.value = p?.default_space_id || "";
-  sel.disabled = false;
-}
-
-
-async function refreshProfileUi() {
-  const authed = useBackend && isAuthenticated?.();
-  const dn = document.getElementById("profileDisplayName");
-  const spaceName = document.getElementById("spaceNameInput");
-  if (!authed) {
-    if (dn) dn.value = "";
-    if (spaceName) spaceName.value = "";
-    await refreshDefaultSpaceSelect();
-    return;
-  }
-
-  const p = await ensureProfileLoaded();
-  if (dn) dn.value = String(p?.display_name || "");
-
-  await refreshDefaultSpaceSelect();
-
-  const activeSpaceId = getAuthContext?.()?.spaceId;
-  const current = (mySpaces || []).find((s) => String(s?.space_id || "") === String(activeSpaceId || ""));
-  if (spaceName) spaceName.value = String(current?.name || "");
-}
-
-function getActiveSpaceRole({ spaces, spaceId }) {
-  const sid = String(spaceId || "").trim();
-  const spacesList = Array.isArray(spaces) ? spaces : [];
-  const row = spacesList.find(s => String(s?.space_id || "") === sid);
-  return String(row?.role || "").trim() || null;
-}
-
 function canWriteActiveSpace({ spaces, spaceId }) {
   const role = getActiveSpaceRole({ spaces, spaceId });
   return role === "owner" || role === "editor";

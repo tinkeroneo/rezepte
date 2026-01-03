@@ -26,8 +26,11 @@ export function wireAccountControls(ctx) {
     showError,
 
     upsertProfile,
-    getProfileCache,
     setProfileCache,
+
+    refreshSpaceSelect,
+    refreshProfileUi,
+    updateSpaceName,
 
     installAdminCorner,
   } = ctx;
@@ -95,6 +98,10 @@ export function wireAccountControls(ctx) {
       const sid = String(spaceSel.value || "").trim();
       if (!sid) return;
 
+      // keep header select in sync
+      const headerSel = document.getElementById("headerSpaceSelect");
+      if (headerSel && String(headerSel.value || "") !== sid) headerSel.value = sid;
+
       try {
         setActiveSpaceId(sid);
         const ctxAuth = (() => { try { return getAuthContext?.(); } catch { return null; } })();
@@ -133,6 +140,57 @@ export function wireAccountControls(ctx) {
         showError?.(String(e?.message || e));
         updateHeaderBadges?.({ syncing: false });
         alert(`Default-Space speichern fehlgeschlagen: ${String(e?.message || e)}`);
+      }
+    });
+  }
+
+  // SAVE PROFILE (display name)
+  const saveProfileBtn = document.getElementById("saveProfileBtn");
+  if (saveProfileBtn && !saveProfileBtn.__installed) {
+    saveProfileBtn.__installed = true;
+    saveProfileBtn.addEventListener("click", async () => {
+      if (!(getUseBackend() && isAuthenticated?.())) {
+        alert("Nicht eingeloggt oder Backend aus (useBackend=false).");
+        return;
+      }
+      const dn = document.getElementById("profileDisplayName");
+      const display_name = String(dn?.value || "").trim();
+      try {
+        const p = await upsertProfile({ display_name });
+        setProfileCache?.(p);
+        await refreshProfileUi?.();
+        updateHeaderBadges?.();
+      } catch (e) {
+        reportError?.(e, { scope: "accountControls", action: "saveProfile" });
+        showError?.(String(e?.message || e));
+        alert(`Profil speichern fehlgeschlagen: ${String(e?.message || e)}`);
+      }
+    });
+  }
+
+  // SAVE SPACE NAME
+  const saveSpaceNameBtn = document.getElementById("saveSpaceNameBtn");
+  if (saveSpaceNameBtn && !saveSpaceNameBtn.__installed) {
+    saveSpaceNameBtn.__installed = true;
+    saveSpaceNameBtn.addEventListener("click", async () => {
+      if (!(getUseBackend() && isAuthenticated?.())) {
+        alert("Nicht eingeloggt oder Backend aus (useBackend=false).");
+        return;
+      }
+      const ctxAuth = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+      const sid = String(ctxAuth?.spaceId || "").trim();
+      if (!sid) return;
+      const inp = document.getElementById("spaceNameInput");
+      const name = String(inp?.value || "").trim();
+      try {
+        await updateSpaceName?.({ spaceId: sid, name });
+        await refreshSpaceSelect?.();
+        await refreshProfileUi?.();
+        alert("Space-Name gespeichert ✅");
+      } catch (e) {
+        reportError?.(e, { scope: "accountControls", action: "saveSpaceName" });
+        showError?.(String(e?.message || e));
+        alert(`Space-Name speichern fehlgeschlagen: ${String(e?.message || e)}`);
       }
     });
   }

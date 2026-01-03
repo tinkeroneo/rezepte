@@ -21,6 +21,63 @@ header{
   gap: var(--s-2); 
 }
 
+/* Header layout: compact two-line on small screens, single line on wide screens */
+.header-grid{
+  display:grid;
+  grid-template-rows:auto auto;
+  gap: var(--s-2);
+}
+
+.header-row{
+  display:flex;
+  align-items:center;
+  gap: var(--s-2);
+}
+
+.header-row--bottom{
+  justify-content:space-between;
+}
+
+.header-space{
+  display:flex;
+  align-items:center;
+  gap: var(--s-2);
+  min-width: 0;
+}
+
+.header-space__icon{
+  opacity:.9;
+}
+
+.header-actions{
+  display:flex;
+  align-items:center;
+  gap: var(--s-2);
+}
+
+.badge--space{
+  max-width: 14rem;
+  min-width: 8rem;
+}
+
+/* Desktop: back to one row */
+@media (min-width: 900px){
+  .header-grid{
+    grid-template-rows:auto;
+    align-items:center;
+  }
+  .header-row--bottom{
+    justify-content:flex-start;
+  }
+  .header-row--bottom{
+    gap: var(--s-2);
+  }
+  .header-actions{
+    margin-left:auto;
+  }
+}
+
+
 /* Badges / chips */
 /* Pill family: badge / pill / chip (shared base)
    - `.badge` / `.pill` are informational (not clickable)
