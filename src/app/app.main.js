@@ -1,0 +1,1143 @@
+// Enable verbose logs by setting: localStorage.setItem("debug", "1")
+const DEBUG = (() => {
+  try {
+    return localStorage.getItem("debug") === "1";
+  } catch {
+    return false;
+  }
+})();
+// src/app/app.main.js
+
+import { reportError, showError } from "../services/errors.js";
+import {
+  listRecipes,
+  upsertRecipe,
+  deleteRecipe as sbDelete,
+  uploadRecipeImage,
+  listAllRecipeParts,
+  addRecipePart,
+  removeRecipePart,
+  initAuthAndSpace,
+  getAuthContext,
+  inviteToSpace,
+  listPendingInvites,
+  listSpaceMembers,
+  revokeInvite,
+  logout as sbLogout,
+  isAuthenticated,
+  listMySpaces,
+  setActiveSpaceId,
+  acceptInvite,
+  declineInvite,
+  getProfile,
+  upsertProfile,
+  updateSpaceName,
+  moveRecipeToSpace,
+  copyRecipeToSpace
+} from "../supabase.js";
+
+import { initRouter } from "../state.js";
+import { saveRecipesLocal, loadRecipesLocal, toLocalShape } from "../domain/recipes.js";
+import { importRecipesIntoApp } from "../domain/import.js";
+import { createRecipeRepo } from "../domain/recipeRepo.js";
+import { rebuildPartsIndex } from "../domain/parts.js";
+import { addToShopping } from "../domain/shopping.js";
+
+import { renderListView } from "../views/list.view.js";
+import { renderDetailView } from "../views/detail.view.js";
+import { renderCookView } from "../views/cook.view.js";
+import { renderAddView } from "../views/add.view.js";
+import { renderShoppingView } from "../views/shopping.view.js";
+import { renderVegan101View } from "../views/vegan101.view.js";
+import { renderAdminView } from "../views/admin.view.js";
+import { renderSelftestView } from "../views/selftest.view.js";
+import { renderDiagnosticsView } from "../views/diagnostics.view.js";
+import { renderTimersOverlay } from "../views/timers.view.js";
+import { renderLoginView } from "../views/login.view.js";
+import { renderInvitesView } from "../views/invites.view.js";
+import { renderAccountView } from "../views/account.view.js";
+import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds } from "../domain/offlineQueue.js";
+
+import { initRadioDock } from "../ui/radioDock.js";
+import { Wake } from "../services/wakeLock.js";
+import { installGlobalErrorHandler } from "../services/errors.js";
+import { getRecentErrors, clearRecentErrors } from "../services/errors.js";
+import { runExclusive } from "../services/locks.js";
+
+import { appState } from "./appState.js";
+import {
+  readUseBackend,
+  writeUseBackend,
+  readTheme,
+  readWinter,
+  setTheme,
+  setWinter,
+  readRadioFeature,
+  setRadioFeature,
+  readRadioConsent,
+  clearRadioConsent,
+  readTimerRingIntervalMs,
+  setTimerRingIntervalMs,
+  readTimerMaxRingSeconds,
+  setTimerMaxRingSeconds,
+  readTimerStepHighlight,
+  setTimerStepHighlight,
+  readTimerSoundEnabled,
+  setTimerSoundEnabled,
+  readTimerSoundId,
+  setTimerSoundId,
+  readTimerSoundVolume,
+  setTimerSoundVolume
+} from "./localSettings.js";
+
+import { applyThemeAndOverlay } from "./ui/theme.js";
+import { installHeaderWiring } from "./ui/header.js";
+import { createDirtyIndicator } from "./ui/dirty.js";
+import { wireAccountControls } from "./ui/accountControls.js";
+import { installAdminCorner } from "./adminCorner.js";
+import { readSpacesCache, writeSpacesCache } from "./app/spaces/readSpacesCache.js";
+/* =========================
+   CONFIG / STATE
+========================= */
+
+let useBackend = readUseBackend();
+appState.useBackend = useBackend;
+let recipeRepo = null;
+let mySpaces = appState.mySpaces;
+
+let __permBootstrapInFlight = false;
+let __permBootstrapAttempts = 0;
+
+
+function rebuildRecipeRepo(on) {
+  recipeRepo = createRecipeRepo({
+    useBackend: on,
+    listRecipes,
+    upsertRecipe,
+    deleteRecipe: sbDelete,
+    loadRecipesLocal,
+    saveRecipesLocal,
+    toLocalShape,
+  });
+}
+
+// IMPORTANT: initial repo build (otherwise recipeRepo is null)
+rebuildRecipeRepo(useBackend);
+
+// Global router reference (needed by setUseBackend)
+let router = null;
+
+// --- Global navigation guards / cleanup (Back + unsaved changes) ---
+function setDirtyGuard(fn) {
+  appState.dirtyGuard = typeof fn === "function" ? fn : null;
+}
+
+function setViewCleanup(fn) {
+  appState.viewCleanup = typeof fn === "function" ? fn : null;
+}
+
+/* =========================
+   BACKEND SWITCH
+========================= */
+
+// Expose a single backend switch implementation (used by admin.view.js)
+export async function setUseBackend(next) {
+  const on = !!next;
+
+  // 1) persist
+  writeUseBackend(on);
+
+  // 2) runtime state
+  useBackend = on;
+  appState.useBackend = useBackend;
+
+  // 3) rebuild repo wiring
+  rebuildRecipeRepo(useBackend);
+
+  // 4) reload data according to new mode
+  updateHeaderBadges({ syncing: true });
+  await runExclusive("loadAll", () => loadAll());
+  updateHeaderBadges({ syncing: false });
+
+  // 5) rerender current view (only if router exists already)
+  if (router?.getView && router?.setView) {
+    const current = router.getView() || { name: "list" };
+    render(current, router.setView);
+  }
+}
+
+// Allow admin view to change settings without circular imports
+window.__tinkeroneoSettings = {
+  readUseBackend,
+  setUseBackend: async (v) => setUseBackend(v),
+
+  // auth/space context (only meaningful in CLOUD)
+  getAuthContext: () => {
+    try { return getAuthContext(); } catch { return null; }
+  },
+  inviteToSpace: async ({ email, role, spaceId }) => inviteToSpace({ email, role, spaceId }),
+  listPendingInvites: async ({ spaceId } = {}) => listPendingInvites({ spaceId }),
+  listSpaceMembers: async ({ spaceId } = {}) => listSpaceMembers({ spaceId }),
+  revokeInvite: async (inviteId) => revokeInvite(inviteId),
+
+  readTheme,
+  setTheme: (v) => setTheme(v),
+
+  readWinter,
+  setWinter: (on) => setWinter(on),
+
+  readRadioFeature,
+  setRadioFeature: (on) => setRadioFeature(on),
+  readRadioConsent,
+  clearRadioConsent,
+
+  readTimerRingIntervalMs,
+  setTimerRingIntervalMs,
+
+  readTimerMaxRingSeconds,
+  setTimerMaxRingSeconds,
+
+  readTimerStepHighlight,
+  setTimerStepHighlight,
+
+  readTimerSoundEnabled,
+  setTimerSoundEnabled,
+
+  readTimerSoundId,
+  setTimerSoundId,
+
+  readTimerSoundVolume,
+  setTimerSoundVolume,
+};
+
+/* =========================
+   UI / BADGES / THEME
+========================= */
+
+
+const appEl = document.getElementById("app");
+
+function updateHeaderBadges({ syncing = false, syncError = false } = {}) {
+  const mode = document.getElementById("modeBadge");
+  if (mode) {
+    mode.textContent = useBackend ? "☁️" : "🖥️";
+    mode.classList.toggle("badge--ok", useBackend);
+    mode.classList.toggle("badge--warn", !useBackend);
+    mode.title = useBackend
+      ? "☁️CLOUD: Sync + Teilen im Space (Supabase). Klick = auf LOCAL (nur dieses Gerät)."
+      : "🖥️LOCAL: nur auf diesem Gerät (offline). Klick = auf CLOUD (Sync + Teilen).";
+  }
+
+  const authBtn = document.getElementById("authBadge");
+  if (authBtn) {
+    const authed = isAuthenticated?.();
+    authBtn.textContent = authed ? "🔐 LOGOUT" : "🔐 LOGIN";
+    authBtn.classList.toggle("badge--ok", authed);
+    authBtn.classList.toggle("badge--warn", !authed);
+    authBtn.title = authed ? "Abmelden" : (useBackend ? "Anmelden per Magic Link" : "Für Login/Sharing: erst auf CLOUD umschalten");
+  }
+
+  const sync = document.getElementById("syncBadge");
+  if (sync) {
+    const pending = (getOfflineQueue?.() || []).length;
+    const showPending = navigator.onLine && !syncing && !syncError && pending > 0;
+
+    sync.hidden = !syncing && !syncError && navigator.onLine && pending === 0;
+
+    if (!navigator.onLine) {
+      sync.textContent = "OFFLINE";
+      sync.classList.add("badge--warn");
+      sync.classList.remove("badge--ok", "badge--bad");
+    } else if (syncError) {
+      sync.textContent = "SYNC";
+      sync.classList.add("badge--bad");
+      sync.classList.remove("badge--ok", "badge--warn");
+    } else if (showPending) {
+      sync.textContent = `PENDING ${pending}`;
+      sync.classList.add("badge--warn");
+      sync.classList.remove("badge--ok", "badge--bad");
+    } else {
+      sync.textContent = "⟳";
+      sync.classList.add("badge--ok");
+      sync.classList.remove("badge--warn", "badge--bad");
+    }
+
+    if (!navigator.onLine) sync.title = "Offline: Änderungen bleiben lokal und werden später synchronisiert";
+    else if (syncError) sync.title = "Sync-Fehler: bitte später nochmal";
+    else if (showPending) sync.title = `${pending} Änderung(en) warten auf Sync`;
+    else sync.title = "Sync ok";
+  }
+
+  // Profile buttons live in Account view -> wire here too (safe no-op if not present)
+  const saveProfileBtn = document.getElementById("saveProfileBtn");
+  if (saveProfileBtn && !saveProfileBtn.__installed) {
+    saveProfileBtn.__installed = true;
+    saveProfileBtn.addEventListener("click", async () => {
+      if (!(useBackend && isAuthenticated?.())) { alert("Nicht eingeloggt oder Backend aus (useBackend=false)."); return; }
+
+      const dn = document.getElementById("profileDisplayName");
+      const display_name = String(dn?.value || "").trim();
+      try {
+        const p = await upsertProfile({ display_name });
+        __profileCache = p;
+        updateHeaderBadges();
+      } catch (err) {
+          reportError(err, { scope: "app.js", action: "Save Profile" });
+          showError("Profil speichern fehlgeschlagen");
+        alert(`Profil speichern fehlgeschlagen: ${String(err?.message || err)}`);
+      }
+    });
+  }
+  
+
+  const saveSpaceNameBtn = document.getElementById("saveSpaceNameBtn");
+  if (saveSpaceNameBtn && !saveSpaceNameBtn.__installed) {
+    saveSpaceNameBtn.__installed = true;
+    saveSpaceNameBtn.addEventListener("click", async () => {
+      if (!(useBackend && isAuthenticated?.())) { alert("Nicht eingeloggt oder Backend aus (useBackend=false)."); return; }
+
+      const ctx = getAuthContext?.();
+      const sid = String(ctx?.spaceId || "").trim();
+      const inp = document.getElementById("spaceNameInput");
+      const name = String(inp?.value || "").trim();
+      if (!sid) return;
+      try {
+        await updateSpaceName({ spaceId: sid, name });
+        await refreshSpaceSelect();
+        alert("Space-Name gespeichert ✅");
+      } catch (err) {
+        reportError(err, { scope: "app.js", action: "Save Space Name" });
+        showError("space Name speichern fehlgeschlagen");
+        alert(`Space-Name speichern fehlgeschlagen: ${String(err?.message || err)}`);
+      }
+    });
+  }
+
+  const spaceSel = document.getElementById("spaceSelect");
+  if (spaceSel) {
+    const authed = isAuthenticated?.();
+    spaceSel.hidden = !authed || !Array.isArray(mySpaces) || mySpaces.length === 0;
+  }
+}
+
+async function refreshSpaceSelect() {
+  const sel = document.getElementById("spaceSelect");
+  if (!sel) return;
+
+  if (!(useBackend && isAuthenticated?.())) {
+    mySpaces = [];
+    sel.innerHTML = "";
+    sel.hidden = true;
+    return;
+  }
+
+  let nextSpaces = null;
+  try {
+    nextSpaces = await listMySpaces();
+  } catch {
+    // keep previous mySpaces on transient errors to avoid permission flicker
+    nextSpaces = null;
+  }
+  if (Array.isArray(nextSpaces)) {
+    mySpaces = nextSpaces;
+    const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+    writeSpacesCache(ctx?.user?.id, mySpaces);
+  } else {
+    // On refresh, mySpaces may still be empty. Try cached spaces for stable permissions/UI.
+    if (!Array.isArray(mySpaces) || mySpaces.length === 0) {
+      const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+      const cached = readSpacesCache(ctx?.user?.id);
+      if (Array.isArray(cached) && cached.length) mySpaces = cached;
+    }
+  }
+
+  const ctx = (() => {
+    try { return getAuthContext(); } catch { return null; }
+  })();
+  const active = String(ctx?.spaceId || "");
+
+  if (!Array.isArray(mySpaces) || mySpaces.length === 0) {
+    sel.innerHTML = "";
+    sel.hidden = true;
+    return;
+  }
+
+  if (mySpaces.length === 1) {
+    const s = mySpaces[0];
+    const sid = String(s?.space_id || "");
+    const name = String(s?.name || sid);
+    const role = String(s?.role || "viewer");
+    const esc = (x) => String(x)
+      .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+    sel.innerHTML = `<option value="${esc(sid)}" selected>${esc(`${name} (${role})`)}</option>`;
+    sel.disabled = true;
+    sel.hidden = false;
+    return;
+  }
+
+  sel.disabled = false;
+
+  sel.innerHTML = mySpaces
+    .map(s => {
+      const sid = String(s?.space_id || "");
+      const name = String(s?.name || sid);
+      const role = String(s?.role || "viewer");
+      const label = `${name} (${role})`;
+      const esc = (x) => String(x)
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+      return `<option value="${esc(sid)}" ${sid === active ? "selected" : ""}>${esc(label)}</option>`;
+    })
+    .join("");
+
+  sel.hidden = false;
+}
+
+/* =========================
+   DATA STATE
+========================= */
+
+let recipes = [];
+let recipeParts = [];
+let partsByParent = new Map();
+
+function setParts(newParts) {
+  recipeParts = newParts ?? [];
+  partsByParent = rebuildPartsIndex(recipeParts);
+}
+
+async function loadAll() {
+  if (!recipeRepo) rebuildRecipeRepo(useBackend);
+
+  const pendingIds = getPendingRecipeIds?.() || new Set();
+  const ctx = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+  const activeSid = String(ctx?.spaceId || "");
+  recipes = (await recipeRepo.getAll()).map((r) => ({
+    ...r,
+    space_id: r.space_id || activeSid || r.spaceId || "",
+    _pending: pendingIds.has(r.id),
+  }));
+
+  if (!useBackend) {
+    setParts([]);
+    return;
+  }
+
+  try {
+    const parts = await listAllRecipeParts();
+    setParts(parts);
+  } catch {
+    setParts([]);
+  }
+}
+
+/* =========================
+   RENDER
+========================= */
+
+async function render(view, setView) {
+  const activeSpaceId = getAuthContext?.()?.spaceId;
+
+  // "write" is determined by the SPACE of the entity you act on, not by the currently selected space.
+  // Active-space write is still useful for list/create defaults:
+  const canWrite = !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId: activeSpaceId });
+
+  // helper for per-recipe permission (fixes "I must switch space to edit")
+  const canWriteForSpace = (spaceId) => !useBackend || canWriteActiveSpace({ spaces: mySpaces, spaceId });
+
+  // Permissions bootstrap: after refresh/auth, spaceId/mySpaces can be temporarily missing.
+  // Avoid rendering read-only UI during this transient state.
+  if (useBackend && isAuthenticated?.()) {
+    const ctx = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+    const sid = String(ctx?.spaceId || "").trim();
+    const spacesMissing = !Array.isArray(mySpaces) || mySpaces.length === 0;
+
+    // If permissions/space context are still missing right after refresh, bootstrap them once or twice.
+    // IMPORTANT: never loop indefinitely — otherwise the app can appear to "hang".
+    if ((!sid || spacesMissing) && !__permBootstrapInFlight) {
+      if (__permBootstrapAttempts >= 2) {
+        // Give up and render normally (read-only may be temporary, but app must remain usable).
+        if (DEBUG) console.warn("perm bootstrap: giving up", { sid, spacesMissing, attempts: __permBootstrapAttempts });
+      } else {
+        __permBootstrapInFlight = true;
+        __permBootstrapAttempts++;
+
+        try {
+          appEl.innerHTML = `
+          <div class="container">
+            <div class="card" style="padding:1rem; text-align:center;">
+              <div style="font-weight:800;">Lade Space-Rechte…</div>
+              <div class="muted" style="margin-top:.35rem;">Einen Moment</div>
+            </div>
+          </div>`;
+        } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+
+        try { await refreshSpaceSelect(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+        __permBootstrapInFlight = false;
+
+        // Recompute and only re-render if we actually got something new.
+        const ctx2 = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+        const sid2 = String(ctx2?.spaceId || "").trim();
+        const spacesMissing2 = !Array.isArray(mySpaces) || mySpaces.length === 0;
+        if (sid2 && !spacesMissing2) {
+          // Await to keep render serialized and avoid recursive storms.
+          await runExclusive("render", () => render(view, setView));
+          return;
+        }
+
+        // Still missing → fall through and render normally (no infinite loop).
+        if (DEBUG) console.warn("perm bootstrap: still missing", { sid2, spacesMissing2 });
+      }
+    }
+  }
+
+
+
+  if (DEBUG) console.log("RENDER VIEW:", view);
+
+  if (view.name === "cook") Wake.enable();
+  else Wake.disable();
+
+  // Login view (no timers overlay)
+  if (view.name === "login") {
+    if (DEBUG) console.log("RENDER LOGIN VIEW");
+
+    const info = {
+      redirectTo: new URL("index.html", location.href).toString().replace(/#.*$/, ""),
+      debug: `origin=${location.origin}\npath=${location.pathname}\nhash=${location.hash}`,
+    };
+
+    return renderLoginView({
+      appEl,
+      state: view,
+      setView,
+      useBackend,
+      setUseBackend,
+      info
+    });
+  }
+
+  // Invites confirmation view
+  if (view.name === "invites") {
+    const inv = window.__tinkeroneoPendingInvites || [];
+    return renderInvitesView({
+      appEl,
+      invites: inv,
+      onAccept: async (inviteId) => {
+        try { await acceptInvite(inviteId); } catch (e) { alert(String(e?.message || e)); }
+        try {
+          const ctx = await initAuthAndSpace();
+          try { await ensureProfileLoaded(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      // Apply default space (profile.default_space_id) on login/session init
+      try {
+        const p = __profileCache;
+        const defSid = String(p?.default_space_id || "").trim();
+        if (defSid && String(ctx?.spaceId || "") !== defSid) {
+          setActiveSpaceId(defSid);
+          // keep offline queue scoped to new active space
+          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
+          // refresh ctx reference if callers use it later
+          try { ctx.spaceId = defSid; } catch (e) { 
+        reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+           }
+        }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+
+          try {
+            if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
+              try {
+                await listRecipes();
+                await upsertProfile({ last_space_id: ctx.spaceId });
+              } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+            }
+          } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+          window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
+        } catch {
+          window.__tinkeroneoPendingInvites = [];
+        }
+        if (!(window.__tinkeroneoPendingInvites || []).length) {
+          await runExclusive("loadAll", () => loadAll());
+          setView({ name: "list", selectedId: null, q: "" });
+          return;
+        }
+        render({ name: "invites" }, setView);
+      },
+      onDecline: async (inviteId) => {
+        try { await declineInvite(inviteId); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+        alert(String(e?.message || e)); }
+        try {
+          const ctx = await initAuthAndSpace();
+          try { await ensureProfileLoaded(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      // Apply default space (profile.default_space_id) on login/session init
+      try {
+        const p = __profileCache;
+        const defSid = String(p?.default_space_id || "").trim();
+        if (defSid && String(ctx?.spaceId || "") !== defSid) {
+          setActiveSpaceId(defSid);
+          // keep offline queue scoped to new active space
+          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
+          // refresh ctx reference if callers use it later
+          try { ctx.spaceId = defSid; } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+        }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+
+          try {
+            if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
+              try {
+                await listRecipes();
+                await upsertProfile({ last_space_id: ctx.spaceId });
+              } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+            }
+          } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+          window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
+        } catch {
+          window.__tinkeroneoPendingInvites = [];
+        }
+        if (!(window.__tinkeroneoPendingInvites || []).length) {
+          await runExclusive("loadAll", () => loadAll());
+          setView({ name: "list", selectedId: null, q: "" });
+          return;
+        }
+        render({ name: "invites" }, setView);
+      },
+      onSkip: async () => {
+        await runExclusive("loadAll", () => loadAll());
+        setView({ name: "list", selectedId: null, q: "" });
+      },
+    });
+  }
+
+  // Global overlay always (except login)
+  renderTimersOverlay({ appEl, state: view, setView });
+
+  if (view.name === "selftest") {
+    const results = [];
+
+    try {
+      const k = "__selftest__" + Math.random().toString(16).slice(2);
+      localStorage.setItem(k, "1");
+      const v = localStorage.getItem(k);
+      localStorage.removeItem(k);
+      results.push({ name: "LocalStorage read/write", ok: v === "1" });
+    } catch (e) {
+              reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+      results.push({ name: "LocalStorage read/write", ok: false, detail: String(e?.message || e) });
+    }
+
+    if (useBackend) {
+      try {
+        await listRecipes();
+        results.push({ name: "Backend erreichbar (listRecipes)", ok: true });
+      } catch (e) {
+                reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+        results.push({ name: "Backend erreichbar (listRecipes)", ok: false, detail: String(e?.message || e) });
+      }
+    } else {
+      results.push({ name: "Backend erreichbar (übersprungen)", ok: true, detail: "useBackend=false" });
+    }
+
+    results.push({ name: "Import-Funktion geladen", ok: typeof importRecipesIntoApp === "function" });
+
+    return renderSelftestView({ appEl, state: view, results, setView });
+  }
+
+  if (view.name === "diagnostics") {
+    let storageOk = true;
+    try {
+      const k = "__diag__" + Math.random().toString(16).slice(2);
+      localStorage.setItem(k, "1");
+      const v = localStorage.getItem(k);
+      localStorage.removeItem(k);
+      storageOk = v === "1";
+    } catch {
+      storageOk = false;
+    }
+
+    let backendOk = true;
+    let backendMs = null;
+
+    if (useBackend) {
+      const t0 = performance.now();
+      try {
+        await listRecipes();
+        backendMs = Math.round(performance.now() - t0);
+      } catch {
+        backendOk = false;
+        backendMs = Math.round(performance.now() - t0);
+      }
+    }
+
+    const info = {
+      useBackend,
+      storageOk,
+      backendOk: useBackend ? backendOk : true,
+      backendMs,
+      importOk: typeof importRecipesIntoApp === "function",
+      recentErrors: getRecentErrors(),
+      onClearErrors: () => clearRecentErrors(),
+    };
+
+    return renderDiagnosticsView({ appEl, state: view, info, setView });
+  }
+
+  if (view.name === "account") {
+    renderAccountView({ appEl, state: view, setView });
+    await refreshSpaceSelect();
+    await refreshProfileUi();
+    wireAccountControls({
+      readTheme,
+      setTheme,
+      applyThemeAndOverlay,
+      isAuthenticated,
+      sbLogout,
+      setUseBackend,
+      getUseBackend: () => useBackend,
+      router,
+      setActiveSpaceId,
+      getAuthContext,
+      setOfflineQueueScope,
+      updateHeaderBadges,
+      runExclusive,
+      loadAll,
+      reportError,
+      showError,
+      upsertProfile,
+      getProfileCache: () => __profileCache,
+      setProfileCache: (p) => { __profileCache = p; },
+      installAdminCorner,
+    });
+    return;
+  }
+
+
+  if (view.name === "list") {
+    return renderListView({
+      appEl,
+      state: view,
+      recipes,
+      partsByParent,
+      setView,
+      useBackend,
+      canWrite,
+      mySpaces,
+      activeSpaceId,
+      onImportRecipes: async ({ items, mode, targetSpaceId }) =>
+        runExclusive("importRecipes", async () => {
+          // optional: import into selected space (backend only)
+          const sid = String(targetSpaceId || "").trim();
+          if (useBackend && sid) {
+            try {
+              setActiveSpaceId(sid);
+              const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+              setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
+              try { await refreshSpaceSelect(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+              // keep profile hint in sync (best-effort)
+              try {
+                await listRecipes();
+                await upsertProfile({ last_space_id: sid });
+              } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+            } catch (e) {
+                      reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+              alert(String(e?.message || e));
+              return;
+            }
+          }
+          await importRecipesIntoApp({
+            items,
+            mode,
+            useBackend,
+            listRecipes,
+            upsertRecipe,
+            toLocalShape,
+            saveRecipesLocal,
+            loadRecipesLocal,
+            setRecipes: (next) => { recipes = next; },
+          });
+        }),
+    });
+  }
+
+  if (view.name === "detail") {
+    const r = recipes.find(x => x.id === view.selectedId);
+    const detailCanWrite = canWriteForSpace(r?.space_id || activeSpaceId);
+
+    return renderDetailView({
+      appEl,
+      state: view,
+      recipes,
+      partsByParent,
+      recipeParts,
+      setView,
+      useBackend,
+      canWrite: detailCanWrite,
+      mySpaces,
+      copyRecipeToSpace,
+      refreshAll: async () => runExclusive("loadAll", () => loadAll()),
+      sbDelete: async (id) => {
+        await recipeRepo.remove(id);
+        await runExclusive("loadAll", () => loadAll());
+      },
+      removeRecipePart,
+      addRecipePart,
+      listAllRecipeParts,
+      onUpdateRecipe: async (rec) => {
+        return runExclusive(`upsert:${rec.id}`, async () => {
+          recipes = await recipeRepo.upsert(rec, { refresh: useBackend });
+          runExclusive("render", () => render(router.getView(), router.setView));
+        });
+      },
+      addToShopping,
+      rebuildPartsIndexSetter: (freshParts) => setParts(freshParts),
+    });
+  }
+
+  if (view.name === "cook") {
+    return renderCookView({
+      canWrite, appEl, state: view, recipes, partsByParent, setView, setViewCleanup, setDirtyGuard
+    });
+  }
+
+  if (view.name === "add") {
+    const existing = view.selectedId ? recipes.find(r => r.id === view.selectedId) : null;
+    const addCanWrite = canWriteForSpace(existing?.space_id || activeSpaceId);
+
+    return renderAddView({
+      appEl,
+      state: view,
+      recipes,
+      activeSpaceId,
+      setView,
+      useBackend,
+      canWrite: addCanWrite,
+      setDirtyGuard,
+      setDirtyIndicator,
+      setViewCleanup,
+      mySpaces,
+      moveRecipeToSpace,
+      upsertProfile,
+      listRecipes,
+      refreshSpaceSelect,
+      upsertSpaceLast: async (sid) => {
+        try {
+          await listRecipes();
+          await upsertProfile({ last_space_id: sid });
+        } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      },
+      upsertRecipe: async (rec) => {
+        const key = `upsert:${rec.id || "new"}`;
+        return runExclusive(key, async () => {
+          await recipeRepo.upsert(rec, { refresh: useBackend });
+          await runExclusive("loadAll", () => loadAll());
+        });
+      },
+      uploadRecipeImage,
+    });
+  }
+
+  if (view.name === "admin") {
+    return renderAdminView({ canWrite, appEl, recipes, setView });
+  }
+
+  if (view.name === "vegan101") {
+    return renderVegan101View({ canWrite, appEl, setView });
+  }
+
+  if (view.name === "shopping") {
+    return renderShoppingView({ appEl, state: view, setView });
+  }
+
+  setView({ name: "list", selectedId: null, q: view.q });
+}
+
+
+/* =========================
+   DIRTY INDICATOR
+========================= */
+
+const setDirtyIndicator = createDirtyIndicator();
+
+export function startApp() {
+  installHeaderWiring();
+  // Keep behavior: don't await boot() here (boot does its own async work)
+  boot();
+}
+
+/* =========================
+   BOOT
+========================= */
+
+async function boot() {
+  installGlobalErrorHandler();
+  installAdminCorner();
+  applyThemeAndOverlay();
+  updateHeaderBadges();
+
+  initRadioDock();
+
+  window.addEventListener("online", () => updateHeaderBadges());
+  window.matchMedia?.("(prefers-color-scheme: dark)")?.addEventListener?.("change", () => applyThemeAndOverlay());
+
+  window.__tinkeroneoUpdateBadges = () => updateHeaderBadges();
+
+
+  // If page was opened via Supabase magic link, consume auth hash BEFORE router touches location.hash.
+  if (useBackend && typeof location !== 'undefined') {
+    const h = String(location.hash || '');
+    if (h.includes('access_token=') && h.includes('refresh_token=')) {
+      try { await initAuthAndSpace(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+    }
+  }
+
+  router = initRouter({
+    canNavigate: ({ reason }) => {
+      if (!appState.dirtyGuard) return true;
+      return appState.dirtyGuard({ reason }) !== false;
+    },
+    onViewChange: (view) => {
+      if (appState.viewCleanup) {
+        try { appState.viewCleanup(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+        console.warn("viewCleanup failed", e); }
+        appState.viewCleanup = null;
+      }
+      appState.dirtyGuard = null;
+      setDirtyIndicator(false);
+
+      // Serialize renders to avoid permission/UI flicker due to overlapping async renders.
+      runExclusive("render", () => render(view, router.setView));
+
+      try {
+        const cb = document.querySelector(".cookbar");
+        if (cb) {
+          const h = Math.ceil(cb.getBoundingClientRect().height);
+          document.documentElement.style.setProperty("--cookbar-h", `${h}px`);
+        } else {
+          document.documentElement.style.removeProperty("--cookbar-h");
+        }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+    },
+  });
+
+  // Share router for modules (header/back, etc.)
+  appState.router = router;
+
+  // Header controls
+  const modeBtn = document.getElementById("modeBadge");
+  if (modeBtn && !modeBtn.__installed) {
+    modeBtn.__installed = true;
+    modeBtn.addEventListener("click", async () => {
+      await setUseBackend(!useBackend);
+      updateHeaderBadges();
+    });
+  }
+
+  const accountBtn = document.getElementById("accountBtn");
+  if (accountBtn && !accountBtn.__installed) {
+    accountBtn.__installed = true;
+    accountBtn.addEventListener("click", () => {
+      location.hash = "#account";
+    });
+  }
+
+  const shoppingBtn = document.getElementById("shopBadge");
+  if (shoppingBtn && !shoppingBtn.__installed) {
+    shoppingBtn.__installed = true;
+    shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" }));
+  }
+
+  // If backend enabled: init auth before backend calls
+  if (useBackend) {
+    try {
+      const ctx = await initAuthAndSpace();
+
+      // Preload cached spaces for this user to stabilize permissions/UI immediately after refresh.
+      // refreshSpaceSelect() will overwrite this if the network call succeeds.
+      if ((!Array.isArray(mySpaces) || mySpaces.length === 0) && ctx?.user?.id) {
+        const cached = readSpacesCache(ctx.user.id);
+        if (Array.isArray(cached) && cached.length) mySpaces = cached;
+      }
+
+      try { await ensureProfileLoaded(); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      // Apply default space (profile.default_space_id) on login/session init
+      try {
+        const p = __profileCache;
+        const defSid = String(p?.default_space_id || "").trim();
+        if (defSid && String(ctx?.spaceId || "") !== defSid) {
+          setActiveSpaceId(defSid);
+          // keep offline queue scoped to new active space
+          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
+          // refresh ctx reference if callers use it later
+          try { ctx.spaceId = defSid; } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+        }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+
+      try {
+        if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
+          try {
+            await listRecipes();
+            await upsertProfile({ last_space_id: ctx.spaceId });
+          } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+        }
+      } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      if (ctx?.user?.id || ctx?.spaceId) {
+        setOfflineQueueScope({ userId: ctx.user?.id || null, spaceId: ctx.spaceId || null });
+      }
+      if (Array.isArray(ctx?.pendingInvites) && ctx.pendingInvites.length) {
+        window.__tinkeroneoPendingInvites = ctx.pendingInvites;
+        router.setView({ name: "invites" });
+      } else if (!ctx?.spaceId && !isAuthenticated?.()) {
+        router.setView({ name: "login" });
+      } else if (!ctx?.spaceId && isAuthenticated?.()) {
+        try { await setUseBackend(false); } catch (e) { 
+                  reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message)); }
+      }
+
+      await refreshSpaceSelect();
+    } catch (e) {
+              reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+      console.error("Auth/Space init failed:", e);
+      try {
+        if (!navigator.onLine) {
+          await setUseBackend(false);
+        }
+      } catch (err) { 
+                  reportError(err, { scope: "app.js", action: String(err?.message) });
+        showError(String(err?.message)); }
+      if (!isAuthenticated?.()) {
+        router.setView({ name: "login" });
+      }
+    }
+  }
+
+  updateHeaderBadges({ syncing: true });
+  await runExclusive("loadAll", () => loadAll());
+  updateHeaderBadges({ syncing: false });
+
+  await runExclusive("render", () => render(router.getView(), router.setView));
+}
+
+
+let __profileCache = null;
+async function ensureProfileLoaded() {
+  if (!(useBackend && isAuthenticated?.())) return null;
+  try {
+    __profileCache = await getProfile();
+    if (!__profileCache) {
+      __profileCache = await upsertProfile({});
+    }
+    return __profileCache;
+  } catch {
+    return null;
+  }
+}
+
+async function refreshDefaultSpaceSelect() {
+  const sel = document.getElementById("defaultSpaceSelect");
+  if (!sel) return;
+
+  const authed = useBackend && isAuthenticated?.();
+  if (!authed) {
+    sel.innerHTML = "";
+    sel.disabled = true;
+    return;
+  }
+
+  const p = await ensureProfileLoaded();
+  const spaces = mySpaces || [];
+
+  sel.innerHTML = `
+    <option value="">— kein Default —</option>
+    ${spaces.map(s =>
+      `<option value="${s.space_id}">${s.name}</option>`
+    ).join("")}
+  `;
+
+  sel.value = p?.default_space_id || "";
+  sel.disabled = false;
+}
+
+
+async function refreshProfileUi() {
+  const authed = useBackend && isAuthenticated?.();
+  const dn = document.getElementById("profileDisplayName");
+  const spaceName = document.getElementById("spaceNameInput");
+  if (!authed) {
+    if (dn) dn.value = "";
+    if (spaceName) spaceName.value = "";
+    await refreshDefaultSpaceSelect();
+    return;
+  }
+
+  const p = await ensureProfileLoaded();
+  if (dn) dn.value = String(p?.display_name || "");
+
+  await refreshDefaultSpaceSelect();
+
+  const activeSpaceId = getAuthContext?.()?.spaceId;
+  const current = (mySpaces || []).find((s) => String(s?.space_id || "") === String(activeSpaceId || ""));
+  if (spaceName) spaceName.value = String(current?.name || "");
+}
+
+function getActiveSpaceRole({ spaces, spaceId }) {
+  const sid = String(spaceId || "").trim();
+  const spacesList = Array.isArray(spaces) ? spaces : [];
+  const row = spacesList.find(s => String(s?.space_id || "") === sid);
+  return String(row?.role || "").trim() || null;
+}
+
+function canWriteActiveSpace({ spaces, spaceId }) {
+  const role = getActiveSpaceRole({ spaces, spaceId });
+  return role === "owner" || role === "editor";
+}
