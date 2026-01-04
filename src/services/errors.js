@@ -1,5 +1,9 @@
 // src/services/errors.js
-// Global error banner for runtime errors & unhandled promise rejections.
+// Global error capture + lightweight diagnostics.
+// Goals:
+// - keep UX calm (banner only for user-relevant errors)
+// - keep logs useful (dedupe, context, rate limit)
+// - never crash the app while logging
 
 import { logClientEvent } from "../supabase.js";
 import { getClientId } from "../domain/clientId.js";
@@ -9,12 +13,31 @@ let installed = false;
 const recentErrors = []; // newest first via accessor
 const MAX_RECENT = 20;
 
-function remember(err) {
+// Persisted (device-local) error log – for diagnostics / bug reports.
+// Note: keep small, never store raw recipe data etc.
+const ERR_KEY = "tinkeroneo_errors_v1";
+const MAX_PERSISTED = 80;
+
+function remember(err, meta = {}) {
+  const ts = Date.now();
   const msg = normalizeErr(err);
+  const stack = String(err?.stack || "");
+
+  // Dedupe (same message within 10s) -> increment count.
+  const prev = recentErrors[0];
+  if (prev && prev.message === msg && (ts - prev.ts) < 10_000) {
+    prev.count = (prev.count || 1) + 1;
+    prev.ts = ts;
+    prev.lastMeta = meta;
+    return;
+  }
+
   recentErrors.unshift({
-    ts: Date.now(),
+    ts,
     message: msg,
-    stack: String(err?.stack || ""),
+    stack,
+    count: 1,
+    lastMeta: meta,
   });
   if (recentErrors.length > MAX_RECENT) recentErrors.length = MAX_RECENT;
 }
@@ -32,47 +55,57 @@ export function installGlobalErrorHandler() {
   installed = true;
 
   window.addEventListener("error", (ev) => {
-    showError(ev?.error || ev?.message || "Unbekannter Fehler");
+    // Runtime errors should be visible (banner), but still keep it calm.
+    showError(ev?.error || ev?.message || "Unbekannter Fehler", { source: "window.error" });
   });
 
   window.addEventListener("unhandledrejection", (ev) => {
-    showError(ev?.reason || "Unhandled Promise Rejection");
+    showError(ev?.reason || "Unhandled Promise Rejection", { source: "unhandledrejection" });
   });
 }
 
-const ERR_KEY = "tinkeroneo_errors_v1";
-
-export function reportError(err, meta = {}) {
+export function getStoredErrors() {
   try {
     const list = JSON.parse(localStorage.getItem(ERR_KEY) || "[]");
-    list.unshift({
-      ts: Date.now(),
-      message: String(err?.message || err),
-      stack: err?.stack || null,
-      ...meta,
-    });
-    localStorage.setItem(ERR_KEY, JSON.stringify(list.slice(0, 50)));
+    return Array.isArray(list) ? list : [];
   } catch {
-    // niemals weiterwerfen
+    return [];
   }
 }
 
+export function clearStoredErrors() {
+  try {
+    localStorage.removeItem(ERR_KEY);
+  } catch {
+    // ignore
+  }
+}
 
-export function showError(err) {
-  remember(err);
+/**
+ * Report an error without necessarily showing a banner.
+ * - Always adds to recentErrors
+ * - Persists to localStorage
+ * - Best-effort backend log (rate-limited)
+ */
+export function reportError(err, meta = {}, opts = {}) {
+  const { showBanner = false } = opts || {};
+  remember(err, meta);
 
-  const msg = normalizeErr(err);
+  const payload = buildLogEntry(err, meta);
+  persistLocal(payload);
+  sendToBackend(payload);
 
-  // Best-effort: also persist to backend (do not crash app).
-  sendToBackend({
-    type: "error",
-    message: msg,
-    stack: String(err?.stack || ""),
-    href: String(location?.href || ""),
-    ua: String(navigator?.userAgent || ""),
-    ts: Date.now(),
-    clientId: getClientId(),
-  });
+  if (showBanner) showError(err, meta);
+}
+
+export function showError(err, meta = {}) {
+  remember(err, meta);
+
+  const entry = buildLogEntry(err, meta);
+  persistLocal(entry);
+  sendToBackend(entry);
+
+  const msg = entry.message;
 
   let el = document.getElementById("globalErrorBanner");
   if (!el) {
@@ -101,7 +134,54 @@ function normalizeErr(e) {
   if (e === null || e === undefined) return "Unbekannter Fehler";
   if (typeof e === "string") return e;
   if (e instanceof Error) return e.message || String(e);
+  if (typeof e === "object" && typeof e.message === "string") return e.message;
   try { return JSON.stringify(e); } catch { return String(e); }
+}
+
+function safeMeta(meta) {
+  // Keep meta small and safe (no huge payloads, no full recipe JSON etc.)
+  try {
+    const out = {};
+    const allow = ["scope", "action", "reason", "source", "view", "route", "spaceId", "op", "status"]; // extend if needed
+    for (const k of allow) {
+      if (meta && meta[k] !== undefined && meta[k] !== null) out[k] = String(meta[k]);
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function buildLogEntry(err, meta = {}) {
+  const msg = normalizeErr(err);
+  const m = safeMeta(meta);
+  const metaStr = Object.keys(m).length ? ` | meta=${JSON.stringify(m)}` : "";
+  return {
+    type: "error",
+    message: `${msg}${metaStr}`,
+    stack: String(err?.stack || ""),
+    href: String(location?.href || ""),
+    ua: String(navigator?.userAgent || ""),
+    ts: Date.now(),
+    clientId: getClientId(),
+  };
+}
+
+function persistLocal(entry) {
+  try {
+    const list = JSON.parse(localStorage.getItem(ERR_KEY) || "[]");
+    const arr = Array.isArray(list) ? list : [];
+    arr.unshift({
+      ts: entry.ts,
+      type: entry.type,
+      message: entry.message,
+      stack: entry.stack || null,
+      href: entry.href,
+    });
+    localStorage.setItem(ERR_KEY, JSON.stringify(arr.slice(0, MAX_PERSISTED)));
+  } catch {
+    // never throw
+  }
 }
 let __lastSendAt = 0;
 let __sentInWindow = 0;

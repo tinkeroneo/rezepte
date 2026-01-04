@@ -93,35 +93,43 @@ function storeAuth(auth) {
 }
 
 async function refreshAccessToken(refresh_token) {
-  const res = await sbFetch(
-    `${SUPABASE_URL}/auth/v1/token`,
-    {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        grant_type: "refresh_token",
-        refresh_token,
-      }),
-      timeoutMs: 12000,
+  try {
+    const res = await sbFetch(
+      `${SUPABASE_URL}/auth/v1/token`,
+      {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          grant_type: "refresh_token",
+          refresh_token,
+        }),
+        timeoutMs: 12000,
+      }
+    );
+
+    // If Supabase rejects the refresh token, this is not a transient error.
+    if (!res.ok) {
+      const transient = res.status >= 500 || res.status === 0;
+      return transient ? { transient: true } : null;
     }
-  );
 
-  if (!res.ok) return null;
-  const json = await res.json();
-  if (!json?.access_token || !json?.refresh_token) return null;
+    const json = await res.json();
+    if (!json?.access_token || !json?.refresh_token) return null;
 
-  const expires_at =
-    Math.floor(Date.now() / 1000) +
-    Number(json.expires_in || 3600);
+    const expires_at = Math.floor(Date.now() / 1000) + Number(json.expires_in || 3600);
 
-  return {
-    access_token: json.access_token,
-    refresh_token: json.refresh_token,
-    expires_at,
-  };
+    return {
+      access_token: json.access_token,
+      refresh_token: json.refresh_token,
+      expires_at,
+    };
+  } catch (e) {
+    // Network / timeout / transient errors: don't force logout.
+    return { transient: true, error: String(e?.message || e) };
+  }
 }
 
 // (redirect helpers removed – keep redirect handling in the login view)
@@ -324,15 +332,31 @@ export async function initAuthAndSpace() {
       !_session.expires_at || _session.expires_at - now < 60;
 
     if (needsRefresh) {
-      const refreshed = await refreshAccessToken(_session.refresh_token);
-      if (!refreshed) {
+      let refreshed = null;
+      try {
+        refreshed = await refreshAccessToken(_session.refresh_token);
+      } catch {
+        // treat fetch errors as transient; keep current session
+        refreshed = { transient: true };
+      }
+
+      if (refreshed && !refreshed.transient) {
+        _session = refreshed;
+        storeAuth(_session);
+      } else if (!refreshed) {
+        // Hard failure (invalid refresh token) -> clear local auth so we don't loop.
         logout();
         return null;
+      } else {
+        // Transient failure (timeout/offline/server) -> keep current session and continue.
+        // This avoids "getting kicked" on a flaky connection or after long tab sleep.
       }
-      _session = refreshed;
-      storeAuth(_session);
     }
   }
+
+  
+
+  
 
   if (!_session?.access_token) {
     _spaceId = null;

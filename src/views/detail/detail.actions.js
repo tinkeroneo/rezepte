@@ -5,7 +5,7 @@ import { buildMenuIngredients, isMenuRecipe } from "../../domain/menu.js";
 
 function cookLinkFor(recipeId) {
   // konsistent zum Router
-  return `${location.origin}${location.pathname}#cook?id=${encodeURIComponent(recipeId)}`;
+  return `${location.origin}${location.pathname}#detail?id=${encodeURIComponent(recipeId)}`;
 }
 
 async function copyText(text) {

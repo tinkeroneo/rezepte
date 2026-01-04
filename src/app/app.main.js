@@ -62,7 +62,7 @@ import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds, compactOffl
 import { initRadioDock } from "../ui/radioDock.js";
 import { Wake } from "../services/wakeLock.js";
 import { installGlobalErrorHandler } from "../services/errors.js";
-import { getRecentErrors, clearRecentErrors } from "../services/errors.js";
+import { getRecentErrors, clearRecentErrors, getStoredErrors, clearStoredErrors } from "../services/errors.js";
 import { runExclusive } from "../services/locks.js";
 
 import { appState } from "./appState.js";
@@ -429,23 +429,6 @@ async function render(view, setView) {
           try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
-      // Apply default space (profile.default_space_id) on login/session init
-      try {
-        const p = getProfileCache?.();
-        const defSid = String(p?.default_space_id || "").trim();
-        if (defSid && String(ctx?.spaceId || "") !== defSid) {
-          setActiveSpaceId(defSid);
-          // keep offline queue scoped to new active space
-          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
-          // refresh ctx reference if callers use it later
-          try { ctx.spaceId = defSid; } catch (e) { 
-        reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message));
-           }
-        }
-      } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
 
           try {
             if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
@@ -479,22 +462,6 @@ async function render(view, setView) {
         try {
           const ctx = await initAuthAndSpace();
           try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
-      // Apply default space (profile.default_space_id) on login/session init
-      try {
-        const p = getProfileCache?.();
-        const defSid = String(p?.default_space_id || "").trim();
-        if (defSid && String(ctx?.spaceId || "") !== defSid) {
-          setActiveSpaceId(defSid);
-          // keep offline queue scoped to new active space
-          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
-          // refresh ctx reference if callers use it later
-          try { ctx.spaceId = defSid; } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
-        }
-      } catch (e) { 
                   reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message)); }
 
@@ -599,7 +566,9 @@ async function render(view, setView) {
       queueLen: (getOfflineQueue?.() || []).length,
       onRetrySync: () => drainOfflineQueue({ reason: "diagnostics" }),
       recentErrors: getRecentErrors(),
+      storedErrors: getStoredErrors?.() || [],
       onClearErrors: () => clearRecentErrors(),
+      onClearStoredErrors: () => clearStoredErrors?.(),
     };
 
     return renderDiagnosticsView({ appEl, state: view, info, setView });
@@ -904,81 +873,71 @@ async function boot() {
     shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" }));
   }
 
-  // If backend enabled: init auth before backend calls
+    // If backend enabled: init auth before backend calls
   if (useBackend) {
     try {
       const ctx = await initAuthAndSpace();
 
       // Load spaces (network, with local cache fallback) before any permission-dependent UI.
-      try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) {
-        reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message));
+      try {
+        await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated });
+      } catch (e) {
+        reportError(e, { scope: "app.main", action: "refreshSpaceSelect" });
       }
 
-      let p = null;
-      try { p = await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
-      // Apply default space (profile.default_space_id) on login/session init
+      // Ensure profile exists/loaded (non-fatal if it fails temporarily).
       try {
-        const defSid = String(p?.default_space_id || "").trim();
-        if (defSid && String(ctx?.spaceId || "") !== defSid) {
-          setActiveSpaceId(defSid);
-          // keep offline queue scoped to new active space
-          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: defSid });
-          // refresh ctx reference if callers use it later
-          try { ctx.spaceId = defSid; } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+        await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated });
+      } catch (e) {
+        reportError(e, { scope: "app.main", action: "ensureProfileLoaded" });
+      }
 
-          // refresh spaces/UI after switching space
-          try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) {
-            reportError(e, { scope: "app.js", action: String(e?.message) });
-            showError(String(e?.message));
-          }
+      // Persist last used space server-side (helps multi-device), but never override client choice on refresh.
+      if (isAuthenticated?.() && ctx?.spaceId) {
+        try {
+          await upsertProfile({ last_space_id: ctx.spaceId });
+        } catch (e) {
+          reportError(e, { scope: "app.main", action: "upsertProfile:last_space_id" });
         }
-      } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+      }
 
-      try {
-        if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
-          try {
-            await listRecipes();
-            await upsertProfile({ last_space_id: ctx.spaceId });
-          } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
-        }
-      } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+      // Scope offline queue to current user/space
       if (ctx?.user?.id || ctx?.spaceId) {
         setOfflineQueueScope({ userId: ctx.user?.id || null, spaceId: ctx.spaceId || null });
       }
+
+      // Route handling
       if (Array.isArray(ctx?.pendingInvites) && ctx.pendingInvites.length) {
         window.__tinkeroneoPendingInvites = ctx.pendingInvites;
         router.setView({ name: "invites" });
       } else if (!ctx?.spaceId && !isAuthenticated?.()) {
         router.setView({ name: "login" });
       } else if (!ctx?.spaceId && isAuthenticated?.()) {
-        try { await setUseBackend(false); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+        // Auth ok but no space assigned -> fall back to local mode
+        try {
+          await setUseBackend(false);
+        } catch (e) {
+          reportError(e, { scope: "app.main", action: "setUseBackend:false" });
+        }
       }
 
-      await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated });
-    } catch (e) {
-              reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message));
-      console.error("Auth/Space init failed:", e);
+      // Final refresh of space UI after potential routing changes.
       try {
-        if (!navigator.onLine) {
-          await setUseBackend(false);
-        }
-      } catch (err) { 
-                  reportError(err, { scope: "app.js", action: String(err?.message) });
-        showError(String(err?.message)); }
+        await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated });
+      } catch (e) {
+        reportError(e, { scope: "app.main", action: "refreshSpaceSelect:final" });
+      }
+    } catch (e) {
+      reportError(e, { scope: "app.main", action: "initAuthAndSpace" });
+      console.error("Auth/Space init failed:", e);
+
+      // If offline, degrade gracefully
+      try {
+        if (!navigator.onLine) await setUseBackend(false);
+      } catch (err) {
+        reportError(err, { scope: "app.main", action: "setUseBackend:offline" });
+      }
+
       if (!isAuthenticated?.()) {
         router.setView({ name: "login" });
       }

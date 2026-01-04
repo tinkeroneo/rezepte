@@ -2,6 +2,7 @@ import { escapeHtml, qs } from "../utils.js";
 
 export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
   const errors = info?.recentErrors ?? [];
+  const stored = info?.storedErrors ?? [];
   const backendLatency = info?.useBackend
     ? (Number.isFinite(info?.backendMs) ? `${escapeHtml(String(info.backendMs))} ms` : "—")
     : "—";
@@ -34,7 +35,7 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
         </div>
 
         <div class="panel">
-          <h3>Letzte Fehler (${errors.length})</h3>
+          <h3>Letzte Fehler (Session) (${errors.length})</h3>
           ${errors.length
             ? `
             <div class="errlist">
@@ -42,7 +43,7 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
                 .map((e) => `
                   <div class="erritem">
                     <div class="errtime">${new Date(e.ts).toLocaleString()}</div>
-                    <div class="errmsg">${escapeHtml(e.message)}</div>
+                    <div class="errmsg">${escapeHtml(e.message)}${e.count && e.count > 1 ? ` <span class="muted">(x${escapeHtml(String(e.count))})</span>` : ""}</div>
                     ${e.stack ? `<pre class="errstack">${escapeHtml(e.stack)}</pre>` : ``}
                   </div>
                 `)
@@ -53,11 +54,38 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
 
           <div class="row" style="margin-top:.75rem; gap:.5rem;">
             <button class="btn btn--ghost" id="clearErrBtn">Fehlerliste leeren</button>
+            <button class="btn btn--ghost" id="copyErrBtn" ${errors.length ? "" : "disabled"}>Letzten kopieren</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Persistente Fehler (Device) (${stored.length})</h3>
+          ${stored.length
+            ? `
+            <div class="errlist">
+              ${stored
+                .slice(0, 30)
+                .map((e) => `
+                  <div class="erritem">
+                    <div class="errtime">${new Date(e.ts).toLocaleString()}</div>
+                    <div class="errmsg">${escapeHtml(String(e.message || ""))}</div>
+                    ${e.stack ? `<pre class="errstack">${escapeHtml(String(e.stack))}</pre>` : ``}
+                  </div>
+                `)
+                .join("")}
+            </div>
+            <div class="muted" style="margin-top:.5rem;">Es werden max. 30 angezeigt (für Performance). Zum Teilen: Export kopieren.</div>
+          `
+            : `<div class="muted">Keine persistenten Fehler.</div>`}
+
+          <div class="row" style="margin-top:.75rem; gap:.5rem; flex-wrap:wrap;">
+            <button class="btn btn--ghost" id="clearStoredErrBtn">Persistente Logs löschen</button>
+            <button class="btn btn--ghost" id="exportStoredErrBtn" ${stored.length ? "" : "disabled"}>Export JSON kopieren</button>
           </div>
         </div>
 
         <div class="panel muted">
-          Tipp: \`/#selftes
+          Tipp: <code>/#selftest</code> prüft zentrale Funktionen (Storage/Backend/Import).
         </div>
     </div>
   `;
@@ -67,6 +95,36 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
   qs("#clearErrBtn")?.addEventListener("click", () => {
     info?.onClearErrors?.();
     setView({ name: "diagnostics" });
+  });
+
+  qs("#copyErrBtn")?.addEventListener("click", async () => {
+    try {
+      const last = errors?.[0];
+      if (!last) return;
+      const text = JSON.stringify(last, null, 2);
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // ignore
+    }
+  });
+
+  qs("#clearStoredErrBtn")?.addEventListener("click", () => {
+    info?.onClearStoredErrors?.();
+    setView({ name: "diagnostics" });
+  });
+
+  qs("#exportStoredErrBtn")?.addEventListener("click", async () => {
+    try {
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        ua: navigator.userAgent,
+        href: location.href,
+        errors: stored,
+      };
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+    } catch {
+      // ignore
+    }
   });
   qs("#syncRetryBtn")?.addEventListener("click", async () => {
     try {

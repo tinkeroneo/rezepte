@@ -377,17 +377,14 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
       image_focus: draftFocus
     };
 
-    // optimistic navigate
-    dirty.clearDirty();
-    img.cleanup();
 
-    if (isEdit) {
-      // Edit-View aus History entfernen
-      const targetHash = `#detail?id=${encodeURIComponent(r.id)}`;
-      window.history.replaceState(null, "", targetHash);
+    // Save to backend/local FIRST, then navigate (avoids "kick" / stale-space race on refresh)
+    const saveBtn = qs(appEl, "#saveBtn");
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.dataset._label ||= saveBtn.textContent;
+      saveBtn.textContent = "Speichere…";
     }
-
-    setView({ name: "detail", selectedId: updated.id, q: state.q });
 
     try {
       await upsertRecipe(updated);
@@ -401,8 +398,25 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
         const includeParts = moveIncludeParts ? !!moveIncludeParts.checked : true;
         await moveRecipeToSpace?.({ recipeId: updated.id, targetSpaceId, includeParts });
       }
+
+      dirty.clearDirty();
+      img.cleanup();
+
+      if (isEdit) {
+        // Edit-View aus History entfernen
+        const targetHash = `#detail?id=${encodeURIComponent(r.id)}`;
+        window.history.replaceState(null, "", targetHash);
+      }
+
+      setView({ name: "detail", selectedId: updated.id, q: state.q });
     } catch (e) {
+      // Stay on page, keep dirty state so user can retry
       alert(`Konnte nicht zum Backend speichern.\nFehler: ${e?.message ?? e}`);
+    } finally {
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = saveBtn.dataset._label || "Speichern";
+      }
     }
   });
 }
