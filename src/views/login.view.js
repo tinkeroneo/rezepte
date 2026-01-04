@@ -65,6 +65,7 @@ export function renderLoginView({ appEl, state, setView, info, useBackend, setUs
   $("#btnSend")?.addEventListener("click", async () => {
     const email = ($("#email").value || "").trim();
     const redirectTo = suggested;
+    console.log(redirectTo);
 
     if (!email) return setMsg("Bitte E-Mail eingeben.", "bad");
     // Make sure it points to index.html when using Live Server folder URLs

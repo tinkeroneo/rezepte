@@ -633,9 +633,7 @@ function normalizeRedirectTo(redirectTo) {
 
 export async function requestMagicLink({ email, redirectTo }) {
   const safeRedirect = normalizeRedirectTo(
-    redirectTo || (location.hostname === "127.0.0.1"
-      ? "http://127.0.0.1:5500/git-rezepte-main/index.html"
-      : "https://cook.tinkeroneo.de/index.html")
+    redirectTo || `${location.origin}/index.html`
   );
 
   const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
