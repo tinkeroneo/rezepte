@@ -300,7 +300,9 @@ textarea{
   min-height: 120px;
   resize: vertical;
   padding: var(--s-3) var(--ctl-px-md);
+  max-height: 60vh;
 }
+
 
 select{
   cursor: pointer;

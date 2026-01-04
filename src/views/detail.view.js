@@ -8,9 +8,7 @@ import {
   bindCooklogCard
 } from "./detail/detail.cooklog.js";
 
-import {
-  applyFocusToImg,
-} from "./detail/detail.focus.js";
+import { applyFocusToImg } from "./detail/detail.focus.js";
 
 import { renderChildrenSectionHtml, bindChildrenSection } from "./detail/detail.parts.js";
 import { bindCopyToSpace } from "./detail/detail.spaceCopy.js";

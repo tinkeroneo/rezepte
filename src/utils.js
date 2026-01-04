@@ -4,9 +4,15 @@ function isDomRoot(x) {
   return x && typeof x.querySelector === "function";
 }
 export function recipeImageOrDefault(imageUrl) {
-  return imageUrl && String(imageUrl).trim()
-    ? imageUrl
-    : "/favicon.svg";
+  if (imageUrl && String(imageUrl).trim()) return imageUrl;
+
+  const t = document.documentElement?.dataset?.theme; // "dark" | "light" (gesetzt von applyThemeAndOverlay)
+  const isDark =
+    t === "dark" ||
+    document.body?.classList?.contains("dark") ||
+    window.matchMedia?.("(prefers-color-scheme: dark)")?.matches; // fallback
+
+  return isDark ? "/faviconDark.svg" : "/favicon.svg";
 }
 
 function normalizeArgs(a, b) {

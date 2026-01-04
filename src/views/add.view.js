@@ -139,36 +139,6 @@ export function renderAddView({
         <div class="muted" id="uploadStatus" style="margin-top:.35rem;"></div>
                  <div id="imgPreviewWrap" style="margin-top:.6rem;"></div>
 
-       <div id="imgFocusPanel" style="margin-top:.6rem; display:none;">
-          <div class="muted" style="margin-bottom:.35rem;">Bild-Fokus</div>
-          <div class="row" style="gap:.6rem; flex-wrap:wrap;">
-            <label class="muted" style="min-width:140px;">
-              Modus
-              <select id="imgFocusMode">
-                <option value="auto">auto (contain)</option>
-                <option value="cover">cover</option>
-              </select>
-            </label>
-            <label class="muted" style="min-width:160px;">
-              X: <span id="imgFocusXVal">50</span>
-              <input id="imgFocusX" type="range" min="0" max="100" value="50" />
-            </label>
-            <label class="muted" style="min-width:160px;">
-              Y: <span id="imgFocusYVal">50</span>
-              <input id="imgFocusY" type="range" min="0" max="100" value="50" />
-            </label>
-            <label class="muted" style="min-width:180px;">
-              Zoom: <span id="imgFocusZoomVal">1.00</span>
-              <input id="imgFocusZoom" type="range" min="1" max="3" step="0.01" value="1" />
-            </label>
-          </div>
-          <div class="row" style="justify-content:flex-end; margin-top:.5rem;">
-            <button type="button" class="btn" id="imgFocusReset">Reset</button>
-            <button type="button" class="btn btn--solid" id="imgFocusSave">Übernehmen</button>
-          </div>
-        </div>
-
-
         <label class="muted">Zutaten (eine pro Zeile)</label>
         <textarea id="ingredients" placeholder="z.B. Weiße Bohnen\nTK-Spinat\nKala Namak">${escapeHtml(ingredientsText)}</textarea>
 
@@ -188,7 +158,9 @@ export function renderAddView({
       <div id="sheetRoot"></div>
     </div>
   `;
-
+appEl
+  .querySelectorAll("textarea")
+  .forEach(autoGrowTextarea);
   // --- DOM refs
   const titleEl = qs(appEl, "#title");
   const categoryEl = qs(appEl, "#category");
@@ -420,4 +392,13 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
       }
     }
   });
+}
+
+function autoGrowTextarea(el) {
+  const grow = () => {
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  };
+  el.addEventListener("input", grow);
+  grow(); // initial
 }
