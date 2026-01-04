@@ -10,6 +10,8 @@ export function renderAccountView({ appEl }) {
   const authedEmail = String(auth?.user?.email || "");
   const cloudEnabled = !!s.readUseBackend?.();
   const activeSpaceId = String(auth?.spaceId || "");
+  const mySpaces = Array.isArray(s.getMySpaces?.()) ? s.getMySpaces() : [];
+  const activeSpaceName = String((mySpaces.find(x => String(x?.space_id || "") === activeSpaceId)?.name) || "");
   appEl.innerHTML = `
   <div class="container">
     <section class="card">
@@ -25,10 +27,7 @@ export function renderAccountView({ appEl }) {
 
       <div class="card">
         <div class="card-title">Space</div>
-        <div class="select-wrapper" style="margin-bottom:.5rem;">
-          <span class="icon">🔀 Wechseln</span>
-          <select id="spaceSelect" class="badge badge-select" title="Space wählen"></select>
-        </div>
+
 
         <div class="muted" style="font-weight:900; margin-bottom:.35rem;"></div>
         <div class="select-wrapper" style="margin-bottom:.35rem;">
@@ -60,6 +59,7 @@ export function renderAccountView({ appEl }) {
           <span id="syncBadge" class="badge" title="Sync-Status" hidden>⟳ Sync-Status</span>
         </div>
       </div>
+      <div class="card">
           <div class="card__hd">
             <div>
               <h2 class="card__title">Space teilen</h2>
@@ -73,12 +73,12 @@ export function renderAccountView({ appEl }) {
       ? `
                 <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:center;">
                   <div class="hint" style="margin:0;">Angemeldet als: <b>${escapeHtml(authedEmail || "-")}</b></div>
-                  <div class="hint" style="margin:0;">Aktiver Space: <b>${escapeHtml(activeSpaceId || "-")}</b></div>
+                  <div class="hint" style="margin:0;">Aktiver Space: <b>${escapeHtml(activeSpaceName || activeSpaceId || "-")}</b></div>
                   <button class="btn" id="btnRefreshSharing" type="button">Refresh</button>
                 </div>
 
                 <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:flex-end;">
-                  <label class="field" style="min-width:220px; flex: 1 1 220px;">
+                  <label class="field" style="min-width:120px; flex: 1 1 220px;">
                     <div class="label">E-Mail</div>
                     <input id="shareEmail" type="email" placeholder="freundin@example.com" />
                   </label>
@@ -109,6 +109,8 @@ export function renderAccountView({ appEl }) {
       : `<div class="hint">Aktiviere CLOUD, um Sharing zu nutzen.</div>`
     }
           </div>
+        <div id="accShareMsg" class="hint" style="min-height:18px;"></div>
+      </div>
       <div class="card">
         <div class="card-title">Darstellung</div>
         <div class="row" style="gap:.5rem; flex-wrap:wrap;">
@@ -124,7 +126,11 @@ export function renderAccountView({ appEl }) {
           <button id="diagnosticsBtn" class="badge badge-btn" type="button">🩺 Diagnostics</button>
         </div>
         <div class="muted" style="margin-top:.35rem;">Import/Export als Sheet · Fehlerliste & Backend-Status</div>
+      </div>        
       </div>
+
+
+
 
     </section>
   </div>  

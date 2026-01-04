@@ -33,7 +33,8 @@ import {
   upsertProfile,
   updateSpaceName,
   moveRecipeToSpace,
-  copyRecipeToSpace
+  copyRecipeToSpace,
+  deleteRecipe
 } from "../supabase.js";
 
 import { initRouter } from "../state.js";
@@ -56,7 +57,7 @@ import { renderTimersOverlay } from "../views/timers.view.js";
 import { renderLoginView } from "../views/login.view.js";
 import { renderInvitesView } from "../views/invites.view.js";
 import { renderAccountView } from "../views/account.view.js";
-import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds } from "../domain/offlineQueue.js";
+import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds, compactOfflineQueue, dequeueOfflineAction } from "../domain/offlineQueue.js";
 
 import { initRadioDock } from "../ui/radioDock.js";
 import { Wake } from "../services/wakeLock.js";
@@ -186,6 +187,9 @@ window.__tinkeroneoSettings = {
   getAuthContext: () => {
     try { return getAuthContext(); } catch { return null; }
   },
+  getMySpaces: () => {
+    try { return appState.mySpaces || []; } catch { return []; }
+  },
   inviteToSpace: async ({ email, role, spaceId }) => inviteToSpace({ email, role, spaceId }),
   listPendingInvites: async ({ spaceId } = {}) => listPendingInvites({ spaceId }),
   listSpaceMembers: async ({ spaceId } = {}) => listSpaceMembers({ spaceId }),
@@ -234,6 +238,55 @@ const updateHeaderBadges = createHeaderBadgesUpdater({
   getOfflineQueue,
   getMySpaces: () => appState.mySpaces,
 });
+
+async function drainOfflineQueue({ reason = "auto" } = {}) {
+  // Only relevant when backend is enabled + online + authenticated
+  if (!useBackend) return { ok: true, skipped: "useBackendOff" };
+  if (navigator.onLine === false) return { ok: true, skipped: "offline" };
+  if (!isAuthenticated?.()) return { ok: true, skipped: "notAuthed" };
+
+  // Compact queue first to avoid duplicate upserts.
+  compactOfflineQueue();
+  const q = getOfflineQueue() || [];
+  if (q.length === 0) return { ok: true, skipped: "empty" };
+
+  updateHeaderBadges({ syncing: true, syncError: false });
+  let anyError = false;
+
+  for (const a of q) {
+    try {
+      if (a.kind === "recipe_upsert" && a.recipe?.id) {
+        await upsertRecipe(a.recipe);
+        dequeueOfflineAction(a.id);
+      } else if (a.kind === "recipe_delete" && a.recipeId) {
+        await deleteRecipe(a.recipeId);
+        dequeueOfflineAction(a.id);
+      } else {
+        // Unknown action -> keep (avoid data loss)
+      }
+    } catch (e) {
+      anyError = true;
+      reportError(e, { scope: "offlineSync", action: a?.kind || "unknown", reason });
+      // Stop early; backend might be down; keep remaining actions.
+      break;
+    }
+  }
+
+  updateHeaderBadges({ syncing: false, syncError: anyError });
+  return { ok: !anyError };
+}
+
+function wireOnlineOfflineHandlers() {
+  const onOnline = () => {
+    updateHeaderBadges();
+    // Try to drain queued actions whenever connection comes back.
+    drainOfflineQueue({ reason: "online" });
+  };
+  const onOffline = () => updateHeaderBadges();
+
+  window.addEventListener("online", onOnline);
+  window.addEventListener("offline", onOffline);
+}
 
 /* =========================
    DATA STATE
@@ -411,6 +464,7 @@ async function render(view, setView) {
           window.__tinkeroneoPendingInvites = [];
         }
         if (!(window.__tinkeroneoPendingInvites || []).length) {
+          await drainOfflineQueue({ reason: "boot" });
           await runExclusive("loadAll", () => loadAll());
           setView({ name: "list", selectedId: null, q: "" });
           return;
@@ -542,6 +596,8 @@ async function render(view, setView) {
       backendOk: useBackend ? backendOk : true,
       backendMs,
       importOk: typeof importRecipesIntoApp === "function",
+      queueLen: (getOfflineQueue?.() || []).length,
+      onRetrySync: () => drainOfflineQueue({ reason: "diagnostics" }),
       recentErrors: getRecentErrors(),
       onClearErrors: () => clearRecentErrors(),
     };
@@ -595,6 +651,11 @@ const onImportRecipesHandler = async ({ items, mode, targetSpaceId }) =>
       router,
       setActiveSpaceId,
       getAuthContext,
+      getMySpaces: () => appState.mySpaces,
+      inviteToSpace,
+      listPendingInvites,
+      listSpaceMembers,
+      revokeInvite,
       setOfflineQueueScope,
       updateHeaderBadges,
       runExclusive,
@@ -736,6 +797,7 @@ const setDirtyIndicator = createDirtyIndicator();
 
 export function startApp() {
   installHeaderWiring();
+  wireOnlineOfflineHandlers();
   // Keep behavior: don't await boot() here (boot does its own async work)
   boot();
 }

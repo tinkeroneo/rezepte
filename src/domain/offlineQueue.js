@@ -46,3 +46,25 @@ export function getPendingRecipeIds() {
   }
   return ids;
 }
+
+// Keep only the latest recipe action per recipeId (dedup).
+// Non-recipe actions are kept as-is in their original order.
+export function compactOfflineQueue() {
+  const q = getOfflineQueue();
+  const keepOther = [];
+  const byRecipe = new Map();
+
+  for (const a of q) {
+    if (a && (a.kind === "recipe_upsert" || a.kind === "recipe_delete") && a.recipeId) {
+      const prev = byRecipe.get(a.recipeId);
+      if (!prev || (a.ts ?? 0) >= (prev.ts ?? 0)) byRecipe.set(a.recipeId, a);
+    } else {
+      keepOther.push(a);
+    }
+  }
+
+  const keepRecipe = Array.from(byRecipe.values()).sort((a, b) => (a?.ts ?? 0) - (b?.ts ?? 0));
+  const next = [...keepOther, ...keepRecipe];
+  lsSet(key(), next);
+  return next;
+}

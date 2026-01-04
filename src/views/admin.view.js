@@ -144,7 +144,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
                 <span>Highlight</span>
               </label>
             </div>
-</label>
+            </label>
             <label class="field">
             <div class="row row--spread" style="align-items:flex-start; gap: 14px;">
               <div>
@@ -156,7 +156,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
                 <span>Ton</span>
               </label>
             </div>
-</label>
+            </label>
             <div class="row" style="flex-wrap:wrap; gap: 12px; align-items:flex-end;">
               <label class="field" style="min-width:240px;">
                 <div class="label">Sound</div>
@@ -179,7 +179,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
               <button class="btn" id="timerSoundPreview" type="button" title="Sound abspielen">▶︎ Test</button>
             </div>
 
-          </div>
+          </div>  
         </section>
 
         <section class="card">
@@ -326,7 +326,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
   // Tools
   q("#btnDiagnostics")?.addEventListener("click", () => setView({ name: "diagnostics" }));
   q("#btnSelftest")?.addEventListener("click", () => setView({ name: "selftest" }));
-  q("#btnLogin")?.addEventListener("click", () => setView({ name: "login" }));
   q("#btnReload")?.addEventListener("click", () => location.reload());
 
   // category colors

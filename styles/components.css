@@ -873,3 +873,8 @@ input[type="search"]:focus, input[type="text"]:focus, textarea:focus, select:foc
   bottom: var(--s-1_5);
   z-index: var(--z-floating);
 }
+
+
+/* account sharing message */
+.hint-ok { color: rgba(120, 220, 160, .95); }
+.hint-bad { color: rgba(255, 120, 120, .95); }

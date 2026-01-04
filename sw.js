@@ -1,5 +1,5 @@
 // sw.js - minimal offline cache for app shell (no build step)
-const CACHE = "tinkeroneo-shell-v4-20260103";
+const CACHE = "tinkeroneo-v4-20260104";
 
 const ASSETS = [
   "./",
@@ -69,6 +69,35 @@ self.addEventListener("fetch", (event) => {
   }
 
   // Cache-first for everything else (images, icons, etc.)
+
+  // Stale-while-revalidate for JS/CSS (prevents "needs hard refresh" for styling/scripts)
+  const isAsset = /\.(?:css|js|mjs)$/i.test(url.pathname);
+  if (isAsset) {
+    event.respondWith((async () => {
+      const cache = await caches.open(CACHE);
+      const cached = await cache.match(req);
+      const fetchPromise = (async () => {
+        try {
+          const res = await fetch(req);
+          if (res && res.ok) await cache.put(req, res.clone());
+          return res;
+        } catch {
+          return null;
+        }
+      })();
+
+      // If we have cached, return it immediately and refresh in background
+      if (cached) {
+        fetchPromise.catch(() => {});
+        return cached;
+      }
+
+      const fresh = await fetchPromise;
+      return fresh || new Response("Offline", { status: 503 });
+    })());
+    return;
+  }
+
   event.respondWith((async () => {
     const cached = await caches.match(req);
     if (cached) return cached;
