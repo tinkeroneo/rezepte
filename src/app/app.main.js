@@ -90,7 +90,7 @@ import {
   readTimerSoundVolume,
   setTimerSoundVolume
 } from "./localSettings.js";
-
+import { withLoader } from "../ui/loader.js";
 import { applyThemeAndOverlay } from "./ui/theme.js";
 import { installHeaderWiring } from "./ui/header.js";
 import { wireHeaderSpaceSelect } from "./ui/headerSpaceSelect.js";
@@ -256,7 +256,11 @@ async function drainOfflineQueue({ reason = "auto" } = {}) {
   for (const a of q) {
     try {
       if (a.kind === "recipe_upsert" && a.recipe?.id) {
-        await upsertRecipe(a.recipe);
+
+        await withLoader("Speichere…", async () => {
+          await upsertRecipe(a.recipe);
+        });
+
         dequeueOfflineAction(a.id);
       } else if (a.kind === "recipe_delete" && a.recipeId) {
         await deleteRecipe(a.recipeId);
@@ -365,13 +369,15 @@ async function render(view, setView) {
               <div class="muted" style="margin-top:.35rem;">Einen Moment</div>
             </div>
           </div>`;
-        } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+        } catch (e) {
+          reportError(e, { scope: "app.js", action: String(e?.message) });
+          showError(String(e?.message));
+        }
 
-        try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+        try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) {
+          reportError(e, { scope: "app.js", action: String(e?.message) });
+          showError(String(e?.message));
+        }
         __permBootstrapInFlight = false;
 
         // Recompute and only re-render if we actually got something new.
@@ -426,22 +432,25 @@ async function render(view, setView) {
         try { await acceptInvite(inviteId); } catch (e) { alert(String(e?.message || e)); }
         try {
           const ctx = await initAuthAndSpace();
-          try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+          try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) {
+            reportError(e, { scope: "app.js", action: String(e?.message) });
+            showError(String(e?.message));
+          }
 
           try {
             if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
               try {
                 await listRecipes();
                 await upsertProfile({ last_space_id: ctx.spaceId });
-              } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+              } catch (e) {
+                reportError(e, { scope: "app.js", action: String(e?.message) });
+                showError(String(e?.message));
+              }
             }
-          } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+          } catch (e) {
+            reportError(e, { scope: "app.js", action: String(e?.message) });
+            showError(String(e?.message));
+          }
           window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
         } catch {
           window.__tinkeroneoPendingInvites = [];
@@ -455,28 +464,32 @@ async function render(view, setView) {
         render({ name: "invites" }, setView);
       },
       onDecline: async (inviteId) => {
-        try { await declineInvite(inviteId); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message));
-        alert(String(e?.message || e)); }
+        try { await declineInvite(inviteId); } catch (e) {
+          reportError(e, { scope: "app.js", action: String(e?.message) });
+          showError(String(e?.message));
+          alert(String(e?.message || e));
+        }
         try {
           const ctx = await initAuthAndSpace();
-          try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+          try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) {
+            reportError(e, { scope: "app.js", action: String(e?.message) });
+            showError(String(e?.message));
+          }
 
           try {
             if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
               try {
                 await listRecipes();
                 await upsertProfile({ last_space_id: ctx.spaceId });
-              } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+              } catch (e) {
+                reportError(e, { scope: "app.js", action: String(e?.message) });
+                showError(String(e?.message));
+              }
             }
-          } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+          } catch (e) {
+            reportError(e, { scope: "app.js", action: String(e?.message) });
+            showError(String(e?.message));
+          }
           window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
         } catch {
           window.__tinkeroneoPendingInvites = [];
@@ -508,8 +521,8 @@ async function render(view, setView) {
       localStorage.removeItem(k);
       results.push({ name: "LocalStorage read/write", ok: v === "1" });
     } catch (e) {
-              reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message));
+      reportError(e, { scope: "app.js", action: String(e?.message) });
+      showError(String(e?.message));
       results.push({ name: "LocalStorage read/write", ok: false, detail: String(e?.message || e) });
     }
 
@@ -518,7 +531,7 @@ async function render(view, setView) {
         await listRecipes();
         results.push({ name: "Backend erreichbar (listRecipes)", ok: true });
       } catch (e) {
-                reportError(e, { scope: "app.js", action: String(e?.message) });
+        reportError(e, { scope: "app.js", action: String(e?.message) });
         showError(String(e?.message));
         results.push({ name: "Backend erreichbar (listRecipes)", ok: false, detail: String(e?.message || e) });
       }
@@ -575,34 +588,34 @@ async function render(view, setView) {
   }
 
 
-const onImportRecipesHandler = async ({ items, mode, targetSpaceId }) =>
-  runExclusive("importRecipes", async () => {
-    // optional: import into selected space (backend only)
-    const sid = String(targetSpaceId || "").trim();
-    if (useBackend && sid) {
-      try {
-        setActiveSpaceId(sid);
-        const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
-        setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
-        await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated });
-        await refreshProfileUi({ getAuthContext, getProfile, upsertProfile, isAuthenticated });
-        updateHeaderBadges?.();
-      } catch (e) {
-        reportError(e, { scope: "app.main", action: "importSwitchSpace" });
-        showError(String(e?.message || e));
+  const onImportRecipesHandler = async ({ items, mode, targetSpaceId }) =>
+    runExclusive("importRecipes", async () => {
+      // optional: import into selected space (backend only)
+      const sid = String(targetSpaceId || "").trim();
+      if (useBackend && sid) {
+        try {
+          setActiveSpaceId(sid);
+          const ctx = (() => { try { return getAuthContext(); } catch { return null; } })();
+          setOfflineQueueScope({ userId: ctx?.user?.id || null, spaceId: ctx?.spaceId || null });
+          await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated });
+          await refreshProfileUi({ getAuthContext, getProfile, upsertProfile, isAuthenticated });
+          updateHeaderBadges?.();
+        } catch (e) {
+          reportError(e, { scope: "app.main", action: "importSwitchSpace" });
+          showError(String(e?.message || e));
+        }
       }
-    }
 
-    await importRecipesIntoApp({
-      items,
-      mode,
-      repo: appState.repo,
-      useBackend,
-      spaceId: String(getAuthContext?.()?.spaceId || ""),
+      await importRecipesIntoApp({
+        items,
+        mode,
+        repo: appState.repo,
+        useBackend,
+        spaceId: String(getAuthContext?.()?.spaceId || ""),
+      });
+
+      await loadAll();
     });
-
-    await loadAll();
-  });
 
 
   if (view.name === "account") {
@@ -660,7 +673,7 @@ const onImportRecipesHandler = async ({ items, mode, targetSpaceId }) =>
       mySpaces: appState.mySpaces,
       activeSpaceId,
       onImportRecipes: onImportRecipesHandler,
-      });
+    });
   }
 
   if (view.name === "detail") {
@@ -727,9 +740,10 @@ const onImportRecipesHandler = async ({ items, mode, targetSpaceId }) =>
         try {
           await listRecipes();
           await upsertProfile({ last_space_id: sid });
-        } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+        } catch (e) {
+          reportError(e, { scope: "app.js", action: String(e?.message) });
+          showError(String(e?.message));
+        }
       },
       upsertRecipe: async (rec) => {
         const key = `upsert:${rec.id || "new"}`;
@@ -793,9 +807,10 @@ async function boot() {
   if (useBackend && typeof location !== 'undefined') {
     const h = String(location.hash || '');
     if (h.includes('access_token=') && h.includes('refresh_token=')) {
-      try { await initAuthAndSpace(); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+      try { await initAuthAndSpace(); } catch (e) {
+        reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+      }
     }
   }
 
@@ -806,10 +821,11 @@ async function boot() {
     },
     onViewChange: (view) => {
       if (appState.viewCleanup) {
-        try { appState.viewCleanup(); } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message));
-        console.warn("viewCleanup failed", e); }
+        try { appState.viewCleanup(); } catch (e) {
+          reportError(e, { scope: "app.js", action: String(e?.message) });
+          showError(String(e?.message));
+          console.warn("viewCleanup failed", e);
+        }
         appState.viewCleanup = null;
       }
       appState.dirtyGuard = null;
@@ -826,9 +842,10 @@ async function boot() {
         } else {
           document.documentElement.style.removeProperty("--cookbar-h");
         }
-      } catch (e) { 
-                  reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message)); }
+      } catch (e) {
+        reportError(e, { scope: "app.js", action: String(e?.message) });
+        showError(String(e?.message));
+      }
     },
   });
 
@@ -873,7 +890,7 @@ async function boot() {
     shoppingBtn.addEventListener("click", () => router.setView({ name: "shopping" }));
   }
 
-    // If backend enabled: init auth before backend calls
+  // If backend enabled: init auth before backend calls
   if (useBackend) {
     try {
       const ctx = await initAuthAndSpace();

@@ -878,3 +878,57 @@ input[type="search"]:focus, input[type="text"]:focus, textarea:focus, select:foc
 /* account sharing message */
 .hint-ok { color: rgba(120, 220, 160, .95); }
 .hint-bad { color: rgba(255, 120, 120, .95); }
+
+/* loader svg*/
+#appLoader {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  background: color-mix(in oklab, #000 35%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+#appLoader.is-on { display: flex; }
+
+.appLoader__card {
+  width: min(320px, calc(100vw - 2rem));
+  padding: 1rem 1rem .9rem;
+  border-radius: 16px;
+  background: var(--panel, #1b1b1b);
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  display: grid;
+  gap: .6rem;
+  justify-items: center;
+}
+
+.appLoader__img {
+  width: 140px;
+  height: 140px;
+  border-radius: 14px;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.appLoader__txt {
+  font-size: .95rem;
+  opacity: .95;
+  text-align: center;
+}
+
+.appLoader__dots { display: flex; gap: .35rem; }
+.appLoader__dots span {
+  width: .45rem; height: .45rem; border-radius: 999px;
+  background: currentColor;
+  opacity: .35;
+  animation: appLoaderDot 1.05s infinite ease-in-out;
+}
+.appLoader__dots span:nth-child(2) { animation-delay: .15s; }
+.appLoader__dots span:nth-child(3) { animation-delay: .30s; }
+
+@keyframes appLoaderDot {
+  0%, 80%, 100% { transform: translateY(0); opacity: .25; }
+  40% { transform: translateY(-4px); opacity: .9; }
+}

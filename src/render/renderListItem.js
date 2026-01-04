@@ -1,4 +1,4 @@
-import { escapeHtml } from "../utils.js";
+import { escapeHtml, recipeImageOrDefault } from "../utils.js";
 import { isFavorite } from "../domain/favorites.js";
 
 export function renderListItem(r, ctx) {
@@ -18,8 +18,8 @@ export function renderListItem(r, ctx) {
          style="--cat-accent:${catAccent(r.category)}">
       <div class="li-left">
         <div class="li-media">
-          ${r.image_url
-            ? `<img class="li-thumb" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+          ${recipeImageOrDefault(r.image_url)
+            ? `<img class="li-thumb" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" alt="${escapeHtml(r.title)}" loading="lazy" />`
             : coverFallbackHtml(r, "li-thumb li-thumb--empty")
         }
 

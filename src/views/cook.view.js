@@ -1,4 +1,4 @@
-import { escapeHtml, qs, qsa } from "../utils.js";
+import { escapeHtml, qs, qsa, recipeImageOrDefault } from "../utils.js";
 import { splitStepsToCards, stepDoneKey, parseDurationSeconds, formatTime } from "../domain/steps.js";
 import { buildMenuIngredients, buildMenuStepSections } from "../domain/menu.js";
 import { renderIngredientsHtml } from "./shared.ingredients.js";
@@ -97,11 +97,14 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
 
         <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
 <details class="image-toggle"> <summary>Bild anzeigen</summary>
-        ${r.image_url ? `
+        ${recipeImageOrDefault(r.image_url) ? `
           <div style="margin:.75rem 0;">
-          
-            <img src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}"
-                 style="width:100%; border-radius:12px; display:block;" />
+  
+
+            <img src="${escapeHtml(recipeImageOrDefault(r.image_url))}"
+  alt="${escapeHtml(r.title)}"
+  style="width:100%; border-radius:12px; display:block;"
+  onerror="this.onerror=null;this.src='/favicon.svg';" />
           </div>
         ` : ""}</details>
 

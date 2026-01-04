@@ -1,5 +1,5 @@
 // src/views/detail/detail.templates.js
-import { escapeHtml } from "../../utils.js";
+import { escapeHtml, recipeImageOrDefault } from "../../utils.js";
 import { splitStepsToCards } from "../../domain/steps.js";
 import { buildMenuIngredients, buildMenuStepSections } from "../../domain/menu.js";
 import { renderIngredientsHtml } from "../shared.ingredients.js";
@@ -43,7 +43,7 @@ export function renderDetailImageHtml({ r }) {
   return `
     <div style="margin:.75rem 0;">
       <div class="img-focus-frame">
-        <img id="detailImg" class="detail-img" src="${escapeHtml(r.image_url)}" alt="${escapeHtml(r.title)}" />
+        <img id="detailImg" class="detail-img" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" alt="${escapeHtml(r.title)}" />
       </div>
 
       <div id="imgFocusPanel" class="card" style="margin-top:.5rem; padding:.75rem; display:none;">

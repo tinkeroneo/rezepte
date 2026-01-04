@@ -3,6 +3,11 @@
 function isDomRoot(x) {
   return x && typeof x.querySelector === "function";
 }
+export function recipeImageOrDefault(imageUrl) {
+  return imageUrl && String(imageUrl).trim()
+    ? imageUrl
+    : "/favicon.svg";
+}
 
 function normalizeArgs(a, b) {
   // Standard: (selector, root)

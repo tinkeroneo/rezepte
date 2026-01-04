@@ -1,5 +1,5 @@
 // src/views/detail.view.js
-import { qs } from "../utils.js";
+import { qs, recipeImageOrDefault } from "../utils.js";
 
 import { getLastCooked, getAvgRating, getRatingCount } from "../domain/cooklog.js";
 import {
@@ -127,7 +127,7 @@ export function renderDetailView({
 
 
   // image click always ok (read-only allowed)
-  bindDetailImageClick({ appEl, imageUrl: r.image_url });
+  bindDetailImageClick({ appEl, imageUrl: recipeImageOrDefault(r.image_url) });
 
   // cooklog is view-only / refresh
   bindCooklogCard({

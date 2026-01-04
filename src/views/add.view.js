@@ -1,4 +1,4 @@
-import { escapeHtml, qs } from "../utils.js";
+import { escapeHtml, qs, recipeImageOrDefault } from "../utils.js";
 import { compressImageFile } from "../domain/images.js";
 import { generateId } from "../domain/id.js";
 import { deleteRecipe as sbDelete } from "../supabase.js";
@@ -7,7 +7,7 @@ import { createDirtyTracker } from "../ui/dirtyTracker.js";
 import { createImagePicker } from "../ui/imagePicker.js";
 
 import { ack } from "../ui/feedback.js";
- 
+import { withLoader } from "../ui/loader.js";
 import { applyFocusToImg, bindImageFocusPanel, normalizeFocus } from "./detail/detail.focus.js";
 
 
@@ -132,7 +132,7 @@ export function renderAddView({
 
         <label class="muted">Foto</label>
         <div class="row">
-          <input id="image_url" type="text" placeholder="https://... oder per Upload setzen" value="${escapeHtml(r.image_url ?? "")}" />
+          <input id="image_url" type="text" placeholder="https://... oder per Upload setzen" value="${escapeHtml(recipeImageOrDefault(r.image_url) ?? "")}" />
         </div>
 
         <input id="image_file" type="file" accept="image/*" />
@@ -342,9 +342,10 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
         });
 
         img.setStatus(`Uploading… (${Math.round(file.size / 1024)} KB)`);
+        await withLoader("Uploading…", async () => {
         const uploadedUrl = await uploadRecipeImage(file, r.id);
         image_url = uploadedUrl;
-
+        });
         img.clearPendingFile();
         img.setStatus("Upload fertig.");
       } catch (e) {
