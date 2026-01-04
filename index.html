@@ -19,18 +19,16 @@
       <div class="header-grid">
         <div class="header-row header-row--top">
           <button id="backBtn" class="badge badge-btn" type="button" title="Zurück" hidden>←</button>
-
-          <button id="vegan101HeaderBtn" class="badge badge-btn badge--gold" type="button" title="Vegan 101">🌱</button>
+          <div class="header-space" id="headerSpaceWrap">
+            <button id="headerSpaceToggle" class="badge badge-btn badge--space-toggle" type="button" title="Space wechseln" aria-expanded="false">🔀</button>
+            <select id="headerSpaceSelect" class="badge badge-select badge--space" title="Space wählen"></select>
+          </div>
+          <button id="vegan101HeaderBtn" class="badge badge-btn" type="button" title="Vegan 101">🌱</button>
 
           <span id="dirtyDot" class="badge badge-btn" title="Ungespeichert" hidden>●</span>
           <button id="modeBadge" class="badge badge-btn" type="button" title="Speicher-Modus">—</button>
-        </div>
 
-        <div class="header-row header-row--bottom">
-          <div class="header-space">
-            <span class="header-space__icon" aria-hidden="true">🔀</span>
-            <select id="headerSpaceSelect" class="badge badge-select badge--space" title="Space wählen"></select>
-          </div>
+
 
           <div class="header-actions">
             <button id="radioHeaderBtn" class="badge badge-btn" type="button" title="Radio" hidden>🎧</button>

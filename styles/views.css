@@ -44,6 +44,44 @@
   bottom: calc(var(--s-5) + env(safe-area-inset-bottom));
   z-index: var(--z-fab);
 }
+/* ---------- Floating Action Button (Add) ---------- */
+.fab-add {
+  position: fixed;
+  right: var(--s-5);
+  bottom: calc(var(--s-5) + env(safe-area-inset-bottom));
+  z-index: var(--z-fab);
+  width: 48px;          /* vorher meist ~32px */
+  height: 48px;
+  border-radius: 50%;   /* rund */
+background-color:  var(--card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color:  var(--text);
+  font-size: 28px;      /* Icon/Text größer */
+  line-height: 1;
+  border-color: var(--primary);
+  
+}
+
+/* Hover / Active */
+.fab-add:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 10px 28px rgba(0,0,0,.4),
+    0 3px 8px rgba(0,0,0,.3);
+}
+
+.fab-add:active {
+  transform: translateY(0);
+  border-bottom: var(--primary);
+}
+.fab-add::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
 
 .fab-menu {
   position: fixed;

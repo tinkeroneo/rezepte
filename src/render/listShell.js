@@ -68,7 +68,7 @@ export function renderListShell({ q = "" } = {}) {
         <button class="btn btn--ghost fab-menu__item" id="fabExport" role="menuitem" type="button" title="Rezepte exportieren">Export</button>
       </div>
 
-      <button class="fab" id="addFab" aria-label="Rezept hinzufügen">+</button>
+      <button class="fab-add" id="addFab" aria-label="Rezept hinzufügen">+</button>
     </div>
   `;
 }

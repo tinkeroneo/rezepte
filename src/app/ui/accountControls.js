@@ -33,6 +33,9 @@ export function wireAccountControls(ctx) {
     updateSpaceName,
 
     installAdminCorner,
+
+
+
   } = ctx;
 
   // THEME
@@ -205,6 +208,18 @@ export function wireAccountControls(ctx) {
       location.hash = "admin";
     });
   }
+
+
+  // TOOLS: Import / Export / Diagnostics
+  const diagBtn = document.getElementById("diagnosticsBtn");
+  if (diagBtn && !diagBtn.__installed) {
+    diagBtn.__installed = true;
+    diagBtn.addEventListener("click", () => {
+      router?.setView?.({ name: "diagnostics" });
+    });
+  }
+
+  
 
   // ensures text/icons are current + wires profile buttons (safe)
   updateHeaderBadges?.();

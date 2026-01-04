@@ -8,7 +8,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
 
   const cloudEnabled = !!s.readUseBackend?.();
   const auth = s.getAuthContext?.() || null;
-  const authedEmail = String(auth?.user?.email || "");
   const activeSpaceId = String(auth?.spaceId || "");
   const winter = !!s.readWinter?.();
   const radioConsent = !!s.readRadioConsent?.();
@@ -117,57 +116,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
           </div>
         </section>
 
-        <section class="card">
-          <div class="card__hd">
-            <div>
-              <h2 class="card__title">Space teilen</h2>
-              <div class="card__subtitle">Einladen per Mail (CLOUD)</div>
-            </div>
-          </div>
-          <div class="card__bd">
-            <div class="hint">Einladen per Mail: Die eingeladene Person loggt sich ein und wird automatisch Mitglied. (RLS schützt eure Daten.)</div>
-
-            ${cloudEnabled
-              ? `
-                <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:center;">
-                  <div class="hint" style="margin:0;">Angemeldet als: <b>${escapeHtml(authedEmail || "-")}</b></div>
-                  <div class="hint" style="margin:0;">Aktiver Space: <b>${escapeHtml(activeSpaceId || "-")}</b></div>
-                  <button class="btn" id="btnRefreshSharing" type="button">Refresh</button>
-                </div>
-
-                <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:flex-end;">
-                  <label class="field" style="min-width:220px; flex: 1 1 220px;">
-                    <div class="label">E-Mail</div>
-                    <input id="shareEmail" type="email" placeholder="freundin@example.com" />
-                  </label>
-
-                  <label class="field" style="min-width:160px;">
-                    <div class="label">Rolle</div>
-                    <select id="shareRole">
-                      <option value="viewer">viewer (lesen)</option>
-                      <option value="editor">editor (bearbeiten)</option>
-                      <option value="owner">owner (verwalten)</option>
-                    </select>
-                  </label>
-
-                  <button class="btn btn--ghost" id="btnInvite" type="button">Einladen</button>
-                </div>
-
-                <div class="row" style="flex-wrap:wrap; gap:1rem; align-items:flex-start;">
-                  <div style="min-width:260px; flex: 1 1 260px;">
-                    <div class="label">Mitglieder (user_spaces)</div>
-                    <div id="membersList" class="hint">Lade…</div>
-                  </div>
-                  <div style="min-width:260px; flex: 1 1 260px;">
-                    <div class="label">Offene Einladungen</div>
-                    <div id="invitesList" class="hint">Lade…</div>
-                  </div>
-                </div>
-              `
-              : `<div class="hint">Aktiviere CLOUD, um Sharing zu nutzen.</div>`
-            }
-          </div>
-        </section>
+        
 
         <section class="card">
           <div class="card__hd">
@@ -244,7 +193,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
             <div class="row" style="flex-wrap:wrap;">
               <button class="btn" id="btnDiagnostics" type="button">Diagnostics</button>
               <button class="btn" id="btnSelftest" type="button">Selftest</button>
-              <button class="btn" id="btnLogin" type="button">Login</button>
               <button class="btn" id="btnReload" type="button">Reload</button>
             </div>
 

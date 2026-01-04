@@ -1,5 +1,5 @@
 // sw.js - minimal offline cache for app shell (no build step)
-const CACHE = "tinkeroneo-shell-v3-20251231";
+const CACHE = "tinkeroneo-shell-v4-20260103";
 
 const ASSETS = [
   "./",
@@ -40,8 +40,15 @@ self.addEventListener("fetch", (event) => {
   // Don't try to cache cross-origin (Supabase, etc.)
   if (url.origin !== self.location.origin) return;
 
-  // Network-first for HTML, cache-first for others
-  if (req.mode === "navigate" || req.headers.get("accept")?.includes("text/html")) {
+  const isHtml = req.mode === "navigate" || req.headers.get("accept")?.includes("text/html");
+  const isCodeAsset =
+    req.destination === "script" ||
+    req.destination === "style" ||
+    url.pathname.endsWith(".js") ||
+    url.pathname.endsWith(".css");
+
+  // Network-first for HTML and for code assets (CSS/JS) to reduce "needs hard refresh" issues.
+  if (isHtml || isCodeAsset) {
     event.respondWith((async () => {
       try {
         const res = await fetch(req);
@@ -49,13 +56,19 @@ self.addEventListener("fetch", (event) => {
         cache.put(req, res.clone());
         return res;
       } catch {
-        const cached = await caches.match("./index.html");
-        return cached || new Response("Offline", { status: 503 });
+        const cached = await caches.match(req);
+        if (cached) return cached;
+        if (isHtml) {
+          const shell = await caches.match("./index.html");
+          return shell || new Response("Offline", { status: 503 });
+        }
+        return new Response("Offline", { status: 503 });
       }
     })());
     return;
   }
 
+  // Cache-first for everything else (images, icons, etc.)
   event.respondWith((async () => {
     const cached = await caches.match(req);
     if (cached) return cached;

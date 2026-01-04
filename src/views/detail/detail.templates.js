@@ -18,14 +18,10 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
             <button class="btn btn--ghost" id="cookBtn" type="button">👨‍🍳 Kochen</button>
 
-            ${
-              canWrite
-                ? `<button class="btn btn--ghost" id="editBtn" type="button" title="Rezept bearbeiten">✏️ Bearbeiten</button>`
-                : `<button class="btn btn--ghost" id="editBtn" type="button" disabled title="Nur Owner/Editor kann bearbeiten" style="opacity:.5;">✏️ Bearbeiten</button>`
-            }
+            ${canWrite ? `<button class="btn btn--ghost" id="editBtn" type="button" title="Rezept bearbeiten">✏️ Bearbeiten</button>` : ``}
 
             <button class="btn btn--ghost" id="copyBtn" type="button" title="In anderen Space kopieren">📤 Kopieren</button>
-            <button class="btn btn--ghost" id="deleteBtn" type="button" title="Rezept löschen">🗑️</button>
+            ${canWrite ? `<button class="btn btn--ghost" id="deleteBtn" type="button" title="Rezept löschen">🗑️</button>` : ``}
           </div>
 
           <button class="btn btn--ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button>
