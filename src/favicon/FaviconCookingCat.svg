@@ -1,8 +1,76 @@
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 width="100%" viewBox="0 0 1024 1024" enable-background="new 0 0 1024 1024" xml:space="preserve">
+ 
 
 
-<path fill="#010101" opacity="1.000000" stroke="none" 
+<style>
+    :root {
+      --ink: #111;
+      --gold: #d2b254;
+    }
+
+    /* Loader-Ring */
+    .ring {
+      fill: none;
+      stroke: var(--gold);
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      stroke-dasharray: 0.28 0.72;
+      animation: ring 50.4s linear infinite;
+      transform-origin: 50% 50%;
+    }
+
+    @keyframes ring {
+      to { transform: rotate(360deg); }
+    }
+
+
+/* Dampf */
+    .steam {
+      fill: #585551ff;
+      stroke: #585551ff;
+      stroke-width: 2.6;
+      opacity: 0;
+      animation: steam 1.8s ease-in-out infinite;
+    }
+    .steam.s2 { animation-delay: .2s; }
+    .steam.s3 { animation-delay: .8s; }
+
+    @keyframes steam {
+      0%   { opacity: 0; transform: translateY(6%); }
+      20%  { opacity: .4; }
+      60%  { opacity: .3; transform: translateY(-6%); }
+      100% { opacity: 0; transform: translateY(-12%); }
+    }
+
+    /* Linien */
+    .ink {
+      stroke: #585551ff;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.4;
+    }
+    .fill {
+      fill: #585551ff;
+    }
+
+
+  </style>
+
+  <!-- Goldring (innen transparent) -->
+  <circle
+    class="ring"
+    cx="490"
+    cy="490"
+    r="450"
+    pathLength="20"
+  />
+
+
+
+
+<path class="Cat" fill="#010101" opacity="1.000000" stroke="none" 
 	d="
 M423.145538,306.152802 
 	C435.850067,299.325104 448.406860,292.195374 461.353363,285.862305 
@@ -100,7 +168,7 @@ M380.837128,603.665100
 	C406.164398,645.708679 397.944672,623.504089 380.837128,603.665100 
 z"/>
 
-<path fill="#020202" opacity="1.000000" stroke="none" 
+<path class="pot" fill="#020202" opacity="1.000000" stroke="none" 
 	d="
 M663.000000,743.885498 
 	C564.735107,744.200134 543.429565,743.268738 536.684082,737.689453 
@@ -166,7 +234,7 @@ M631.401367,664.624207
 	C619.173645,656.001770 624.261780,662.437256 631.063232,667.999939 
 	C631.203186,666.699280 631.272522,666.055298 631.401367,664.624207 
 z"/>
-<path fill="#020202" opacity="1.000000" stroke="none" 
+<path  class="cookingHat" fill="#020202" opacity="1.000000" stroke="none" 
 	d="
 M339.049896,290.905273 
 	C335.680298,290.901581 332.801453,290.901581 328.651672,290.901581 
@@ -192,7 +260,7 @@ M339.049896,290.905273
 	C361.266357,287.249512 358.385925,290.353699 352.022980,290.860962 
 	C347.887238,291.190674 343.703094,290.913940 339.049896,290.905273 
 z"/>
-<path fill="#585551ff" opacity="1.000000" stroke="none" 
+<path  class="steam s1" fill="#585551ff" opacity="1.000000" stroke="none" 
 	d="
 M710.750610,497.167175 
 	C703.082825,486.590820 700.344910,474.878998 702.212830,462.598267 
@@ -217,7 +285,7 @@ M710.750610,497.167175
 	C734.964905,536.901794 734.456604,521.811218 727.411865,514.836975 
 	C721.746826,509.228577 716.443054,503.255219 710.750610,497.167175 
 z"/>
-<path fill="#9c9187ff" opacity="1.000000" stroke="none" 
+<path  class="steam s2" fill="#9c9187ff" opacity="1.000000" stroke="none" 
 	d="
 M740.252563,489.517914 
 	C735.597534,478.059204 738.791748,467.021179 748.848755,461.004211 
