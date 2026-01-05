@@ -6,13 +6,31 @@ function isDomRoot(x) {
 export function recipeImageOrDefault(imageUrl) {
   if (imageUrl && String(imageUrl).trim()) return imageUrl;
 
-  const t = document.documentElement?.dataset?.theme; // "dark" | "light" (gesetzt von applyThemeAndOverlay)
-  const isDark =
-    t === "dark" ||
-    document.body?.classList?.contains("dark") ||
-    window.matchMedia?.("(prefers-color-scheme: dark)")?.matches; // fallback
+  return defaultRecipeImageUrl();
+}
 
-  return isDark ? "/faviconDark.svg" : "/favicon.svg";
+function isDarkThemeForDefaults() {
+  const t = (document.documentElement?.dataset?.theme || "").toLowerCase();
+  // dataset wins (prevents "sticky" dark when a class is left behind)
+  if (t === "dark") return true;
+  if (t === "light") return false;
+  return document.documentElement?.classList?.contains("dark") ||
+    document.body?.classList?.contains("dark") ||
+    false;
+}
+
+export function defaultRecipeImageUrl() {
+  return isDarkThemeForDefaults() ? "/faviconDark.svg" : "/favicon.svg";
+}
+
+// Replaces already-rendered fallback images after a theme switch.
+// Relies on the markup: <img data-default-img="1" ...>
+export function refreshDefaultRecipeImages(root = document) {
+  const next = defaultRecipeImageUrl();
+  root.querySelectorAll('img[data-default-img="1"]').forEach((img) => {
+    // Always set; browsers won't update unless src changes.
+    img.setAttribute("src", next);
+  });
 }
 
 function normalizeArgs(a, b) {

@@ -184,6 +184,17 @@ body.dark .chip:hover{ background: rgba(255,255,255,.05); }
 
 body.dark .badge{ background: rgba(255,255,255,0.04); }
 
+/* Light theme interaction tints
+   Defaults above use subtle white tints (great on dark, nearly invisible on light).
+*/
+:root[data-theme="light"] :where(.badge,.pill,.chip){
+  --pill-bg: rgba(0,0,0,0.03);
+  --pill-border: rgba(21,24,29,0.12);
+  --pill-fg: rgba(21,24,29,0.70);
+}
+:root[data-theme="light"] .chip:hover{ background: rgba(0,0,0,0.05); }
+:root[data-theme="light"] .badge-btn:hover{ background: rgba(0,0,0,0.04); }
+
 .badge.badge--cloud,
 .badge.badge--local{ background: transparent; }
 
@@ -198,6 +209,7 @@ body.dark .badge{ background: rgba(255,255,255,0.04); }
   font-weight: 700;
   background: rgba(255,255,255,0.03);
 }
+:root[data-theme="light"] .badge.badge--tag{ background: rgba(0,0,0,0.03); }
 
 .badge-btn{
   appearance: none;
@@ -464,6 +476,7 @@ body.dark .btn:hover{ background: var(--primary-2); }
   overflow: hidden;
   background: rgba(255,255,255,0.04);
 }
+:root[data-theme="light"] .seg{ background: rgba(0,0,0,0.03); }
 .seg__btn{
   border: 0;
   background: transparent;
@@ -700,6 +713,7 @@ input[type="radio"] {
   background: rgba(255,255,255,0.03);
   font-weight: 800;
 }
+:root[data-theme="light"] .timer-chip-more{ background: rgba(0,0,0,0.03); }
 
 .timer-chip.overdue{
   border-color: rgba(210,179,123,0.55);

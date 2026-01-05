@@ -110,3 +110,35 @@
   --overlay-icon: #fff;
   --overlay-accent: var(--primary); /* dein Champagner-Gold */
 }
+
+/* Light theme overrides
+   - Activated via: document.documentElement.dataset.theme = "light"
+   - Keep overrides complete enough so Light isn't "Dark with a bright background".
+*/
+:root[data-theme="light"]{
+  /* colors */
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --card: #ffffff;
+  --text: #15181d;
+  --muted: rgba(21,24,29,0.62);
+  --border: rgba(21,24,29,0.12);
+
+  /* shadows: a bit softer for light backgrounds */
+  --shadow: 0 10px 26px rgba(0,0,0,0.12);
+  --shadow-strong: 0 18px 56px rgba(0,0,0,0.18);
+  --shadow-soft: 0 10px 26px rgba(0,0,0,0.10);
+  --shadow-med: 0 12px 34px rgba(0,0,0,0.14);
+  --shadow-pop: 0 16px 46px rgba(0,0,0,0.16);
+  --shadow-1: var(--shadow-soft);
+  --shadow-2: var(--shadow-med);
+
+  /* toast */
+  --toast-bg: rgba(255,255,255,.96);
+  --toast-text: #111;
+
+  /* overlays */
+  --overlay-bg: rgba(0, 0, 0, .35);
+  --overlay-bg-active: rgba(0, 0, 0, .45);
+  --overlay-icon: #111;
+}

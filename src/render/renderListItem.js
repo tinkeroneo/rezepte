@@ -19,7 +19,7 @@ export function renderListItem(r, ctx) {
       <div class="li-left">
         <div class="li-media">
           ${recipeImageOrDefault(r.image_url)
-            ? `<img class="li-thumb" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+            ? `<img class="li-thumb" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" data-default-img="${r.image_url ? "" : "1"}" alt="${escapeHtml(r.title)}" loading="lazy" />`
             : coverFallbackHtml(r, "li-thumb li-thumb--empty")
         }
 

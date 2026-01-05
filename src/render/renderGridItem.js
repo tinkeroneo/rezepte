@@ -14,7 +14,7 @@ export function renderGridItem(r, ctx) {
     <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
       <div class="grid-media">
         ${recipeImageOrDefault(r.image_url)
-          ? `<img class="grid-img" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+          ? `<img class="grid-img" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" data-default-img="${r.image_url ? "" : "1"}" alt="${escapeHtml(r.title)}" loading="lazy" />`
           : coverFallbackHtml(r, "grid-img")
         }
 
