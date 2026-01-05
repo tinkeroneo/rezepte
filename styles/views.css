@@ -1,7 +1,7 @@
 /* --- List: recipe grid must be multi-column --- */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: var(--s-4);
   align-items: start;
 }
@@ -17,11 +17,11 @@
   min-width: 0;
 }
 .grid-card:hover {
-  transform: translateY(-0.5px);
-  box-shadow:
-    0 10px 8px rgba(0,0,0,.4),
-    0 13px 5px rgba(0,0,0,.3);
-}
+  transform: translateY(-.7px);
+  border-top: var(--primary);
+  border-bottom: var(--primary);
+  border-left: var(--primary-soft);
+  border-right: var(--primary-soft); }
 
 /* --- Detail: image must be embedded/clipped --- */
 .img-focus-frame {
