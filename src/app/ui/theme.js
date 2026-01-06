@@ -12,8 +12,21 @@ export function applyThemeAndOverlay() {
   document.documentElement.classList.toggle("dark", !!wantsDark);
   document.body.classList.toggle("dark", !!wantsDark);
 
+  updateFavicon(resolved);
   document.body.classList.toggle("winter", readWinter());
 
   // Update already-rendered fallback images (favicon.svg/faviconDark.svg)
   refreshDefaultRecipeImages(document);
 }
+
+function updateFavicon(resolvedTheme) {
+  const icon = document.getElementById("app-favicon");
+  if (!icon) return;
+
+  icon.href =
+    (resolvedTheme === "dark"
+      ? "./faviconDark.svg"
+      : "./favicon.svg")
+    + "?v=" + (resolvedTheme === "dark" ? "d" : "l");
+}
+
