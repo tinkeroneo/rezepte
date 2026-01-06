@@ -56,7 +56,19 @@ export function bindDetailActions({
   }
 
   // Link kopieren (immer erlaubt)
-  const copyBtn = qs(appEl, "#copyCookLinkBtn");
+  const copyLinkBtn = qs(appEl, "#copyCookLinkBtn");
+  if (copyLinkBtn && !copyLinkBtn.__bound) {
+    copyLinkBtn.__bound = true;
+    copyLinkBtn.addEventListener("click", async () => {
+      const url = cookLinkFor(recipe.id);
+      const ok = await copyText(url);
+      if (ok) ack(copyLinkBtn);
+      else prompt("Cook-Link kopieren:", url);
+    });
+  }
+
+   // Link kopieren (immer erlaubt)
+  const copyBtn = qs(appEl, "#copyBtn");
   if (copyBtn && !copyBtn.__bound) {
     copyBtn.__bound = true;
     copyBtn.addEventListener("click", async () => {

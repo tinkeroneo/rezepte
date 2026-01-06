@@ -110,7 +110,7 @@ export function renderIngredientsSectionHtml({ r, recipes, partsByParent }) {
       <h3 style="margin:0;">Zutaten</h3>
       <button class="btn btn--ghost" id="addToShoppingBtn" type="button">🧺</button>
     </div>
-
+    <div class="card" style="margin-top:.6rem;">
     ${
       isMenu
         ? buildMenuIngredients(r, recipes, partsByParent)
@@ -123,6 +123,7 @@ export function renderIngredientsSectionHtml({ r, recipes, partsByParent }) {
             .join("")
         : renderIngredientsHtml(r.ingredients ?? [])
     }
+    </div>
   `;
 }
 

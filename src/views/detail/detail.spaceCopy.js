@@ -120,37 +120,77 @@ export function bindCopyToSpace({
   useBackend,
   mySpaces,
   recipe,
-  canWrite,
-  copyRecipeToSpace, // async (recipeId, targetSid, { includeParts }) => void
+  // canWrite,  // <- NICHT mehr als Gate verwenden!
+  copyRecipeToSpace, // async ({ recipe, targetSpaceId, includeParts }) => void
   onAfterCopy // () => void
 }) {
   const btn = qs(appEl, "#copyBtn");
   if (!btn) return;
 
-  if (!useBackend || !canWrite || typeof copyRecipeToSpace !== "function") {
+  // avoid double-binding
+  if (btn.__copyBound) return;
+  btn.__copyBound = true;
+
+  if (!useBackend || typeof copyRecipeToSpace !== "function") {
     btn.disabled = true;
-    btn.title = "Nur Owner/Editor & Backend aktiv";
+    btn.title = "Backend nicht aktiv";
     btn.style.opacity = "0.5";
     return;
   }
 
+  // helper: determine whether a target space is writable
+  const isWritableSpace = (sid) => {
+    const s = (mySpaces || []).find(x =>
+      x?.space_id === sid || x?.id === sid || x?.sid === sid
+    );
+    // support common shapes: canWrite / writable / role
+    if (!s) return false;
+    if (typeof s.canWrite === "boolean") return s.canWrite;
+    if (typeof s.writable === "boolean") return s.writable;
+    if (typeof s.readonly === "boolean") return !s.readonly;
+    if (typeof s.role === "string") return ["owner", "editor", "write"].includes(s.role);
+    return false;
+  };
+
+  // prefilter targets: only writable
+  const writableTargets = (mySpaces || []).filter(s => {
+    const sid = s?.space_id ?? s?.id ?? s?.sid;
+    return sid && isWritableSpace(sid);
+  });
+
+  // If there is no writable target at all, disable with proper hint.
+  if (writableTargets.length === 0) {
+    btn.disabled = true;
+    btn.title = "Kein Ziel-Space mit Schreibrechten verfügbar";
+    btn.style.opacity = "0.5";
+    return;
+  }
+
+  // allow copying even from view-space (read-only source)
+  btn.disabled = false;
+  btn.title = "In einen Space kopieren";
+
   btn.addEventListener("click", () => {
     openCopySheet({
-      mySpaces,
+      // IMPORTANT: pass only writable spaces to the sheet
+      mySpaces: writableTargets,
       currentSid: recipe?.space_id,
 
-
       onConfirm: async ({ targetSid, includeParts }) => {
-              if (!targetSid) {
-  alert("Ungültiger Ziel-Space.");
-  return;
-}
-await copyRecipeToSpace({
-  recipe,
-  targetSpaceId: targetSid,
-  includeParts
-});
+        if (!targetSid) {
+          alert("Ungültiger Ziel-Space.");
+          return;
+        }
+        if (!isWritableSpace(targetSid)) {
+          alert("In diesen Space kannst du nicht schreiben (View/Read-only).");
+          return;
+        }
 
+        await copyRecipeToSpace({
+          recipe,
+          targetSpaceId: targetSid,
+          includeParts
+        });
 
         ack(btn);
         onAfterCopy?.();
