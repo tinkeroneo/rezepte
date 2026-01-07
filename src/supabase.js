@@ -93,19 +93,20 @@ function storeAuth(auth) {
 }
 
 async function refreshAccessToken(refresh_token) {
+  if (!refresh_token) return null;
   try {
+    // Supabase GoTrue expects x-www-form-urlencoded for refresh_token grant.
+    // Putting grant_type into the query avoids "unsupported_grant_type" parsing issues.
     const res = await sbFetch(
-      `${SUPABASE_URL}/auth/v1/token`,
+      `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,
       {
         method: "POST",
         headers: {
           apikey: SUPABASE_ANON_KEY,
-          "Content-Type": "application/json",
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: JSON.stringify({
-          grant_type: "refresh_token",
-          refresh_token,
-        }),
+        body: new URLSearchParams({ refresh_token }),
         timeoutMs: 12000,
       }
     );
@@ -685,6 +686,26 @@ function sbHeaders() {
   };
 }
 
+async function sbFetchAuthed(url, opts = {}, retried = false) {
+  const res = await sbFetch(url, opts);
+
+  if (res.status === 401 && !retried && _session?.refresh_token) {
+    const refreshed = await refreshAccessToken(_session.refresh_token);
+    if (refreshed && !refreshed.transient) {
+      _session = refreshed;
+      storeAuth(_session);
+
+      const headers = { ...(opts.headers || {}) };
+      headers.Authorization = `Bearer ${_session.access_token}`;
+
+      return sbFetchAuthed(url, { ...opts, headers }, true);
+    }
+  }
+
+  return res;
+}
+
+
 /* =========================
    FETCH HELPERS
 ========================= */
@@ -745,7 +766,7 @@ export async function listRecipes() {
     _spaceId
   )}&order=created_at.desc`;
 
-  const res = await sbFetch(url, { headers: sbHeaders() });
+  const res = await sbFetchAuthed(url, { headers: sbHeaders() });
   if (!res.ok)
     throw new Error(`listRecipes failed: ${res.status} ${await sbJson(res)}`);
   return res.json();
@@ -767,7 +788,7 @@ export async function upsertRecipe(recipe) {
     image_focus: recipe.image_focus ?? { x: 50, y: 50, zoom: 1, mode: "auto" },
   };
 
-  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipes`, {
+  const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/recipes`, {
     method: "POST",
     headers: {
       ...sbHeaders(),
@@ -787,7 +808,7 @@ export async function deleteRecipe(id) {
     id
   )}&space_id=eq.${encodeURIComponent(_spaceId)}`;
 
-  const res = await sbFetch(url, { method: "DELETE", headers: sbHeaders() });
+  const res = await sbFetchAuthed(url, { method: "DELETE", headers: sbHeaders() });
   if (!res.ok)
     throw new Error(`deleteRecipe failed: ${res.status} ${await sbJson(res)}`);
   return true;
@@ -803,7 +824,7 @@ export async function listAllRecipeParts() {
     _spaceId
   )}&order=sort_order.asc`;
 
-  const res = await sbFetch(url, { headers: sbHeaders() });
+  const res = await sbFetchAuthed(url, { headers: sbHeaders() });
   if (!res.ok)
     throw new Error(`listParts failed: ${res.status} ${await sbJson(res)}`);
   return res.json();
@@ -811,7 +832,7 @@ export async function listAllRecipeParts() {
 
 export async function addRecipePart(parentId, childId, sortOrder = 0) {
   requireSpace();
-  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipe_parts`, {
+  const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/recipe_parts`, {
     method: "POST",
     headers: { ...sbHeaders(), Prefer: "resolution=merge-duplicates" },
     body: JSON.stringify([
@@ -839,7 +860,7 @@ export async function removeRecipePart(parentId, childId) {
       parentId
     )}&child_id=eq.${encodeURIComponent(childId)}`;
 
-  const res = await sbFetch(url, { method: "DELETE", headers: sbHeaders() });
+  const res = await sbFetchAuthed(url, { method: "DELETE", headers: sbHeaders() });
   if (!res.ok)
     throw new Error(
       `removeRecipePart failed: ${res.status} ${await sbJson(res)}`
@@ -860,7 +881,7 @@ export async function listCookEventsSb(recipeId) {
     `&recipe_id=eq.${encodeURIComponent(recipeId)}` +
     `&order=at.desc`;
 
-  const res = await sbFetch(url, { headers: sbHeaders() });
+  const res = await sbFetchAuthed(url, { headers: sbHeaders() });
   if (!res.ok)
     throw new Error(
       `listCookEvents failed: ${res.status} ${await sbJson(res)}`
@@ -876,7 +897,7 @@ export async function upsertCookEventSb(ev) {
     client_id: getClientId(),
   };
 
-  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/cook_events`, {
+  const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/cook_events`, {
     method: "POST",
     headers: {
       ...sbHeaders(),
@@ -899,7 +920,7 @@ export async function deleteCookEventSb(id) {
       id
     )}&space_id=eq.${encodeURIComponent(_spaceId)}`;
 
-  const res = await sbFetch(url, { method: "DELETE", headers: sbHeaders() });
+  const res = await sbFetchAuthed(url, { method: "DELETE", headers: sbHeaders() });
   if (!res.ok)
     throw new Error(
       `deleteCookEvent failed: ${res.status} ${await sbJson(res)}`
@@ -919,7 +940,7 @@ export async function logClientEvent(evt) {
     client_id: evt.client_id ?? getClientId(),
   };
 
-  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/client_logs`, {
+  const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/client_logs`, {
     method: "POST",
     headers: { ...sbHeaders(), Prefer: "return=minimal" },
     body: JSON.stringify([payload]),
@@ -1158,7 +1179,7 @@ export async function moveRecipeToSpace({ recipeId, targetSpaceId, includeParts 
   // 1) move recipes
   for (const ch of chunkArray(idsToMove, 50)) {
     const q = ch.map(encodeURIComponent).join(",");
-    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipes?id=in.(${q})`, {
+    const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/recipes?id=in.(${q})`, {
       method: "PATCH",
       headers: {
         ...sbHeaders(),
@@ -1176,7 +1197,7 @@ export async function moveRecipeToSpace({ recipeId, targetSpaceId, includeParts 
     for (const chunkEdges of chunkArray(edgesToMove, 200)) {
       const parentIds = Array.from(new Set(chunkEdges.map(e => String(e.parent_id))));
       const q = parentIds.map(encodeURIComponent).join(",");
-      const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(fromSpaceId)}&parent_id=in.(${q})`, {
+      const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(fromSpaceId)}&parent_id=in.(${q})`, {
         method: "PATCH",
         headers: {
           ...sbHeaders(),
@@ -1233,7 +1254,7 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
   });
 
   for (const ch of chunkArray(newRows, 50)) {
-    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipes`, {
+    const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/recipes`, {
       method: "POST",
       headers: {
         ...sbHeaders(),
@@ -1258,7 +1279,7 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
       }));
 
     for (const ch of chunkArray(edgeRows, 200)) {
-      const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipe_parts`, {
+      const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/recipe_parts`, {
         method: "POST",
         headers: {
           ...sbHeaders(),

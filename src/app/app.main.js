@@ -802,6 +802,22 @@ async function boot() {
 
   window.__tinkeroneoUpdateBadges = () => updateHeaderBadges();
 
+  // When the app returns from background (mobile sleep), refresh auth once (best-effort).
+  // This prevents "looks logged out" behavior when the access token expired while the app was paused.
+  let __authResumeInflight = false;
+  async function __resumeRefreshAuth() {
+    if (!useBackend || __authResumeInflight) return;
+    __authResumeInflight = true;
+    try { await initAuthAndSpace(); } catch { /* ignore */ }
+    finally { __authResumeInflight = false; }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") __resumeRefreshAuth();
+  });
+  window.addEventListener("focus", () => __resumeRefreshAuth());
+
+
 
   // If page was opened via Supabase magic link, consume auth hash BEFORE router touches location.hash.
   if (useBackend && typeof location !== 'undefined') {
