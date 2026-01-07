@@ -12,6 +12,7 @@ export function renderAccountView({ appEl }) {
   const activeSpaceId = String(auth?.spaceId || "");
   const mySpaces = Array.isArray(s.getMySpaces?.()) ? s.getMySpaces() : [];
   const activeSpaceName = String((mySpaces.find(x => String(x?.space_id || "") === activeSpaceId)?.name) || "");
+  const isAuthed = !!auth?.user?.id || !!authedEmail;
   appEl.innerHTML = `
   <div class="container">
     <section class="card">
@@ -24,7 +25,7 @@ export function renderAccountView({ appEl }) {
           <button id="adminBadge" class="badge badge-btn" type="button" hidden>🛠️ Admin</button>
         </div>
       </div>
-
+    ${isAuthed ? `
       <div class="card">
         <div class="card-title">Space</div>
 
@@ -59,6 +60,7 @@ export function renderAccountView({ appEl }) {
           <span id="syncBadge" class="badge" title="Sync-Status" hidden>⟳ Sync-Status</span>
         </div>
       </div>
+
       <div class="card">
           <div class="card__hd">
             <div>
@@ -111,6 +113,7 @@ export function renderAccountView({ appEl }) {
           </div>
         <div id="accShareMsg" class="hint" style="min-height:18px;"></div>
       </div>
+     ` : ``}
       <div class="card">
         <div class="card-title">Darstellung</div>
         <div class="row" style="gap:.5rem; flex-wrap:wrap;">
