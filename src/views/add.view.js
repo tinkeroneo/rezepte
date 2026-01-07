@@ -310,7 +310,7 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
         const file = await compressImageFile(pendingFile, {
           maxSide: 1600,
           quality: 0.82,
-          mime: "image/jpeg",
+          // mime: "image/jpeg", // lässt PNG PNG sein
         });
 
         img.setStatus(`Uploading… (${Math.round(file.size / 1024)} KB)`);
