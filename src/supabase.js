@@ -314,6 +314,8 @@ function storeActiveSpace(userId, spaceId) {
 /* ---------- public auth API ---------- */
 
 export async function initAuthAndSpace() {
+  __debugSetAuthEvent?.("initAuthAndSpace:start");
+
   // 1) Magic-Link Hash
   const fromHash = readAuthFromHash();
   if (fromHash) {
@@ -344,13 +346,19 @@ export async function initAuthAndSpace() {
       if (refreshed && !refreshed.transient) {
         _session = refreshed;
         storeAuth(_session);
+        __debugSetAuthEvent?.("refresh ok");
+
       } else if (!refreshed) {
         // Hard failure (invalid refresh token) -> clear local auth so we don't loop.
         logout();
+        __debugSetAuthError?.("refresh failed -> logout");
+
         return null;
       } else {
         // Transient failure (timeout/offline/server) -> keep current session and continue.
         // This avoids "getting kicked" on a flaky connection or after long tab sleep.
+        
+        __debugSetAuthError?.("transient failure");
       }
     }
   }
@@ -1297,3 +1305,27 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
   return { newRecipeId: newRootId };
 }
 
+export function __debugAuthSnapshot() {
+  let raw = null;
+  try { raw = localStorage.getItem(LS_AUTH_KEY); } catch {
+    //
+  }
+  return {
+    hasSession: !!_session?.access_token,
+    hasRefresh: !!_session?.refresh_token,
+    expires_at: _session?.expires_at ?? null,
+    userId: _user?.id ?? null,
+    spaceId: _spaceId ?? null,
+    lsAuthPresent: raw ? true : false,
+    lsAuthLen: raw ? raw.length : 0,
+    lastErr: _lastAuthError ?? null,
+    lastEvent: _lastAuthEvent ?? null,
+    now: Date.now()
+  };
+}
+
+// OPTIONAL: set these in your code where errors happen
+let _lastAuthError = null;
+let _lastAuthEvent = null;
+export function __debugSetAuthEvent(e) { _lastAuthEvent = e; }
+export function __debugSetAuthError(e) { _lastAuthError = String(e); }

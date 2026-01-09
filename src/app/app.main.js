@@ -36,6 +36,7 @@ import {
   copyRecipeToSpace,
   deleteRecipe
 } from "../supabase.js";
+import { __debugAuthSnapshot } from "../supabase.js";
 
 import { initRouter } from "../state.js";
 import { saveRecipesLocal, loadRecipesLocal, toLocalShape } from "../domain/recipes.js";
@@ -783,6 +784,34 @@ export function startApp() {
   wireOnlineOfflineHandlers();
   // Keep behavior: don't await boot() here (boot does its own async work)
   boot();
+  function installDebugOverlay() {
+  const el = document.createElement("div");
+  el.id = "authDebug";
+  el.style.cssText =
+    "position:fixed;left:8px;bottom:8px;z-index:99999;" +
+    "background:rgba(0,0,0,.75);color:#fff;padding:8px;" +
+    "border-radius:10px;font:12px/1.2 monospace;" +
+    "max-width:92vw;white-space:pre-wrap;";
+  document.body.appendChild(el);
+
+  const tick = () => {
+    const s = __debugAuthSnapshot();
+    el.textContent =
+      `AUTH DBG\n` +
+      `lsAuth: ${s.lsAuthPresent} (len ${s.lsAuthLen})\n` +
+      `hasSession: ${s.hasSession} hasRefresh: ${s.hasRefresh}\n` +
+      `expires_at: ${s.expires_at}\n` +
+      `userId: ${s.userId}\n` +
+      `spaceId: ${s.spaceId}\n` +
+      `lastEvent: ${s.lastEvent}\n` +
+      `lastErr: ${s.lastErr}\n`;
+    setTimeout(tick, 1500);
+  };
+  tick();
+}
+
+installDebugOverlay();
+
 }
 
 /* =========================
