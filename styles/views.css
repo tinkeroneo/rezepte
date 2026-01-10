@@ -304,6 +304,7 @@ html.dark .fav-inline:hover{
 
 
 :where(.fav-inline,.fav-overlay){
+  -webkit-user-select:none;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -340,6 +341,7 @@ html.dark .fav-inline:hover{
   font-size: 1.6rem;
   padding-left: var(--s-2);
   flex: 0 0 auto;
+  -webkit-user-select:none;
   user-select: none;
 }
 

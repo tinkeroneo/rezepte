@@ -142,6 +142,7 @@ header{
   background: var(--pill-bg, rgba(255,255,255,0.06));
   border: 1px solid var(--pill-border, var(--border));
   color: var(--pill-fg, var(--muted));
+  -webkit-user-select:none;
   user-select:none;
   -webkit-tap-highlight-color: transparent;
 }
@@ -406,6 +407,7 @@ select{
   justify-content: center;
   gap: var(--ctl-gap);
   cursor: pointer;
+  -webkit-user-select:none;
   user-select: none;
   transition:
     background var(--dur-2) var(--ease-standard),
@@ -841,6 +843,7 @@ input[type="search"]:focus, input[type="text"]:focus, textarea:focus, select:foc
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,.45);
+  -webkit-backdrop-filter:  blur(2px);
   backdrop-filter: blur(2px);
   z-index: var(--z-sheet-backdrop);
 }
@@ -904,6 +907,7 @@ input[type="search"]:focus, input[type="text"]:focus, textarea:focus, select:foc
   justify-content: center;
   z-index: 9999;
   background: color-mix(in oklab, #000 35%, transparent);
+  -webkit-backdrop-filter:  blur(2px);
   backdrop-filter: blur(2px);
 }
 
@@ -924,8 +928,8 @@ input[type="search"]:focus, input[type="text"]:focus, textarea:focus, select:foc
   width: 140px;
   height: 140px;
   border-radius: 14px;
-  user-select: none;
   -webkit-user-drag: none;
+  user-select: none;
 }
 
 .appLoader__txt {
@@ -967,6 +971,7 @@ input[type="search"]:focus, input[type="text"]:focus, textarea:focus, select:foc
   background: color-mix(in srgb, var(--card) 92%, transparent);
   border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
   box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  -webkit-backdrop-filter:  blur(10px);
   backdrop-filter: blur(10px);
 }
 #backendStatusBanner .bsb-dot{

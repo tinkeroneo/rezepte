@@ -20,13 +20,13 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
 
             ${canWrite ? `<button class="btn btn--ghost" id="editBtn" type="button" title="Rezept bearbeiten">✏️ Bearbeiten</button>` : ``}
 
-            <button class="btn btn--ghost" id="copyBtn" type="button" title="In anderen Space kopieren">📤 Kopieren</button>
+            <button class="btn btn--ghost" id="copyBtn" type="button" title="In anderen Space kopieren">⧉ Kopieren</button>
             ${canWrite ? `<button class="btn btn--ghost" id="deleteBtn" type="button" title="Rezept löschen">🗑️</button>` : ``}
           </div>
 
           <button class="btn btn--ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button>
         </div>
-      </div>
+      </div>  
 
       <div class="card__bd">
         <h2 style="margin:0;">${escapeHtml(r.title)}</h2>
