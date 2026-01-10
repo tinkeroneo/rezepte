@@ -9,6 +9,7 @@ const DEBUG = (() => {
 // src/app/app.main.js
 
 import { reportError, showError } from "../services/errors.js";
+import { markBackendOffline, markBackendOnline } from "../services/backendStatus.js";
 import {
   listRecipes,
   upsertRecipe,
@@ -286,6 +287,8 @@ function wireOnlineOfflineHandlers() {
     updateHeaderBadges();
     // Try to drain queued actions whenever connection comes back.
     drainOfflineQueue({ reason: "online" });
+    // Also refresh list data (best-effort) – fixes "logged in but API missing" after sleep/VPN.
+    reloadAllAndRender({ reason: "online" });
   };
   const onOffline = () => updateHeaderBadges();
 
@@ -326,8 +329,32 @@ async function loadAll() {
   try {
     const parts = await listAllRecipeParts();
     setParts(parts);
-  } catch {
+    markBackendOnline?.();
+  } catch (e) {
+    markBackendOffline?.(String(e?.message || e || "Backend nicht erreichbar"));
     setParts([]);
+  }
+}
+
+
+// Reload backend/local data and re-render current view.
+// Used for: backend offline banner retry, browser 'online' event, resume from sleep.
+async function reloadAllAndRender({ reason = "manual" } = {}) {
+  try {
+    updateHeaderBadges({ syncing: true });
+
+    // Best-effort: refresh auth/space when backend is enabled.
+    if (useBackend) {
+      try { await initAuthAndSpace(); } catch { /* ignore */ }
+    }
+
+    await runExclusive("loadAll", () => loadAll());
+    await runExclusive("render", () => render(router.getView(), router.setView));
+  } catch (e) {
+    reportError(e, { scope: "app.main", action: `reloadAllAndRender:${reason}` });
+    showError(String(e?.message || e));
+  } finally {
+    updateHeaderBadges({ syncing: false });
   }
 }
 
@@ -782,6 +809,13 @@ const setDirtyIndicator = createDirtyIndicator();
 export function startApp() {
   installHeaderWiring();
   wireOnlineOfflineHandlers();
+
+  // Retry handler used by offline banner.
+  window.addEventListener("backend:retry", () => {
+    // If router not ready yet, boot() will do the initial load.
+    try { reloadAllAndRender({ reason: "banner" }); } catch { /* ignore */ }
+  });
+
   // Keep behavior: don't await boot() here (boot does its own async work)
   boot();
   function installDebugOverlay() {
@@ -810,7 +844,10 @@ export function startApp() {
   tick();
 }
 
-installDebugOverlay();
+  // Debug overlay (only when enabled)
+  try {
+    if (localStorage.getItem("debugAuth") === "1") installDebugOverlay();
+  } catch { /* ignore */ }
 
 }
 

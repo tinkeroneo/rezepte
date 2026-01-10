@@ -11,6 +11,7 @@ const ASSETS = [
   "./styles/views.css",
   "./manifest.json",
   "./favicon.svg",
+  "./faviconDark.svg",
 ];
 
 self.addEventListener("install", (event) => {

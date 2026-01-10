@@ -4,6 +4,7 @@
  */
 import { setUseBackend } from "../app.js";
 import { enqueueOfflineAction } from "./offlineQueue.js";
+import { markBackendOffline, markBackendOnline } from "../services/backendStatus.js";
 export function createRecipeRepo({
   useBackend,
   listRecipes,
@@ -37,8 +38,11 @@ export function createRecipeRepo({
       try {
         const fromBackend = normalizeList(await listRecipes());
         setLocal(fromBackend);
+        markBackendOnline?.();
         return fromBackend;
-      } catch {
+      } catch (e) {
+        // Backend unreachable (VPN/offline/sleep). Keep local UX but surface status.
+        markBackendOffline?.(String(e?.message || e || "Backend nicht erreichbar"));
         return getLocal();
       }
     },
@@ -56,7 +60,9 @@ export function createRecipeRepo({
 
       try {
         await upsertRecipe(recipe);
-      } catch {
+        markBackendOnline?.();
+      } catch (e) {
+        markBackendOffline?.(String(e?.message || e || "Backend nicht erreichbar"));
         // Keep local UX, queue for later retry
         enqueueOfflineAction({ kind: "recipe_upsert", recipeId: recipe.id, recipe });
         return local;
@@ -64,8 +70,9 @@ export function createRecipeRepo({
       if (!refresh) return local;
 
       const fromBackend = normalizeList(await listRecipes());
-      setLocal(fromBackend);
-      return fromBackend;
+        setLocal(fromBackend);
+        markBackendOnline?.();
+        return fromBackend;
     },
 
     /** Delete locally first; then backend when enabled. */
@@ -75,7 +82,9 @@ export function createRecipeRepo({
       if (_useBackend) {
         try {
           await deleteRecipe(id);
-        } catch {
+          markBackendOnline?.();
+        } catch (e) {
+          markBackendOffline?.(String(e?.message || e || "Backend nicht erreichbar"));
           enqueueOfflineAction({ kind: "recipe_delete", recipeId: id });
         }
       }

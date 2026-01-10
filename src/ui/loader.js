@@ -9,7 +9,7 @@ function ensure() {
   el.id = "appLoader";
   el.innerHTML = `
     <div class="appLoader__card" role="status" aria-live="polite">
-      <img class="appLoader__img" src="./src/favicon/FaviconCookingCat.svg" alt="Lädt..." />
+      <img class="appLoader__img" src="./src/favicon/iconCookingCatDark.svg" alt="Lädt..." />
       <div class="appLoader__txt" id="appLoaderText">Lade…</div>
       <div class="appLoader__dots" aria-hidden="true">
         <span></span><span></span><span></span>

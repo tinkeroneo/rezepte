@@ -26,7 +26,7 @@ function updateFavicon(resolvedTheme) {
   icon.href =
     (resolvedTheme === "dark"
       ? "./src/favicon/iconCookingCatDark.svg"
-      : "./src/favicon/IconLight.svg")
+      : "./src/favicon/iconCookingCatLight.svg")
     + "?v=" + (resolvedTheme === "dark" ? "d" : "l");
 }
 

@@ -703,23 +703,45 @@ function sbHeaders() {
 }
 
 async function sbFetchAuthed(url, opts = {}, retried = false) {
-  const res = await sbFetch(url, opts);
+  let res;
+  try {
+    res = await sbFetch(url, opts);
+  } catch (e) {
+    const err = new Error("OFFLINE");
+    err.transient = true;
+    err.cause = e;
+    throw err;
+  }
 
   if (res.status === 401 && !retried && _session?.refresh_token) {
     const refreshed = await refreshAccessToken(_session.refresh_token);
-    if (refreshed && !refreshed.transient) {
+
+    if (refreshed?.transient) {
+      const err = new Error("OFFLINE");
+      err.transient = true;
+      throw err;
+    }
+
+    if (refreshed) {
       _session = refreshed;
       storeAuth(_session);
 
       const headers = { ...(opts.headers || {}) };
       headers.Authorization = `Bearer ${_session.access_token}`;
-
       return sbFetchAuthed(url, { ...opts, headers }, true);
     }
   }
 
+  // If still 401 after retry (or no refresh token), treat as "needs login"
+  if (res.status === 401) {
+    const err = new Error("UNAUTHORIZED");
+    err.code = 401;
+    throw err;
+  }
+
   return res;
 }
+
 
 
 /* =========================
