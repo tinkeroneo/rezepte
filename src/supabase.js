@@ -350,10 +350,18 @@ export async function initAuthAndSpace() {
 
       } else if (!refreshed) {
         // Hard failure (invalid refresh token) -> clear local auth so we don't loop.
-        logout();
-        __debugSetAuthError?.("refresh failed -> logout");
+        // KEIN logout bei transienten Fehlern (mobile/offline/VPN)
+  __debugSetAuthError?.("refresh failed (kept session)");
 
-        return null;
+  return {
+    session: null,
+    user: null,
+    userId: null,
+    spaceId: null,
+    pendingInvites: [],
+    expired: true, // wichtig: UI darf Login zeigen
+  };
+
       } else {
         // Transient failure (timeout/offline/server) -> keep current session and continue.
         // This avoids "getting kicked" on a flaky connection or after long tab sleep.
