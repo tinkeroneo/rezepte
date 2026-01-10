@@ -74,7 +74,7 @@ export function renderCooklogCardHtml({ recipeId, lastStr, avgLabel, avgCount })
               ${ev.note ? `<div class="muted" style="margin-top:.15rem;">${escapeHtml(ev.note)}</div>` : ""}
             </div>
             <div class="row" style="gap:.25rem;">
-              <button class="btn btn--ghost" type="button" data-ev-edit="${escapeHtml(ev.id)}" title="Bearbeiten">✏️</button>
+              <button class="btn btn--ghost" type="button" data-ev-edit="${escapeHtml(ev.id)}" title="Bearbeiten">✎</button>
               <button class="btn btn--ghost" type="button" data-ev-del="${escapeHtml(ev.id)}" title="Löschen">🗑️</button>
             </div>
           </div>

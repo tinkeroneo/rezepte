@@ -38,7 +38,7 @@ export function renderAccountView({ appEl }) {
 
         <div class="muted" style="font-weight:900; margin-bottom:.35rem;"></div>
         <div class="select-wrapper" style="margin-bottom:.35rem;">
-          <span class="icon">✏️ (Um)benennen</span>
+          <span class="icon">✎ (Um)benennen</span>
           <input id="spaceNameInput" class="badge badge-select" type="text" placeholder="Space-Name" />
           <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">💾</button>
         </div>  

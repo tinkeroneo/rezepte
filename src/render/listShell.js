@@ -33,8 +33,8 @@ export function renderListShell({ q = "" } = {}) {
               <button class="btn btn--ghost" id="pendingToggle" type="button" style="display:none;">⌛</button>
 
               <select id="sortSelect">
-                <option value="new">Erstelldatum</option>
                 <option value="az">Name</option>
+                <option value="new">Erstelldatum</option>
                 <option value="time">Kochdauer</option>
                 <option value="lastCooked">Zuletzt gekocht</option>
                 <option value="bestRated">Bewertung</option>

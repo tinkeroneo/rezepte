@@ -81,10 +81,10 @@ export function initListToolbar({
   if (qEl && typeof ui.q === "string") qEl.value = ui.q;
   if (catEl) catEl.value = ui.cat || "";
   if (tagEl) tagEl.value = ui.tag || "";
-  if (sortEl) sortEl.value = ui.sort || "new";
+  if (sortEl) sortEl.value = ui.sort || "az";
 
   if (ui.sortDir !== "asc" && ui.sortDir !== "desc") {
-    ui.sortDir = defaultDirFor(ui.sort || "new");
+    ui.sortDir = defaultDirFor(ui.sort || "az");
     setUi(ui);
     onPersist?.({ sortDir: ui.sortDir });
   }
@@ -202,12 +202,12 @@ export function initListToolbar({
       // reflect in DOM
       if (catEl) catEl.value = "";
       if (tagEl) tagEl.value = "";
-      if (sortEl) sortEl.value = "new";
+      if (sortEl) sortEl.value = "az";
       if (qEl) qEl.value = "";
 
       setUi(u);
 
-      onPersist?.({ cat: "", tag: "", sort: "new", sortDir: u.sortDir });
+      onPersist?.({ cat: "", tag: "", sort: "az", sortDir: u.sortDir });
       applySortDirUi();
 
       onResetNavigate?.();
@@ -222,7 +222,7 @@ export function initListToolbar({
     if (qEl && typeof nextUi.q === "string") qEl.value = nextUi.q;
     if (catEl) catEl.value = nextUi.cat || "";
     if (tagEl) tagEl.value = nextUi.tag || "";
-    if (sortEl) sortEl.value = nextUi.sort || "new";
+    if (sortEl) sortEl.value = nextUi.sort || "az";
 
     // sort dir arrow
     if (typeof nextUi.sortDir === "string") {

@@ -583,6 +583,11 @@ textarea { min-height: 120px; resize: vertical; }
 }
 
 
+.app-header {
+  
+  background: var(--card);
+}
+
 /* Radio mini dock (persist across views) */
 .radio-dock {
   position: fixed;

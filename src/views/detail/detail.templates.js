@@ -18,9 +18,9 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
             <button class="btn btn--ghost" id="cookBtn" type="button">👨‍🍳 Kochen</button>
 
-            ${canWrite ? `<button class="btn btn--ghost" id="editBtn" type="button" title="Rezept bearbeiten">✏️ Bearbeiten</button>` : ``}
+           
 
-            <button class="btn btn--ghost" id="copyBtn" type="button" title="In anderen Space kopieren">⧉ Kopieren</button>
+            
             ${canWrite ? `<button class="btn btn--ghost" id="deleteBtn" type="button" title="Rezept löschen">🗑️</button>` : ``}
           </div>
 
@@ -29,7 +29,10 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
       </div>  
 
       <div class="card__bd">
-        <h2 style="margin:0;">${escapeHtml(r.title)}</h2>
+        <h2 style="margin:0;">${escapeHtml(r.title)} 
+                              <button class="btn btn--ghost" id="copyBtn" type="button" title="In anderen Space kopieren">⧉</button>
+                              ${canWrite ? `<button class="btn btn--ghost" id="editBtn" type="button" title="Rezept bearbeiten">✎</button>` : ``}
+                              </h2>
         ${r.time ? `<div class="muted">${escapeHtml(r.time)}</div>` : ""}
         ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
       </div>
