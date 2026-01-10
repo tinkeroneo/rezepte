@@ -38,64 +38,18 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
 }
 
 export function renderDetailImageHtml({ r }) {
-  // Always render an image: real one if available, otherwise theme-aware favicon fallback.
-  // The focus controls only make sense for real images, so we omit the panel when no image_url.
-  if (!r.image_url) {
-    return `
-      <div style="margin:.75rem 0;">
-        <div class="img-focus-frame">
-          <img
-            id="detailImg"
-            class="detail-img"
-            src="${escapeHtml(recipeImageOrDefault(r.image_url))}"
-            data-default-img="1"
-            alt="${escapeHtml(r.title)}"
-          />
-        </div>
-      </div>
-    `;
-  }
 
   return `
     <div style="margin:.75rem 0;">
       <div class="img-focus-frame">
-        <img id="detailImg" class="detail-img" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" data-default-img="" alt="${escapeHtml(r.title)}" />
-      </div>
-
-      <div id="imgFocusPanel" class="card" style="margin-top:.5rem; padding:.75rem; display:none;">
-        <div class="row" style="justify-content:space-between; gap:.75rem; flex-wrap:wrap;">
-          <label class="muted" style="display:flex; gap:.5rem; align-items:center;">
-            Modus
-            <select id="imgFocusMode" class="input" style="min-width:140px;">
-              <option value="auto">Auto (ganzes Bild)</option>
-              <option value="cover">Cover (Zuschnitt)</option>
-            </select>
-          </label>
-          <label class="muted" style="display:flex; gap:.5rem; align-items:center;">
-            Zoom
-            <input id="imgFocusZoom" type="range" min="1" max="3" step="0.05" />
-            <span id="imgFocusZoomVal" class="muted" style="min-width:3ch; text-align:right;"></span>
-          </label>
-        </div>
-
-        <div class="row" style="gap:.75rem; align-items:center; margin-top:.5rem; flex-wrap:wrap;">
-          <label class="muted" style="display:flex; gap:.5rem; align-items:center;">
-            X
-            <input id="imgFocusX" type="range" min="0" max="100" step="1" />
-            <span id="imgFocusXVal" class="muted" style="min-width:3ch; text-align:right;"></span>
-          </label>
-          <label class="muted" style="display:flex; gap:.5rem; align-items:center;">
-            Y
-            <input id="imgFocusY" type="range" min="0" max="100" step="1" />
-            <span id="imgFocusYVal" class="muted" style="min-width:3ch; text-align:right;"></span>
-          </label>
-        </div>
-
-        <div class="row" style="justify-content:flex-end; margin-top:.75rem; gap:.5rem;">
-          <button class="btn btn--ghost" id="imgFocusReset" type="button">Reset</button>
-          <button class="btn" id="imgFocusSave" type="button">Speichern</button>
-        </div>
-      </div>
+        <img 
+          id="detailImg" 
+          class="detail-img" 
+          src="${escapeHtml(recipeImageOrDefault(r.image_url))}" 
+          data-default-img="" 
+          alt="${escapeHtml(r.title)}" 
+        />
+      </div>    
     </div>
   `;
 }

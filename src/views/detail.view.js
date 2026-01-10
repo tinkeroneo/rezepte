@@ -1,5 +1,5 @@
 // src/views/detail.view.js
-import { qs, recipeImageOrDefault } from "../utils.js";
+import { recipeImageOrDefault } from "../utils.js";
 
 import { getLastCooked, getAvgRating, getRatingCount } from "../domain/cooklog.js";
 import {
@@ -8,7 +8,6 @@ import {
   bindCooklogCard
 } from "./detail/detail.cooklog.js";
 
-import { applyFocusToImg } from "./detail/detail.focus.js";
 
 import { renderChildrenSectionHtml, bindChildrenSection } from "./detail/detail.parts.js";
 import { bindCopyToSpace } from "./detail/detail.spaceCopy.js";
@@ -100,12 +99,7 @@ export function renderDetailView({
     onCleanup: () => { },
   });
 
-  // --- focus (read-only: Panel ausblenden, Save no-op)
-  const img = qs(appEl, "#detailImg");
-  if (img) {
-    applyFocusToImg(img, r.image_focus);
 
-  }
 
   // --- actions (intern nutzt canWrite)
   bindDetailActions({

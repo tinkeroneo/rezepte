@@ -95,18 +95,22 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
         <h2>👩‍🍳 ${escapeHtml(r.title)}</h2>
 
 
-        <div class="muted">${escapeHtml(r.category ?? "")}${r.time ? " · " + escapeHtml(r.time) : ""}</div>
-<details class="image-toggle"> <summary>Bild anzeigen</summary>
-        ${recipeImageOrDefault(r.image_url) ? `
-          <div style="margin:.75rem 0;">
-  
-
-            <img src="${escapeHtml(recipeImageOrDefault(r.image_url))}"
-  data-default-img="${r.image_url ? "" : "1"}"
-  alt="${escapeHtml(r.title)}"
-  style="width:100%; border-radius:12px; display:block;"
-  onerror="this.onerror=null;this.src=(document.documentElement?.dataset?.theme==='dark' ? '/faviconDark.svg' : '/favicon.svg');" />
-          </div>
+        <div class="muted">
+          <button class="btn btn--ghost" id="resetBtn">Reset Steps</button>
+          ${escapeHtml(r.category ?? "")}
+          ${r.time ? " · " + escapeHtml(r.time) : ""}
+        </div>
+        <details class="image-toggle"> 
+        
+          <summary>Bild anzeigen</summary>
+          ${recipeImageOrDefault(r.image_url) ? `
+            <div style="margin:.75rem 0;">
+              <img src="${escapeHtml(recipeImageOrDefault(r.image_url))}"
+                data-default-img="${r.image_url ? "" : "1"}"
+                alt="${escapeHtml(r.title)}"
+                style="width:100%; border-radius:12px; display:block;"
+                onerror="this.onerror=null;this.src=(document.documentElement?.dataset?.theme==='dark' ? '/faviconDark.svg' : '/favicon.svg');" />
+            </div>
         ` : ""}</details>
 
         <hr />
@@ -156,7 +160,6 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
         <div class="cookbar-row">
           <button class="btn btn--solid" id="ingredientsBtn">Zutaten</button>
           <div id="timerRoot" class="timerroot-dock"></div>
-          <button class="btn btn--ghost" id="resetBtn">Reset Steps</button>
         </div>
       </div>
 

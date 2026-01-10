@@ -67,6 +67,7 @@ function showBanner(message) {
     });
 
     el.querySelector("#backendStatusBannerRetry")?.addEventListener("click", () => {
+      // eslint-disable-next-line no-undef
       window.dispatchEvent(new CustomEvent("backend:retry"));
     });
 
@@ -74,6 +75,7 @@ function showBanner(message) {
     el.addEventListener("click", (e) => {
       const t = e.target;
       if (t && (t.id === "backendStatusBannerClose" || t.id === "backendStatusBannerRetry")) return;
+      // eslint-disable-next-line no-undef
       window.dispatchEvent(new CustomEvent("backend:retry"));
     }, { passive: true });
   }

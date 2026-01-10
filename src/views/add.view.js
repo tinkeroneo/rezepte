@@ -6,9 +6,7 @@ import { deleteRecipe as sbDelete } from "../supabase.js";
 import { createDirtyTracker } from "../ui/dirtyTracker.js";
 import { createImagePicker } from "../ui/imagePicker.js";
 
-import { ack } from "../ui/feedback.js";
 import { withLoader } from "../ui/loader.js";
-import { applyFocusToImg, bindImageFocusPanel, normalizeFocus } from "./detail/detail.focus.js";
 
 
 function normalizeRecipe(existing) {
@@ -25,7 +23,7 @@ function normalizeRecipe(existing) {
       source: existing.source ?? "",
       tags: existing.tags ?? [],
       space_id: existing.space_id,
-       image_focus: existing.image_focus ?? null,
+      image_focus: existing.image_focus ?? null,
     };
   }
   return {
@@ -158,9 +156,9 @@ export function renderAddView({
       <div id="sheetRoot"></div>
     </div>
   `;
-appEl
-  .querySelectorAll("textarea")
-  .forEach(autoGrowTextarea);
+  appEl
+    .querySelectorAll("textarea")
+    .forEach(autoGrowTextarea);
   // --- DOM refs
   const titleEl = qs(appEl, "#title");
   const categoryEl = qs(appEl, "#category");
@@ -205,48 +203,8 @@ appEl
     previewWrap,
     statusEl,
   });
-let draftFocus = normalizeFocus(r.image_focus);
 
-// Focus-Panel nur zeigen, wenn Preview-Bild existiert
-const focusPanelEl = qs(appEl, "#imgFocusPanel");
-
-const bindOrRefreshFocus = () => {
-  const imgEl = img.getImgEl?.();
-  if (!focusPanelEl) return;
-
-  if (!imgEl) {
-    focusPanelEl.style.display = "none";
-    return;
-  }
-
-  focusPanelEl.style.display = "";
-  applyFocusToImg(imgEl, draftFocus);
-
-  // bindImageFocusPanel bindet Listener einmal; okay, weil IDs stabil sind.
-  // Wir geben imgEl (stabil dank imagePicker-fix) rein.
-  if (!focusPanelEl.__bound) {
-    focusPanelEl.__bound = true;
-    bindImageFocusPanel({
-      appEl,
-      imgEl,
-      initialFocus: draftFocus,
-      onSaveFocus: async (next) => {
-        draftFocus = normalizeFocus(next);
-        applyFocusToImg(imgEl, draftFocus);
-        dirty.markDirty();
-        ack(qs(appEl, "#imgFocusSave"));
-      },
-      ack
-    });
-  }
-};
-
-// initial
-bindOrRefreshFocus();
-
-// wenn sich Bild ändert: refresh
-fileEl?.addEventListener("change", () => bindOrRefreshFocus());
-imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
+  
 
   // --- Dirty tracker
   const dirty = createDirtyTracker({
@@ -262,7 +220,7 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
     setFormDisabled(appEl, true);
     // Re-enable preview-related elements so the image preview still renders
     // (it is static HTML anyway, but keep it safe)
-    previewWrap?.querySelectorAll("*").forEach(() => {});
+    previewWrap?.querySelectorAll("*").forEach(() => { });
     return; // No handlers when read-only
   }
 
@@ -283,7 +241,7 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
   // --- Delete (edit only)
   qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
     if (!confirm("Rezept wirklich löschen?")) return;
-    await sbDelete?.(r.id).catch(() => {});
+    await sbDelete?.(r.id).catch(() => { });
     setView({ name: "list", selectedId: null, q: state.q });
   });
 
@@ -315,8 +273,8 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
 
         img.setStatus(`Uploading… (${Math.round(file.size / 1024)} KB)`);
         await withLoader("Uploading…", async () => {
-        const uploadedUrl = await uploadRecipeImage(file, r.id);
-        image_url = uploadedUrl;
+          const uploadedUrl = await uploadRecipeImage(file, r.id);
+          image_url = uploadedUrl;
         });
         img.clearPendingFile();
         img.setStatus("Upload fertig.");
@@ -347,7 +305,6 @@ imageUrlEl?.addEventListener("input", () => bindOrRefreshFocus());
       ingredients,
       steps,
       image_url: image_url || "",
-      image_focus: draftFocus
     };
 
 

@@ -26,9 +26,59 @@ const BUCKET = "recipe-images";
 const LS_AUTH_KEY = "tinkeroneo_sb_auth_v1";
 const LS_FORCE_DEFAULT_ONCE = "tinkeroneo_force_default_space_once_v1";
 
-function markForceDefaultOnce() {
-  try { localStorage.setItem(LS_FORCE_DEFAULT_ONCE, "1"); } catch { /* ignore */ }
+/* ---------- debug helpers ---------- */
+
+function debugAuthEnabled() {
+  try {
+    return localStorage.getItem("debugAuth") === "1";
+  } catch {
+    return false;
+  }
 }
+
+// OPTIONAL: set these in your code where errors happen
+let _lastAuthError = null;
+let _lastAuthEvent = null;
+
+export function __debugSetAuthEvent(e) {
+  if (!debugAuthEnabled()) return;
+  _lastAuthEvent = String(e);
+}
+
+export function __debugSetAuthError(e) {
+  if (!debugAuthEnabled()) return;
+  _lastAuthError = String(e);
+}
+
+export function __debugAuthSnapshot() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(LS_AUTH_KEY);
+  } catch {
+    //
+  }
+  return {
+    hasSession: !!_session?.access_token,
+    hasRefresh: !!_session?.refresh_token,
+    expires_at: _session?.expires_at ?? null,
+    userId: _user?.id ?? null,
+    spaceId: _spaceId ?? null,
+    lsAuthPresent: raw ? true : false,
+    lsAuthLen: raw ? raw.length : 0,
+    lastErr: _lastAuthError ?? null,
+    lastEvent: _lastAuthEvent ?? null,
+    now: Date.now(),
+  };
+}
+
+function markForceDefaultOnce() {
+  try {
+    localStorage.setItem(LS_FORCE_DEFAULT_ONCE, "1");
+  } catch {
+    /* ignore */
+  }
+}
+
 function consumeForceDefaultOnce() {
   try {
     const v = localStorage.getItem(LS_FORCE_DEFAULT_ONCE);
@@ -38,7 +88,6 @@ function consumeForceDefaultOnce() {
     return false;
   }
 }
-
 
 let _session = null; // { access_token, refresh_token, expires_at }
 let _spaceId = null;
@@ -92,69 +141,95 @@ function storeAuth(auth) {
   }
 }
 
+function clearStoredAuth() {
+  try {
+    localStorage.removeItem(LS_AUTH_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function isRealInvalidRefresh(errBody) {
+  const code = String(errBody?.error_code || errBody?.error || "");
+  const msg = String(errBody?.msg || errBody?.message || "").toLowerCase();
+
+  // The important ones:
+  // - invalid_grant (common)
+  // - invalid_credentials (some environments)
+  // also treat "refresh token not found/expired" as invalid.
+  if (code === "invalid_grant" || code === "invalid_credentials") return true;
+  if (msg.includes("invalid_grant") || msg.includes("invalid_credentials")) return true;
+  if (msg.includes("refresh") && (msg.includes("expired") || msg.includes("not found"))) return true;
+
+  return false;
+}
+
 async function refreshAccessToken(refresh_token) {
   if (!refresh_token) return null;
 
-  try {
-    const res = await sbFetch(
-      `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,
-      {
-        method: "POST",
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams({ refresh_token }),
-        timeoutMs: 12000,
-      }
-    );
+  // Supabase GoTrue expects JSON here (grant_type via query).
+  const url = `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`;
 
-    // Read body ALWAYS so we can debug real cause
+  try {
+    const payload = JSON.stringify({ refresh_token });
+
+    __debugSetAuthEvent("refreshAccessToken:JSON");
+
+    const res = await sbFetch(url, {
+      method: "POST",
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: payload,
+      timeoutMs: 20000,
+    });
+
     const text = await res.text();
     let body = null;
-    try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = text;
+    }
 
     if (!res.ok) {
       const status = res.status;
-
-      // Treat common retryable statuses as transient
       const transient = status === 0 || status === 408 || status === 429 || status >= 500;
 
-      // Store a useful error for your overlay
-      __debugSetAuthError?.(`refresh http ${status}: ${typeof body === "string" ? body : JSON.stringify(body)}`);
+      __debugSetAuthError(
+        `refresh http ${status}: ${typeof body === "string" ? body : JSON.stringify(body)}`
+      );
 
       return transient ? { transient: true, status, body } : { invalid: true, status, body };
     }
 
-    // success: parse json
-    const json = body && typeof body === "object" ? body : null;
-    if (!json?.access_token || !json?.refresh_token) {
-      __debugSetAuthError?.("refresh ok but missing tokens");
+    if (!body?.access_token || !body?.refresh_token) {
+      __debugSetAuthError("refresh ok but missing tokens");
       return null;
     }
 
-    const expires_at = Math.floor(Date.now() / 1000) + Number(json.expires_in || 3600);
+    const expires_at = Math.floor(Date.now() / 1000) + Number(body.expires_in || 3600);
 
     return {
-      access_token: json.access_token,
-      refresh_token: json.refresh_token,
+      access_token: body.access_token,
+      refresh_token: body.refresh_token,
       expires_at,
     };
   } catch (e) {
-    __debugSetAuthError?.(`refresh exception: ${String(e?.message || e)}`);
+    __debugSetAuthError(`refresh exception: ${String(e?.message || e)}`);
     return { transient: true, error: String(e?.message || e) };
   }
 }
 
-
-// (redirect helpers removed – keep redirect handling in the login view)
-
+/* =========================
+   SPACE LIST / RESOLVE
+========================= */
 
 async function listUserSpacesRaw(access_token) {
   const res = await sbFetch(
     `${SUPABASE_URL}/rest/v1/user_spaces?select=space_id,role,is_default,created_at&order=created_at.asc`,
-
     {
       headers: {
         apikey: SUPABASE_ANON_KEY,
@@ -170,7 +245,6 @@ async function listUserSpacesRaw(access_token) {
   const rows = await res.json();
   return Array.isArray(rows) ? rows : [];
 }
-
 
 async function resolveSpaceId({ access_token, userId }) {
   const rows = await listUserSpacesRaw(access_token);
@@ -202,7 +276,6 @@ async function resolveSpaceId({ access_token, userId }) {
   if (!first) throw new Error("No space assigned to user");
   return first;
 }
-
 
 async function provisionDefaultSpace({ access_token, userId }) {
   if (!userId) throw new Error("Missing userId for space provisioning");
@@ -266,7 +339,9 @@ async function fetchMyInvites({ access_token, email }) {
   const mail = String(email || "").trim();
   if (!mail) return [];
 
-  const url = `${SUPABASE_URL}/rest/v1/space_invites?select=id,space_id,role,email,created_at&email=ilike.${encodeURIComponent(mail)}&order=created_at.desc`;
+  const url = `${SUPABASE_URL}/rest/v1/space_invites?select=id,space_id,role,email,created_at&email=ilike.${encodeURIComponent(
+    mail
+  )}&order=created_at.desc`;
   const res = await sbFetch(url, {
     headers: {
       apikey: SUPABASE_ANON_KEY,
@@ -286,7 +361,6 @@ async function fetchMyInvites({ access_token, email }) {
 async function listSpacesByIds({ access_token, ids }) {
   const uniq = Array.from(new Set((ids || []).filter(Boolean)));
   if (uniq.length === 0) return new Map();
-  // Build: id=in.(a,b,c)
   const inList = uniq.join(",");
   const res = await sbFetch(`${SUPABASE_URL}/rest/v1/spaces?select=id,name&id=in.(${inList})`, {
     headers: {
@@ -326,10 +400,12 @@ function storeActiveSpace(userId, spaceId) {
   }
 }
 
-/* ---------- public auth API ---------- */
+/* =========================
+   PUBLIC AUTH API
+========================= */
 
 export async function initAuthAndSpace() {
-  __debugSetAuthEvent?.("initAuthAndSpace:start");
+  __debugSetAuthEvent("initAuthAndSpace:start");
 
   // 1) Magic-Link Hash
   const fromHash = readAuthFromHash();
@@ -346,37 +422,30 @@ export async function initAuthAndSpace() {
   // 3) Refresh if needed
   if (_session?.refresh_token) {
     const now = Math.floor(Date.now() / 1000);
-    const needsRefresh =
-      !_session.expires_at || _session.expires_at - now < 60;
+    const needsRefresh = !_session.expires_at || _session.expires_at - now < 60;
 
     if (needsRefresh) {
-      let refreshed = null;
-      try {
-        refreshed = await refreshAccessToken(_session.refresh_token);
-      } catch {
-        // treat fetch errors as transient; keep current session
-        refreshed = { transient: true };
+      const refreshed = await refreshAccessToken(_session.refresh_token);
+
+      if (refreshed && !refreshed.transient && !refreshed.invalid) {
+        _session = refreshed;
+        storeAuth(_session);
+        __debugSetAuthEvent("refresh ok");
+      } else if (refreshed?.invalid) {
+        // Only logout for real invalid refresh tokens
+        if (isRealInvalidRefresh(refreshed.body)) {
+          __debugSetAuthError("refresh invalid -> logout (real invalid)");
+          logout();
+          return null;
+        }
+
+        // Non-transient but not a real invalid token: keep session (don’t brick the user)
+        __debugSetAuthError("refresh invalid -> kept session (non-real-invalid)");
+      } else if (refreshed?.transient) {
+        __debugSetAuthError("refresh transient (kept session)");
       }
-if (refreshed && !refreshed.transient && !refreshed.invalid) {
-  _session = refreshed;
-  storeAuth(_session);
-  __debugSetAuthEvent?.("refresh ok");
-} else if (refreshed?.invalid) {
-  __debugSetAuthError?.("refresh invalid -> logout");
-  logout();              // hier darfst du wirklich löschen
-  return null;
-} else {
-  // transient: keep session; app may be offline
-  __debugSetAuthError?.("refresh transient (kept session)");
-}
-
-
     }
   }
-
-
-
-
 
   if (!_session?.access_token) {
     _spaceId = null;
@@ -384,9 +453,7 @@ if (refreshed && !refreshed.transient && !refreshed.invalid) {
     return null;
   }
 
-  // 3.5) Load user (email) and fetch pending invites (confirmation happens in UI)
-  // Be resilient: if network is unavailable, keep the local session so the app
-  // can still run in LOCAL mode and not "bounce" to Login on refresh.
+  // 3.5) Load user (email) and fetch pending invites
   let pendingInvites = [];
   try {
     _user = await fetchCurrentUser(_session.access_token);
@@ -395,7 +462,6 @@ if (refreshed && !refreshed.transient && !refreshed.invalid) {
       email: _user?.email,
     });
   } catch {
-    // keep _session; just mark user/space unknown for now
     _user = null;
     _spaceId = null;
     return {
@@ -408,17 +474,14 @@ if (refreshed && !refreshed.transient && !refreshed.invalid) {
     };
   }
 
-  // 4) Resolve space (respect stored active space per user)
+  // 4) Resolve space
   try {
     _spaceId = await resolveSpaceId({ access_token: _session.access_token, userId: _user?.id });
   } catch (e) {
     const msg = String(e?.message || e || "");
-    // New users may have no membership yet -> provision a private default space.
     if (msg.includes("No space assigned")) {
       _spaceId = await provisionDefaultSpace({ access_token: _session.access_token, userId: _user?.id });
     } else {
-      // Network / transient errors: don't force a logout.
-      // Keep last known active space so offline-queue stays scoped correctly.
       const fallbackSpace = _user?.id ? readStoredActiveSpace(_user.id) : null;
       _spaceId = fallbackSpace;
 
@@ -430,7 +493,6 @@ if (refreshed && !refreshed.transient && !refreshed.invalid) {
         pendingInvites,
         offline: true,
       };
-
     }
   }
 
@@ -449,11 +511,7 @@ export function logout() {
   _session = null;
   _spaceId = null;
   _user = null;
-  try {
-    localStorage.removeItem(LS_AUTH_KEY);
-  } catch {
-    /* ignore */
-  }
+  clearStoredAuth();
 }
 
 export function getAuthContext() {
@@ -463,9 +521,9 @@ export function getAuthContext() {
 export async function listMySpaces() {
   requireAuth();
   const rows = await listUserSpacesRaw(_session.access_token);
-  const ids = rows.map(r => r?.space_id).filter(Boolean);
+  const ids = rows.map((r) => r?.space_id).filter(Boolean);
   const meta = await listSpacesByIds({ access_token: _session.access_token, ids });
-  return rows.map(r => {
+  return rows.map((r) => {
     const sid = r?.space_id || "";
     const name = meta.get(sid)?.name || sid;
     return { space_id: sid, name, role: r?.role || "viewer" };
@@ -487,13 +545,16 @@ export async function acceptInvite(inviteId) {
   if (!id) throw new Error("Invalid invite id");
 
   // Load invite to get space_id/role (RLS: user reads only their email invites)
-  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/space_invites?select=id,space_id,role,email&id=eq.${id}&limit=1`, {
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${_session.access_token}`,
-    },
-    timeoutMs: 12000,
-  });
+  const res = await sbFetch(
+    `${SUPABASE_URL}/rest/v1/space_invites?select=id,space_id,role,email&id=eq.${id}&limit=1`,
+    {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${_session.access_token}`,
+      },
+      timeoutMs: 12000,
+    }
+  );
   if (!res.ok) throw new Error(`Accept invite failed: ${res.status} ${await sbJson(res)}`);
   const rows = await res.json();
   const inv = rows?.[0];
@@ -632,29 +693,22 @@ export function isAuthenticated() {
 }
 
 function normalizeRedirectTo(redirectTo) {
-  // Falls leer -> aktuelle Seite ohne hash/query
-  const raw = (redirectTo && String(redirectTo).trim()) || (location.origin + location.pathname);
+  const raw = (redirectTo && String(redirectTo).trim()) || location.origin + location.pathname;
 
-  // Wenn jemand aus Versehen "origin + fullUrl" gemacht hat, reparieren wir das:
-  // Beispiel: "http://127.../http://127.../git-rezepte-main/index.html"
   const doubled = raw.match(/^(https?:\/\/[^/]+)\/(https?:\/\/.+)$/i);
   const fixedRaw = doubled ? doubled[2] : raw;
 
-  const u = new URL(fixedRaw); // muss absolute URL sein
+  const u = new URL(fixedRaw);
   u.hash = "";
-  // optional: query killen (ich empfehle ja, weil du q/id in hash hast)
   u.search = "";
 
-  // wenn auf Ordner gezeigt wird -> index.html erzwingen
   if (u.pathname.endsWith("/")) u.pathname += "index.html";
 
   return u.toString();
 }
 
 export async function requestMagicLink({ email, redirectTo }) {
-  const safeRedirect = normalizeRedirectTo(
-    redirectTo || `${location.origin}/index.html`
-  );
+  const safeRedirect = normalizeRedirectTo(redirectTo || `${location.origin}/index.html`);
 
   const res = await fetch(`${SUPABASE_URL}/auth/v1/otp`, {
     method: "POST",
@@ -672,9 +726,6 @@ export async function requestMagicLink({ email, redirectTo }) {
   if (!res.ok) throw new Error(`Magic link failed: ${res.status} ${await res.text()}`);
   return true;
 }
-
-
-
 
 export function getSpaceId() {
   return _spaceId;
@@ -706,69 +757,47 @@ function sbHeaders() {
 }
 
 async function sbFetchAuthed(url, opts = {}, retried = false) {
-  let res;
-  try {
-    res = await sbFetch(url, opts);
-  } catch (e) {
-    const err = new Error("OFFLINE");
-    err.transient = true;
-    err.cause = e;
-    throw err;
-  }
+  const res = await sbFetch(url, opts);
 
   if (res.status === 401 && !retried && _session?.refresh_token) {
     const refreshed = await refreshAccessToken(_session.refresh_token);
 
-    if (refreshed?.transient) {
-      const err = new Error("OFFLINE");
-      err.transient = true;
-      throw err;
-    }
-
-    if (refreshed) {
+    if (refreshed && !refreshed.transient && !refreshed.invalid) {
       _session = refreshed;
       storeAuth(_session);
 
       const headers = { ...(opts.headers || {}) };
       headers.Authorization = `Bearer ${_session.access_token}`;
+
       return sbFetchAuthed(url, { ...opts, headers }, true);
     }
-  }
 
-  // If still 401 after retry (or no refresh token), treat as "needs login"
-  if (res.status === 401) {
-    const err = new Error("UNAUTHORIZED");
-    err.code = 401;
-    throw err;
+    // If refresh token is truly invalid -> logout (prevents loops)
+    if (refreshed?.invalid && isRealInvalidRefresh(refreshed.body)) {
+      logout();
+      return res;
+    }
+
+    // transient/unknown invalid -> keep session, return original 401
+    return res;
   }
 
   return res;
 }
 
-
-
 /* =========================
    FETCH HELPERS
 ========================= */
 
-
-async function sbFetch(
-  url,
-  { timeoutMs = DEFAULT_TIMEOUT_MS, signal: externalSignal, ...opts } = {}
-) {
+async function sbFetch(url, { timeoutMs = DEFAULT_TIMEOUT_MS, signal: externalSignal, ...opts } = {}) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
 
-  // Wenn ein externes Signal existiert → mitziehen
   if (externalSignal) {
     if (externalSignal.aborted) {
       ctrl.abort();
     } else {
-      externalSignal.addEventListener(
-        "abort",
-        () => ctrl.abort(),
-        { once: true }
-      );
+      externalSignal.addEventListener("abort", () => ctrl.abort(), { once: true });
     }
   }
 
@@ -787,7 +816,6 @@ async function sbFetch(
   }
 }
 
-
 async function sbJson(res) {
   const text = await res.text();
   try {
@@ -803,13 +831,10 @@ async function sbJson(res) {
 
 export async function listRecipes() {
   requireSpace();
-  const url = `${SUPABASE_URL}/rest/v1/recipes?space_id=eq.${encodeURIComponent(
-    _spaceId
-  )}&order=created_at.desc`;
+  const url = `${SUPABASE_URL}/rest/v1/recipes?space_id=eq.${encodeURIComponent(_spaceId)}&order=created_at.desc`;
 
   const res = await sbFetchAuthed(url, { headers: sbHeaders() });
-  if (!res.ok)
-    throw new Error(`listRecipes failed: ${res.status} ${await sbJson(res)}`);
+  if (!res.ok) throw new Error(`listRecipes failed: ${res.status} ${await sbJson(res)}`);
   return res.json();
 }
 
@@ -838,20 +863,18 @@ export async function upsertRecipe(recipe) {
     body: JSON.stringify([row]),
   });
 
-  if (!res.ok)
-    throw new Error(`upsertRecipe failed: ${res.status} ${await sbJson(res)}`);
+  if (!res.ok) throw new Error(`upsertRecipe failed: ${res.status} ${await sbJson(res)}`);
   return (await res.json())[0];
 }
 
 export async function deleteRecipe(id) {
   requireSpace();
-  const url = `${SUPABASE_URL}/rest/v1/recipes?id=eq.${encodeURIComponent(
-    id
-  )}&space_id=eq.${encodeURIComponent(_spaceId)}`;
+  const url =
+    `${SUPABASE_URL}/rest/v1/recipes?id=eq.${encodeURIComponent(id)}` +
+    `&space_id=eq.${encodeURIComponent(_spaceId)}`;
 
   const res = await sbFetchAuthed(url, { method: "DELETE", headers: sbHeaders() });
-  if (!res.ok)
-    throw new Error(`deleteRecipe failed: ${res.status} ${await sbJson(res)}`);
+  if (!res.ok) throw new Error(`deleteRecipe failed: ${res.status} ${await sbJson(res)}`);
   return true;
 }
 
@@ -861,13 +884,10 @@ export async function deleteRecipe(id) {
 
 export async function listAllRecipeParts() {
   requireSpace();
-  const url = `${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(
-    _spaceId
-  )}&order=sort_order.asc`;
+  const url = `${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(_spaceId)}&order=sort_order.asc`;
 
   const res = await sbFetchAuthed(url, { headers: sbHeaders() });
-  if (!res.ok)
-    throw new Error(`listParts failed: ${res.status} ${await sbJson(res)}`);
+  if (!res.ok) throw new Error(`listParts failed: ${res.status} ${await sbJson(res)}`);
   return res.json();
 }
 
@@ -886,26 +906,19 @@ export async function addRecipePart(parentId, childId, sortOrder = 0) {
     ]),
   });
 
-  if (!res.ok)
-    throw new Error(`addRecipePart failed: ${res.status} ${await sbJson(res)}`);
+  if (!res.ok) throw new Error(`addRecipePart failed: ${res.status} ${await sbJson(res)}`);
   return true;
 }
 
 export async function removeRecipePart(parentId, childId) {
   requireSpace();
   const url =
-    `${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(
-      _spaceId
-    )}` +
-    `&parent_id=eq.${encodeURIComponent(
-      parentId
-    )}&child_id=eq.${encodeURIComponent(childId)}`;
+    `${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(_spaceId)}` +
+    `&parent_id=eq.${encodeURIComponent(parentId)}` +
+    `&child_id=eq.${encodeURIComponent(childId)}`;
 
   const res = await sbFetchAuthed(url, { method: "DELETE", headers: sbHeaders() });
-  if (!res.ok)
-    throw new Error(
-      `removeRecipePart failed: ${res.status} ${await sbJson(res)}`
-    );
+  if (!res.ok) throw new Error(`removeRecipePart failed: ${res.status} ${await sbJson(res)}`);
   return true;
 }
 
@@ -916,17 +929,12 @@ export async function removeRecipePart(parentId, childId) {
 export async function listCookEventsSb(recipeId) {
   requireSpace();
   const url =
-    `${SUPABASE_URL}/rest/v1/cook_events?space_id=eq.${encodeURIComponent(
-      _spaceId
-    )}` +
+    `${SUPABASE_URL}/rest/v1/cook_events?space_id=eq.${encodeURIComponent(_spaceId)}` +
     `&recipe_id=eq.${encodeURIComponent(recipeId)}` +
     `&order=at.desc`;
 
   const res = await sbFetchAuthed(url, { headers: sbHeaders() });
-  if (!res.ok)
-    throw new Error(
-      `listCookEvents failed: ${res.status} ${await sbJson(res)}`
-    );
+  if (!res.ok) throw new Error(`listCookEvents failed: ${res.status} ${await sbJson(res)}`);
   return res.json();
 }
 
@@ -947,25 +955,18 @@ export async function upsertCookEventSb(ev) {
     body: JSON.stringify([payload]),
   });
 
-  if (!res.ok)
-    throw new Error(
-      `upsertCookEvent failed: ${res.status} ${await sbJson(res)}`
-    );
+  if (!res.ok) throw new Error(`upsertCookEvent failed: ${res.status} ${await sbJson(res)}`);
   return true;
 }
 
 export async function deleteCookEventSb(id) {
   requireSpace();
   const url =
-    `${SUPABASE_URL}/rest/v1/cook_events?id=eq.${encodeURIComponent(
-      id
-    )}&space_id=eq.${encodeURIComponent(_spaceId)}`;
+    `${SUPABASE_URL}/rest/v1/cook_events?id=eq.${encodeURIComponent(id)}` +
+    `&space_id=eq.${encodeURIComponent(_spaceId)}`;
 
   const res = await sbFetchAuthed(url, { method: "DELETE", headers: sbHeaders() });
-  if (!res.ok)
-    throw new Error(
-      `deleteCookEvent failed: ${res.status} ${await sbJson(res)}`
-    );
+  if (!res.ok) throw new Error(`deleteCookEvent failed: ${res.status} ${await sbJson(res)}`);
 }
 
 /* =========================
@@ -973,8 +974,9 @@ export async function deleteCookEventSb(id) {
 ========================= */
 
 export async function logClientEvent(evt) {
-  if (!_spaceId) return; // ⬅️ DAS
+  if (!_spaceId) return;
   requireSpace();
+
   const payload = {
     ...evt,
     space_id: _spaceId,
@@ -988,10 +990,7 @@ export async function logClientEvent(evt) {
     timeoutMs: 8000,
   });
 
-  if (!res.ok)
-    throw new Error(
-      `client log failed: ${res.status} ${await sbJson(res)}`
-    );
+  if (!res.ok) throw new Error(`client log failed: ${res.status} ${await sbJson(res)}`);
   return true;
 }
 
@@ -1013,11 +1012,7 @@ export async function uploadRecipeImage(file, recipeId) {
 
   const ext =
     file.name?.split(".").pop()?.toLowerCase() ||
-    (file.type === "image/png"
-      ? "png"
-      : file.type === "image/webp"
-        ? "webp"
-        : "jpg");
+    (file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg");
 
   const signRes = await sbFetch(`${SUPABASE_URL}/functions/v1/sign-upload`, {
     method: "POST",
@@ -1056,8 +1051,6 @@ export async function uploadRecipeImage(file, recipeId) {
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}`;
 }
 
-
-
 /* =========================
    PROFILES (Displayname + Default/Last Space)
 ========================= */
@@ -1066,14 +1059,17 @@ async function tryFetchProfile({ access_token, userId }) {
   try {
     const uid = String(userId || "").trim();
     if (!uid) return null;
-    const res = await sbFetch(`${SUPABASE_URL}/rest/v1/profiles?select=user_id,display_name,default_space_id,last_space_id&user_id=eq.${uid}&limit=1`, {
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${access_token}`,
-      },
-      timeoutMs: 12000,
-    });
-    if (!res.ok) return null; // table may not exist yet
+    const res = await sbFetch(
+      `${SUPABASE_URL}/rest/v1/profiles?select=user_id,display_name,default_space_id,last_space_id&user_id=eq.${uid}&limit=1`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${access_token}`,
+        },
+        timeoutMs: 12000,
+      }
+    );
+    if (!res.ok) return null;
     const rows = await res.json();
     return Array.isArray(rows) && rows[0] ? rows[0] : null;
   } catch {
@@ -1083,8 +1079,7 @@ async function tryFetchProfile({ access_token, userId }) {
 
 export async function getProfile() {
   requireAuth();
-  const p = await tryFetchProfile({ access_token: _session.access_token, userId: _user?.id });
-  return p;
+  return await tryFetchProfile({ access_token: _session.access_token, userId: _user?.id });
 }
 
 export async function upsertProfile(patch) {
@@ -1131,13 +1126,9 @@ export async function updateSpaceName({ spaceId, name }) {
   return Array.isArray(rows) ? rows[0] : rows;
 }
 
-
 /* =========================
    RECIPE: MOVE/COPY TO SPACE
 ========================= */
-
-
-
 
 function chunkArray(arr, size) {
   const out = [];
@@ -1146,7 +1137,7 @@ function chunkArray(arr, size) {
 }
 
 async function fetchRecipesByIds({ access_token, ids }) {
-  const uniq = Array.from(new Set((ids || []).map(x => String(x || "").trim()).filter(Boolean)));
+  const uniq = Array.from(new Set((ids || []).map((x) => String(x || "").trim()).filter(Boolean)));
   if (!uniq.length) return [];
   const chunks = chunkArray(uniq, 50);
   const rows = [];
@@ -1165,10 +1156,13 @@ async function fetchRecipesByIds({ access_token, ids }) {
 async function fetchRecipePartsEdges({ access_token, spaceId }) {
   const sid = String(spaceId || "").trim();
   if (!sid) return [];
-  const res = await sbFetch(`${SUPABASE_URL}/rest/v1/recipe_parts?select=space_id,parent_id,child_id,sort_order&space_id=eq.${encodeURIComponent(sid)}`, {
-    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${access_token}` },
-    timeoutMs: 20000,
-  });
+  const res = await sbFetch(
+    `${SUPABASE_URL}/rest/v1/recipe_parts?select=space_id,parent_id,child_id,sort_order&space_id=eq.${encodeURIComponent(sid)}`,
+    {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${access_token}` },
+      timeoutMs: 20000,
+    }
+  );
   if (!res.ok) throw new Error(`fetchRecipePartsEdges failed: ${res.status} ${await sbJson(res)}`);
   return await res.json();
 }
@@ -1195,11 +1189,6 @@ function collectDescendants({ rootId, edges }) {
   return Array.from(visited);
 }
 
-
-/* =========================
-   RECIPE: MOVE/COPY TO SPACE (with Parts)
-========================= */
-
 export async function moveRecipeToSpace({ recipeId, targetSpaceId, includeParts = true }) {
   requireAuth();
   const rid = String(recipeId || "").trim();
@@ -1214,7 +1203,7 @@ export async function moveRecipeToSpace({ recipeId, targetSpaceId, includeParts 
   if (includeParts && fromSpaceId) {
     const edges = await fetchRecipePartsEdges({ access_token, spaceId: fromSpaceId });
     idsToMove = collectDescendants({ rootId: rid, edges });
-    edgesToMove = edges.filter(e => idsToMove.includes(String(e.parent_id || "")));
+    edgesToMove = edges.filter((e) => idsToMove.includes(String(e.parent_id || "")));
   }
 
   // 1) move recipes
@@ -1224,7 +1213,6 @@ export async function moveRecipeToSpace({ recipeId, targetSpaceId, includeParts 
       method: "PATCH",
       headers: {
         ...sbHeaders(),
-        "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
       body: JSON.stringify({ space_id: sid }),
@@ -1236,25 +1224,26 @@ export async function moveRecipeToSpace({ recipeId, targetSpaceId, includeParts 
   // 2) move edges where parent is in moved set
   if (includeParts && edgesToMove.length && fromSpaceId) {
     for (const chunkEdges of chunkArray(edgesToMove, 200)) {
-      const parentIds = Array.from(new Set(chunkEdges.map(e => String(e.parent_id))));
+      const parentIds = Array.from(new Set(chunkEdges.map((e) => String(e.parent_id))));
       const q = parentIds.map(encodeURIComponent).join(",");
-      const res = await sbFetchAuthed(`${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(fromSpaceId)}&parent_id=in.(${q})`, {
-        method: "PATCH",
-        headers: {
-          ...sbHeaders(),
-          "Content-Type": "application/json",
-          Prefer: "return=minimal",
-        },
-        body: JSON.stringify({ space_id: sid }),
-        timeoutMs: 20000,
-      });
+      const res = await sbFetchAuthed(
+        `${SUPABASE_URL}/rest/v1/recipe_parts?space_id=eq.${encodeURIComponent(fromSpaceId)}&parent_id=in.(${q})`,
+        {
+          method: "PATCH",
+          headers: {
+            ...sbHeaders(),
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ space_id: sid }),
+          timeoutMs: 20000,
+        }
+      );
       if (!res.ok) throw new Error(`move recipe_parts failed: ${res.status} ${await sbJson(res)}`);
     }
   }
 
   return { movedIds: idsToMove, targetSpaceId: sid };
 }
-
 
 export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = true }) {
   requireAuth();
@@ -1273,14 +1262,14 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
   }
 
   const srcRows = await fetchRecipesByIds({ access_token, ids });
-  const byId = new Map(srcRows.map(r => [String(r.id), r]));
+  const byId = new Map(srcRows.map((r) => [String(r.id), r]));
 
   const idMap = new Map();
   for (const id of ids) {
-    idMap.set(id, (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`));
+    idMap.set(id, crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
   }
 
-  const newRows = ids.map(oldId => {
+  const newRows = ids.map((oldId) => {
     const r = byId.get(String(oldId));
     if (!r) throw new Error(`Missing source recipe: ${oldId}`);
     const nr = { ...r };
@@ -1300,7 +1289,6 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
       headers: {
         ...sbHeaders(),
         Prefer: "return=minimal",
-        "Content-Type": "application/json",
       },
       body: JSON.stringify(ch),
       timeoutMs: 20000,
@@ -1311,8 +1299,8 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
   if (includeParts && edges.length) {
     const idsSet = new Set(ids.map(String));
     const edgeRows = edges
-      .filter(e => idsSet.has(String(e.parent_id)) && idsSet.has(String(e.child_id)))
-      .map(e => ({
+      .filter((e) => idsSet.has(String(e.parent_id)) && idsSet.has(String(e.child_id)))
+      .map((e) => ({
         space_id: sid,
         parent_id: idMap.get(String(e.parent_id)),
         child_id: idMap.get(String(e.child_id)),
@@ -1325,7 +1313,6 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
         headers: {
           ...sbHeaders(),
           Prefer: "return=minimal",
-          "Content-Type": "application/json",
         },
         body: JSON.stringify(ch),
         timeoutMs: 20000,
@@ -1337,28 +1324,3 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
   const newRootId = idMap.get(String(recipe.id));
   return { newRecipeId: newRootId };
 }
-
-export function __debugAuthSnapshot() {
-  let raw = null;
-  try { raw = localStorage.getItem(LS_AUTH_KEY); } catch {
-    //
-  }
-  return {
-    hasSession: !!_session?.access_token,
-    hasRefresh: !!_session?.refresh_token,
-    expires_at: _session?.expires_at ?? null,
-    userId: _user?.id ?? null,
-    spaceId: _spaceId ?? null,
-    lsAuthPresent: raw ? true : false,
-    lsAuthLen: raw ? raw.length : 0,
-    lastErr: _lastAuthError ?? null,
-    lastEvent: _lastAuthEvent ?? null,
-    now: Date.now()
-  };
-}
-
-// OPTIONAL: set these in your code where errors happen
-let _lastAuthError = null;
-let _lastAuthEvent = null;
-export function __debugSetAuthEvent(e) { _lastAuthEvent = e; }
-export function __debugSetAuthError(e) { _lastAuthError = String(e); }

@@ -819,6 +819,8 @@ export function startApp() {
   // Keep behavior: don't await boot() here (boot does its own async work)
   boot();
   function installDebugOverlay() {
+    window.__forceRefresh = true;
+
   const el = document.createElement("div");
   el.id = "authDebug";
   el.style.cssText =
