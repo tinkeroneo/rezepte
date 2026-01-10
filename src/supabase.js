@@ -67,7 +67,7 @@ function readAuthFromHash() {
 
   // Hash bereinigen (Router bleibt sauber)
   window.history.replaceState(null, "", location.pathname + location.search);
-markForceDefaultOnce();
+  markForceDefaultOnce();
 
   return { access_token, refresh_token, expires_at };
 }
@@ -94,9 +94,8 @@ function storeAuth(auth) {
 
 async function refreshAccessToken(refresh_token) {
   if (!refresh_token) return null;
+
   try {
-    // Supabase GoTrue expects x-www-form-urlencoded for refresh_token grant.
-    // Putting grant_type into the query avoids "unsupported_grant_type" parsing issues.
     const res = await sbFetch(
       `${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,
       {
@@ -111,14 +110,29 @@ async function refreshAccessToken(refresh_token) {
       }
     );
 
-    // If Supabase rejects the refresh token, this is not a transient error.
+    // Read body ALWAYS so we can debug real cause
+    const text = await res.text();
+    let body = null;
+    try { body = text ? JSON.parse(text) : null; } catch { body = text; }
+
     if (!res.ok) {
-      const transient = res.status >= 500 || res.status === 0;
-      return transient ? { transient: true } : null;
+      const status = res.status;
+
+      // Treat common retryable statuses as transient
+      const transient = status === 0 || status === 408 || status === 429 || status >= 500;
+
+      // Store a useful error for your overlay
+      __debugSetAuthError?.(`refresh http ${status}: ${typeof body === "string" ? body : JSON.stringify(body)}`);
+
+      return transient ? { transient: true, status, body } : { invalid: true, status, body };
     }
 
-    const json = await res.json();
-    if (!json?.access_token || !json?.refresh_token) return null;
+    // success: parse json
+    const json = body && typeof body === "object" ? body : null;
+    if (!json?.access_token || !json?.refresh_token) {
+      __debugSetAuthError?.("refresh ok but missing tokens");
+      return null;
+    }
 
     const expires_at = Math.floor(Date.now() / 1000) + Number(json.expires_in || 3600);
 
@@ -128,10 +142,11 @@ async function refreshAccessToken(refresh_token) {
       expires_at,
     };
   } catch (e) {
-    // Network / timeout / transient errors: don't force logout.
+    __debugSetAuthError?.(`refresh exception: ${String(e?.message || e)}`);
     return { transient: true, error: String(e?.message || e) };
   }
 }
+
 
 // (redirect helpers removed – keep redirect handling in the login view)
 
@@ -342,38 +357,26 @@ export async function initAuthAndSpace() {
         // treat fetch errors as transient; keep current session
         refreshed = { transient: true };
       }
+if (refreshed && !refreshed.transient && !refreshed.invalid) {
+  _session = refreshed;
+  storeAuth(_session);
+  __debugSetAuthEvent?.("refresh ok");
+} else if (refreshed?.invalid) {
+  __debugSetAuthError?.("refresh invalid -> logout");
+  logout();              // hier darfst du wirklich löschen
+  return null;
+} else {
+  // transient: keep session; app may be offline
+  __debugSetAuthError?.("refresh transient (kept session)");
+}
 
-      if (refreshed && !refreshed.transient) {
-        _session = refreshed;
-        storeAuth(_session);
-        __debugSetAuthEvent?.("refresh ok");
 
-      } else if (!refreshed) {
-        // Hard failure (invalid refresh token) -> clear local auth so we don't loop.
-        // KEIN logout bei transienten Fehlern (mobile/offline/VPN)
-  __debugSetAuthError?.("refresh failed (kept session)");
-
-  return {
-    session: null,
-    user: null,
-    userId: null,
-    spaceId: null,
-    pendingInvites: [],
-    expired: true, // wichtig: UI darf Login zeigen
-  };
-
-      } else {
-        // Transient failure (timeout/offline/server) -> keep current session and continue.
-        // This avoids "getting kicked" on a flaky connection or after long tab sleep.
-        
-        __debugSetAuthError?.("transient failure");
-      }
     }
   }
 
-  
 
-  
+
+
 
   if (!_session?.access_token) {
     _spaceId = null;
