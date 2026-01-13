@@ -39,6 +39,7 @@ export function renderDetailView({
   addToShopping,
 
   refreshAll,
+  addRecipePart,
   removeRecipePart,
   rebuildPartsIndexSetter,
 
@@ -83,7 +84,7 @@ export function renderDetailView({
       ${renderIngredientsSectionHtml({ r, recipes, partsByParent })}
       ${renderStepsSectionHtml({ r, recipes, partsByParent })}
       ${renderCooklogCardHtml({ recipeId: r.id, lastStr, avgLabel, avgCount })}
-      ${renderChildrenSectionHtml({ children, canWrite: writable })}
+      ${renderChildrenSectionHtml({ parentId: r.id, children, canWrite: writable })}
       <div id="sheetRoot"></div>
     </div>
   `;
@@ -149,10 +150,16 @@ export function renderDetailView({
       parentId: r.id,
       state,
       setView,
+
+      recipes,
+      childrenIds: children?.map(x => x.id) || [],
+
+      addRecipePart,
       removeRecipePart,
       rebuildPartsIndexSetter,
       refreshAll
     });
+
 
     bindDeleteRecipe({
       appEl,
