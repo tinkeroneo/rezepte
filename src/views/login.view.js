@@ -66,10 +66,12 @@ export function renderLoginView({ appEl, state, setView, info, useBackend, setUs
     const email = ($("#email").value || "").trim();
     const redirectTo = suggested;
     console.log(redirectTo);
+    // Use "confirm" route to avoid mail-scanner consuming the Supabase /verify link.
+    const confirmRedirect = buildConfirmRedirect(redirectTo);
 
     if (!email) return setMsg("Bitte E-Mail eingeben.", "bad");
     // Make sure it points to index.html when using Live Server folder URLs
-    const normalizedRedirect = normalizeRedirectToIndexHtml(redirectTo);
+    const normalizedRedirect = normalizeRedirectToIndexHtml(confirmRedirect);
 
     setMsg("Sende Magic Link…");
     $("#btnSend").disabled = true;
@@ -133,6 +135,23 @@ function normalizeRedirectToIndexHtml(url) {
     return u.toString();
   } catch {
     return url;
+  }
+}
+
+
+
+function buildConfirmRedirect(finalRedirectTo) {
+  // finalRedirectTo should be your app entry (index.html)
+  // We wrap it into a hash-route: #confirm?next=<finalRedirectTo>
+  const normalizedFinal = normalizeRedirectToIndexHtml(finalRedirectTo);
+  try {
+    const u = new URL(normalizedFinal);
+    const next = normalizedFinal.replace(/#.*$/, "");
+    u.hash = "confirm?next=" + encodeURIComponent(next);
+    return u.toString();
+  } catch {
+    const next = String(normalizedFinal || "").replace(/#.*$/, "");
+    return String(normalizedFinal || "").replace(/#.*$/, "") + "#confirm?next=" + encodeURIComponent(next);
   }
 }
 

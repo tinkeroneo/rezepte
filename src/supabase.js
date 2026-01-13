@@ -404,6 +404,71 @@ function storeActiveSpace(userId, spaceId) {
    PUBLIC AUTH API
 ========================= */
 
+
+/* =========================
+   AUTH: OTP VERIFY (token_hash)
+   - Used for "confirm login" flow to avoid mail-scanner consuming the verify link.
+   - Call from a user click (button), then we store session like the classic hash flow.
+========================= */
+
+export async function verifyOtpAndStore({ token_hash, type = "magiclink" }) {
+  if (!token_hash) throw new Error("Missing token_hash");
+
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/verify`, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      type,
+      token_hash,
+    }),
+  });
+
+  const bodyText = await res.text();
+  let body = null;
+  try { body = bodyText ? JSON.parse(bodyText) : null; } catch { body = bodyText; }
+
+  if (!res.ok) {
+    throw new Error(`Verify failed: ${res.status} ${typeof body === "string" ? body : JSON.stringify(body)}`);
+  }
+
+  const access_token = body?.access_token;
+  const refresh_token = body?.refresh_token;
+  const expires_in = Number(body?.expires_in || body?.expires_in_seconds || 0);
+
+  if (!access_token || !refresh_token) {
+    throw new Error("Verify succeeded but no session returned.");
+  }
+
+  const expires_at = Math.floor(Date.now() / 1000) + (expires_in || 0);
+
+  _session = { access_token, refresh_token, expires_at };
+  storeAuth(_session);
+
+  // Cache user (best-effort)
+  try {
+    _user = await fetchCurrentUser(access_token);
+  } catch {
+    /* ignore */
+  }
+
+  // Important: remove token info from URL if present
+  try {
+    // keep hash-route, but drop any sensitive query/hash params
+    // (callers often navigate away anyway)
+    if (location.hash?.startsWith("#confirm?")) {
+      // keep route name only
+      location.hash = "#confirm";
+    }
+  } catch {
+    /* ignore */
+  }
+
+  return true;
+}
+
 export async function initAuthAndSpace() {
   __debugSetAuthEvent("initAuthAndSpace:start");
 

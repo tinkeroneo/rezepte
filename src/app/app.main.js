@@ -57,6 +57,7 @@ import { renderSelftestView } from "../views/selftest.view.js";
 import { renderDiagnosticsView } from "../views/diagnostics.view.js";
 import { renderTimersOverlay } from "../views/timers.view.js";
 import { renderLoginView } from "../views/login.view.js";
+import { renderConfirmView } from "../views/confirm.view.js";
 import { renderInvitesView } from "../views/invites.view.js";
 import { renderAccountView } from "../views/account.view.js";
 import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds, compactOfflineQueue, dequeueOfflineAction } from "../domain/offlineQueue.js";
@@ -450,7 +451,17 @@ async function render(view, setView) {
     });
   }
 
-  // Invites confirmation view
+  
+  // Confirm view (magic-link token_hash flow)
+  if (view.name === "confirm") {
+    return renderConfirmView({
+      appEl,
+      state: view,
+      setView: router.setView,
+    });
+  }
+
+// Invites confirmation view
   if (view.name === "invites") {
     const inv = window.__tinkeroneoPendingInvites || [];
     return renderInvitesView({
@@ -1012,7 +1023,14 @@ async function boot() {
         window.__tinkeroneoPendingInvites = ctx.pendingInvites;
         router.setView({ name: "invites" });
       } else if (!ctx?.spaceId && !isAuthenticated?.()) {
-        router.setView({ name: "login" });
+        // Allow unauthenticated routes (e.g. magiclink confirm) to render before forcing login.
+        const v = router?.getView?.() || null;
+        const name =
+          v?.name ||
+          (String(location.hash || "").replace(/^#/, "").split("?")[0].split("/")[0] || "");
+        if (name !== "confirm" && name !== "invites") {
+          router.setView({ name: "login" });
+        }
       } else if (!ctx?.spaceId && isAuthenticated?.()) {
         // Auth ok but no space assigned -> fall back to local mode
         try {

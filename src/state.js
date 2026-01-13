@@ -11,6 +11,9 @@ function parseHash() {
     name: namePart || "list",
     selectedId: params.get("id"),
     q: params.get("q") || "",
+    token_hash: params.get("token_hash") || "",
+    type: params.get("type") || "",
+    next: params.get("next") || "",
     // optional UI state persists elsewhere if needed
   };
 }
