@@ -3,33 +3,34 @@
 export function renderInvitesView({ appEl, invites, onAccept, onDecline, onSkip }) {
   const rows = Array.isArray(invites) ? invites : [];
 
+  // Wenn keine Einladungen: Invite-Screen gar nicht anzeigen
+  if (!rows.length) {
+    onSkip?.();          // verlässt die View (deine bestehende Logik)
+    return;
+  }
+
   appEl.innerHTML = `
-    <div class="page">
-      <header class="topbar">
-        <div class="title">Einladungen</div>
-        <div class="spacer"></div>
-        <button class="btn" id="btnSkip" type="button">Später</button>
-      </header>
+   <div class="container">
+      <section class="card">
+        <div class="page">
+          <h1 class="view-title">Einladungen</h1>
+          <h2>Spaces, zu denen du eingeladen wurdest</h2>
+          <div class="hint">Du kannst Einladungen annehmen oder ablehnen.</div>
 
-      <div class="card">
-        <h2>Spaces, zu denen du eingeladen wurdest</h2>
-        <div class="hint">Du kannst Einladungen annehmen oder ablehnen. (Aceptar / Rechazar)</div>
-
-        <div id="invRows" style="display:flex; flex-direction:column; gap:.65rem; margin-top: .75rem;">
-          ${rows.length ? rows.map(r => renderRow(r)).join("") : `<div class="hint">Keine offenen Einladungen 🎉</div>`}
+          <div id="invRows" style="display:flex; flex-direction:column; gap: 1.65rem; margin-top: 1.75rem;">
+            ${rows.map(r => renderRow(r)).join("")}
+          </div>
         </div>
-
         <div class="row" style="margin-top:1rem; justify-content:flex-end;">
-          <button class="btn" id="btnDone" type="button">Weiter</button>
+          <button class="btn" id="btnSkip" type="button">Später</button>
         </div>
-      </div>
+      </section>
     </div>
   `;
 
   const qs = (sel) => appEl.querySelector(sel);
 
   qs("#btnSkip")?.addEventListener("click", () => onSkip?.());
-  qs("#btnDone")?.addEventListener("click", () => onSkip?.());
 
   appEl.querySelectorAll("[data-accept]").forEach((btn) => {
     btn.addEventListener("click", async () => {
