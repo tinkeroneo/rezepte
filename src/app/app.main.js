@@ -451,7 +451,7 @@ async function render(view, setView) {
     });
   }
 
-  
+
   // Confirm view (magic-link token_hash flow)
   if (view.name === "confirm") {
     return renderConfirmView({
@@ -461,7 +461,7 @@ async function render(view, setView) {
     });
   }
 
-// Invites confirmation view
+  // Invites confirmation view
   if (view.name === "invites") {
     const inv = window.__tinkeroneoPendingInvites || [];
     return renderInvitesView({
@@ -832,30 +832,30 @@ export function startApp() {
   function installDebugOverlay() {
     window.__forceRefresh = true;
 
-  const el = document.createElement("div");
-  el.id = "authDebug";
-  el.style.cssText =
-    "position:fixed;left:8px;bottom:8px;z-index:99999;" +
-    "background:rgba(0,0,0,.75);color:#fff;padding:8px;" +
-    "border-radius:10px;font:12px/1.2 monospace;" +
-    "max-width:92vw;white-space:pre-wrap;";
-  document.body.appendChild(el);
+    const el = document.createElement("div");
+    el.id = "authDebug";
+    el.style.cssText =
+      "position:fixed;left:8px;bottom:8px;z-index:99999;" +
+      "background:rgba(0,0,0,.75);color:#fff;padding:8px;" +
+      "border-radius:10px;font:12px/1.2 monospace;" +
+      "max-width:92vw;white-space:pre-wrap;";
+    document.body.appendChild(el);
 
-  const tick = () => {
-    const s = __debugAuthSnapshot();
-    el.textContent =
-      `AUTH DBG\n` +
-      `lsAuth: ${s.lsAuthPresent} (len ${s.lsAuthLen})\n` +
-      `hasSession: ${s.hasSession} hasRefresh: ${s.hasRefresh}\n` +
-      `expires_at: ${s.expires_at}\n` +
-      `userId: ${s.userId}\n` +
-      `spaceId: ${s.spaceId}\n` +
-      `lastEvent: ${s.lastEvent}\n` +
-      `lastErr: ${s.lastErr}\n`;
-    setTimeout(tick, 1500);
-  };
-  tick();
-}
+    const tick = () => {
+      const s = __debugAuthSnapshot();
+      el.textContent =
+        `AUTH DBG\n` +
+        `lsAuth: ${s.lsAuthPresent} (len ${s.lsAuthLen})\n` +
+        `hasSession: ${s.hasSession} hasRefresh: ${s.hasRefresh}\n` +
+        `expires_at: ${s.expires_at}\n` +
+        `userId: ${s.userId}\n` +
+        `spaceId: ${s.spaceId}\n` +
+        `lastEvent: ${s.lastEvent}\n` +
+        `lastErr: ${s.lastErr}\n`;
+      setTimeout(tick, 1500);
+    };
+    tick();
+  }
 
   // Debug overlay (only when enabled)
   try {
@@ -1018,27 +1018,57 @@ async function boot() {
         setOfflineQueueScope({ userId: ctx.user?.id || null, spaceId: ctx.spaceId || null });
       }
 
-      // Route handling
-      if (Array.isArray(ctx?.pendingInvites) && ctx.pendingInvites.length) {
-        window.__tinkeroneoPendingInvites = ctx.pendingInvites;
-        router.setView({ name: "invites" });
-      } else if (!ctx?.spaceId && !isAuthenticated?.()) {
-        // Allow unauthenticated routes (e.g. magiclink confirm) to render before forcing login.
+      // Clear stale pending invites (important: invite view uses this global)
+      if (!Array.isArray(ctx?.pendingInvites) || ctx.pendingInvites.length === 0) {
+        try { delete window.__tinkeroneoPendingInvites; } catch { 
+          //
+        }
+        // If we are currently on invites view, leave it (otherwise it can "stick")
         const v = router?.getView?.() || null;
         const name =
           v?.name ||
           (String(location.hash || "").replace(/^#/, "").split("?")[0].split("/")[0] || "");
-        if (name !== "confirm" && name !== "invites") {
-          router.setView({ name: "login" });
-        }
-      } else if (!ctx?.spaceId && isAuthenticated?.()) {
-        // Auth ok but no space assigned -> fall back to local mode
-        try {
-          await setUseBackend(false);
-        } catch (e) {
-          reportError(e, { scope: "app.main", action: "setUseBackend:false" });
+
+        if (name === "invites") {
+          // go somewhere sensible depending on auth/space
+          if (!isAuthenticated?.()) router.setView({ name: "login" });
+          else if (ctx?.spaceId) router.setView({ name: "list", selectedId: null, q: "" });
+          else router.setView({ name: "account" }); // or "list" if you prefer
         }
       }
+
+      // Route handling
+      if (Array.isArray(ctx?.pendingInvites) && ctx.pendingInvites.length) {
+        // 👉 Nur wenn es wirklich Einladungen gibt, zeigen wir die Invite-View
+        window.__tinkeroneoPendingInvites = ctx.pendingInvites;
+        router.setView({ name: "invites" });
+        return;
+      }
+
+      if (!ctx?.spaceId && !isAuthenticated?.()) {
+        // 👉 Nicht eingeloggt: Login erzwingen
+        //    (confirm darf durch, damit Magiclink funktioniert)
+        const v = router?.getView?.() || null;
+        const name =
+          v?.name ||
+          (String(location.hash || "").replace(/^#/, "").split("?")[0].split("/")[0] || "");
+
+        if (name !== "confirm") {
+          router.setView({ name: "login" });
+        }
+        return;
+      }
+
+      if (!ctx?.spaceId && isAuthenticated?.()) {
+        // 👉 Eingeloggt, aber:
+        //    - keine Einladungen
+        //    - kein Space
+        //    => einfach nichts erzwingen
+        //    (App bleibt stabil, kein Local-Fallback, kein Invite-UI)
+        return;
+      }
+
+
 
       // Final refresh of space UI after potential routing changes.
       try {

@@ -20,6 +20,16 @@ header{
   display:flex; 
   gap: var(--s-2); 
 }
+/* Android select overlay fix */
+@supports (-webkit-touch-callout: none) {
+  select.badge-select {
+    background-color: var(--overlay-bg, #fff);
+    color: var(--text-primary, #000);
+    -webkit-appearance: menulist;
+    appearance: menulist;
+    border: 1px solid var(--border-subtle, rgba(0,0,0,.15));
+  }
+}
 
 /* Header layout: compact two-line on small screens, single line on wide screens */
 .header-grid{
@@ -225,7 +235,7 @@ body.dark .badge-btn:hover{ background: rgba(255,255,255,0.05); }
 .badge-select{
   max-width: 12.5rem;
   cursor: pointer;
-  background: transparent;
+  background-color: var(--overlay-bg);
   border: 1px solid var(--border);
   color: var(--text);
 }
