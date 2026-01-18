@@ -1,5 +1,6 @@
 // src/views/confirm.view.js
 import { verifyOtpAndStore, isAuthenticated } from "../supabase.js";
+import { readUseBackend, writeUseBackend } from "../app/localSettings.js";
 
 // View: #confirm?token_hash=...&type=magiclink&next=...
 export function renderConfirmView({ appEl, state, router }) {
@@ -65,6 +66,15 @@ export function renderConfirmView({ appEl, state, router }) {
       setMsg("Bestätige Login…");
 
       await verifyOtpAndStore({ token_hash, type });
+
+      // After a successful cloud login we default to backend mode, so the user
+      // immediately sees their default space instead of staying in local mode.
+      // (User can still toggle back to local later.)
+      try {
+        if (!readUseBackend?.()) writeUseBackend(true);
+      } catch {
+        // ignore
+      }
 
       // After storing the session, jump to next (full URL) or back into the app.
       if (next) return hardNavigate(next);
