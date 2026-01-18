@@ -115,6 +115,7 @@ header{
     background-color: var(--card);
     color: var(--text);
     pointer-events: auto;
+    z-index: 2;
   }
 }
 
