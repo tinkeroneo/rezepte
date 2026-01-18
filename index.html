@@ -102,8 +102,10 @@
             if (hasActiveTimers() || inCookView()) {
               // retry später
               window.clearTimeout(window.__updateToastRetry);
-              window.__updateToastRetry = window.setTimeout(showToast, 2500);
+              window.__updateToastRetry = window.setTimeout(showToast, 1500);
               return;
+            } else {
+  showToast();  
             }
             toast.classList.add("toast--show");
             toast.setAttribute("aria-hidden", "false");
@@ -117,6 +119,25 @@
 
           try {
             const reg = await navigator.serviceWorker.register("./sw.js");
+function maybeShowUpdateToast(reg) {
+  // Show whenever a new SW is waiting (update ready)
+  if (reg?.waiting) showToast();
+}
+
+// After register:
+maybeShowUpdateToast(reg);
+
+// Also when update is found:
+reg.addEventListener("updatefound", () => {
+  const sw = reg.installing;
+  if (!sw) return;
+  sw.addEventListener("statechange", () => {
+    if (sw.state === "installed") {
+      // show even if controller is missing (first install / weird webview cases)
+      showToast();
+    }
+  });
+});
 
             const requestSkipWaiting = () => {
               if (reg.waiting) {
@@ -138,9 +159,9 @@
               sw.addEventListener("statechange", () => {
                 if (sw.state === "installed") {
                   // installed + controller vorhanden => Update bereit
-                  if (navigator.serviceWorker.controller) {
+                  
                     showToast();
-                  }
+                  
                 }
               });
             });
