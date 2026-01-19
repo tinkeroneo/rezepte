@@ -45,6 +45,7 @@ export function renderDetailView({
 
   mySpaces,
   copyRecipeToSpace,
+  createRecipeShare,
 
   sbDelete,
 
@@ -115,7 +116,8 @@ export function renderDetailView({
 
     addToShopping,
     recipes,
-    partsByParent
+    partsByParent,
+    createRecipeShare
   });
 
 

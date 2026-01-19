@@ -35,7 +35,9 @@ import {
   updateSpaceName,
   moveRecipeToSpace,
   copyRecipeToSpace,
-  deleteRecipe
+  getSharedRecipe,
+  deleteRecipe,
+  createRecipeShare
 } from "../supabase.js";
 import { __debugAuthSnapshot } from "../supabase.js";
 
@@ -58,6 +60,7 @@ import { renderDiagnosticsView } from "../views/diagnostics.view.js";
 import { renderTimersOverlay } from "../views/timers.view.js";
 import { renderLoginView } from "../views/login.view.js";
 import { renderConfirmView } from "../views/confirm.view.js";
+import { renderShareView } from "../views/share.view.js";
 import { renderInvitesView } from "../views/invites.view.js";
 import { renderAccountView } from "../views/account.view.js";
 import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds, compactOfflineQueue, dequeueOfflineAction } from "../domain/offlineQueue.js";
@@ -461,6 +464,20 @@ async function render(view, setView) {
     });
   }
 
+  // Share view (public read-only recipe)
+  if (view.name === "share") {
+    renderShareView({
+      appEl,
+      state: view,
+      setView,
+      getSharedRecipe,
+      isAuthenticated,
+      recipes: appState.recipes,
+    });
+    return;
+  }
+
+
   // Invites confirmation view
   if (view.name === "invites") {
     const inv = window.__tinkeroneoPendingInvites || [];
@@ -737,6 +754,7 @@ async function render(view, setView) {
       },
       removeRecipePart,
       addRecipePart,
+      createRecipeShare,
       listAllRecipeParts,
       onUpdateRecipe: async (rec) => {
         return runExclusive(`upsert:${rec.id}`, async () => {
@@ -1053,7 +1071,7 @@ async function boot() {
           v?.name ||
           (String(location.hash || "").replace(/^#/, "").split("?")[0].split("/")[0] || "");
 
-        if (name !== "confirm") {
+        if (name !== "confirm" && name !== "share") {
           router.setView({ name: "login" });
         }
         return;

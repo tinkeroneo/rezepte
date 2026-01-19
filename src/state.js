@@ -4,17 +4,31 @@ import { KEYS, lsSet } from "./storage.js";
 // Parse: #cook?id=123&q=abc
 function parseHash() {
   const raw = (location.hash || "#list").slice(1);
-  const [namePart, qsPart] = raw.split("?");
+  const [namePartRaw, qsPart] = raw.split("?");
+  const namePart = namePartRaw || "list";
   const params = new URLSearchParams(qsPart || "");
+
+  // Short share links: #s/<token>
+  if (namePart.startsWith("s/")) {
+    return {
+      name: "share",
+      selectedId: null,
+      q: params.get("q") || "",
+      token: decodeURIComponent(namePart.slice(2) || ""),
+      token_hash: params.get("token_hash") || "",
+      type: params.get("type") || "",
+      next: params.get("next") || ""
+    };
+  }
 
   return {
     name: namePart || "list",
     selectedId: params.get("id"),
     q: params.get("q") || "",
+    token: params.get("token") || "",
     token_hash: params.get("token_hash") || "",
     type: params.get("type") || "",
-    next: params.get("next") || "",
-    // optional UI state persists elsewhere if needed
+    next: params.get("next") || ""
   };
 }
 

@@ -24,7 +24,7 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
             ${canWrite ? `<button class="btn btn--ghost" id="deleteBtn" type="button" title="Rezept löschen">🗑️</button>` : ``}
           </div>
 
-          <button class="btn btn--ghost" id="copyCookLinkBtn" type="button" title="Link kopieren">🔗</button>
+          <button class="btn btn--ghost" id="shareLinkBtn" type="button" title="Link kopieren">🔗</button>
         </div>
       </div>  
 

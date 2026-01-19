@@ -8,6 +8,9 @@ function cookLinkFor(recipeId) {
   return `${location.origin}${location.pathname}#detail?id=${encodeURIComponent(recipeId)}`;
 }
 
+function shareLinkFor(token) {
+  return `${location.origin}${location.pathname}#s/${encodeURIComponent(token)}`;
+}
 async function copyText(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -44,7 +47,8 @@ export function bindDetailActions({
   canShop = true,
   addToShopping,
   recipes,
-  partsByParent
+  partsByParent,
+  createRecipeShare
 }) {
   // Kochen (immer erlaubt)
   const cookBtn = qs(appEl, "#cookBtn");
@@ -55,29 +59,39 @@ export function bindDetailActions({
     });
   }
 
-  // Link kopieren (immer erlaubt)
-  const copyLinkBtn = qs(appEl, "#copyCookLinkBtn");
-  if (copyLinkBtn && !copyLinkBtn.__bound) {
-    copyLinkBtn.__bound = true;
-    copyLinkBtn.addEventListener("click", async () => {
-      const url = cookLinkFor(recipe.id);
-      const ok = await copyText(url);
-      if (ok) ack(copyLinkBtn);
-      else prompt("Cook-Link kopieren:", url);
+  // Share-Link erstellen (Token-Link, mit Auto-Redirect beim Öffnen) (read-only, public token)
+  const shareLinkBtn = qs(appEl, "#shareLinkBtn");
+  if (shareLinkBtn && !shareLinkBtn.__bound) {
+    shareLinkBtn.__bound = true;
+    shareLinkBtn.addEventListener("click", async () => {
+
+
+      try {
+        if (typeof createRecipeShare !== "function") {
+          // fallback: copy normal link
+          const url = cookLinkFor(recipe.id);
+          const ok = await copyText(url);
+          if (ok) ack(shareLinkBtn);
+          else prompt("Link kopieren:", url);
+          return;
+        }
+
+        const token = await createRecipeShare({ recipeId: recipe.id, expiresInDays: 7, maxUses: 50 });
+       
+        if (!token) throw new Error("Kein Share-Token erhalten");
+        
+        const url = shareLinkFor(token);
+        const ok = await copyText(url);
+        if (ok) ack(shareLinkBtn);
+        else prompt("Share-Link:", url);
+      } catch (e) {
+        alert(`Teilen fehlgeschlagen: ${e?.message || e}`);
+      }
+
     });
   }
 
-   // Link kopieren (immer erlaubt)
-  const copyBtn = qs(appEl, "#copyBtn");
-  if (copyBtn && !copyBtn.__bound) {
-    copyBtn.__bound = true;
-    copyBtn.addEventListener("click", async () => {
-      const url = cookLinkFor(recipe.id);
-      const ok = await copyText(url);
-      if (ok) ack(copyBtn);
-      else prompt("Cook-Link kopieren:", url);
-    });
-  }
+
 
   // Einkaufsliste (immer erlaubt, sofern canShop)
   const shopBtn = qs(appEl, "#addToShoppingBtn");

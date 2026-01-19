@@ -150,7 +150,17 @@ function clearStoredAuth() {
 }
 
 function isRealInvalidRefresh(errBody) {
+  // GoTrue can return either JSON or plain text (some proxies / environments).
+  if (typeof errBody === "string") {
+    const s = errBody.toLowerCase();
+    if (s.includes("invalid_grant") || s.includes("invalid_credentials")) return true;
+    if (s.includes("refresh") && (s.includes("expired") || s.includes("not found") || s.includes("invalid"))) return true;
+    if (s.includes("invalid") && s.includes("token")) return true;
+    return false;
+  }
+
   const code = String(errBody?.error_code || errBody?.error || "");
+  const desc = String(errBody?.error_description || "").toLowerCase();
   const msg = String(errBody?.msg || errBody?.message || "").toLowerCase();
 
   // The important ones:
@@ -159,7 +169,9 @@ function isRealInvalidRefresh(errBody) {
   // also treat "refresh token not found/expired" as invalid.
   if (code === "invalid_grant" || code === "invalid_credentials") return true;
   if (msg.includes("invalid_grant") || msg.includes("invalid_credentials")) return true;
-  if (msg.includes("refresh") && (msg.includes("expired") || msg.includes("not found"))) return true;
+  if (desc.includes("invalid_grant") || desc.includes("invalid_credentials")) return true;
+  if ((msg.includes("refresh") || desc.includes("refresh")) && ((msg + " " + desc).includes("expired") || (msg + " " + desc).includes("not found"))) return true;
+  if ((msg + " " + desc).includes("invalid") && (msg + " " + desc).includes("token")) return true;
 
   return false;
 }
@@ -821,6 +833,30 @@ function sbHeaders() {
   };
 }
 
+export async function canReadRecipeAuthed(recipeId) {
+  if (!recipeId) return false;
+  if (!_session?.access_token) return false;
+
+  const url = `${SUPABASE_URL}/rest/v1/recipes?id=eq.${encodeURIComponent(recipeId)}&select=id&limit=1`;
+  const res = await sbFetchAuthed(url, {
+    method: "GET",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${_session.access_token}`,
+    },
+  });
+  if (!res.ok) return false;
+  const rows = await res.json();
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+function sbHeadersAnon() {
+  return {
+    apikey: SUPABASE_ANON_KEY,
+    "Content-Type": "application/json",
+  };
+}
+
 async function sbFetchAuthed(url, opts = {}, retried = false) {
   const res = await sbFetch(url, opts);
 
@@ -1388,4 +1424,64 @@ export async function copyRecipeToSpace({ recipe, targetSpaceId, includeParts = 
 
   const newRootId = idMap.get(String(recipe.id));
   return { newRecipeId: newRootId };
+}
+
+
+export async function createRecipeShare({ recipeId, expiresInDays = 7, maxUses = null }) {
+  if (!recipeId) throw new Error("createRecipeShare: missing recipeId");
+
+  const url = `${SUPABASE_URL}/rest/v1/rpc/create_recipe_share`;
+  const res = await sbFetchAuthed(url, {
+    method: "POST",
+    headers: {
+      apikey: SUPABASE_ANON_KEY,
+      Authorization: `Bearer ${_session.access_token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      p_recipe_id: recipeId,
+      p_expires_in_days: expiresInDays,
+      p_max_uses: maxUses,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await sbJson(res);
+    throw new Error(`createRecipeShare failed: ${res.status} ${JSON.stringify(err)}`);
+  }
+
+  const data = await res.json();
+
+  // PostgREST RPC scalar returns are often JSON strings: "abcd..."
+  if (typeof data === "string") return data;
+
+  // Some setups wrap results
+  if (data && typeof data === "object") {
+    if (typeof data.token === "string") return data.token;
+    if (typeof data.result === "string") return data.result;
+  }
+
+  // Very defensive fallback
+  if (Array.isArray(data) && typeof data[0] === "string") return data[0];
+
+  return null;
+}
+
+
+export async function getSharedRecipe({ token }) {
+  const t = String(token || "").trim();
+  if (!t) throw new Error("getSharedRecipe: missing token");
+
+  // Public read: server-side function returns the full recipe payload (incl. ingredients/steps where available).
+  const url = `${SUPABASE_URL}/rest/v1/rpc/get_shared_recipe`;
+  const res = await sbFetch(url, {
+    method: "POST",
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_token: t })
+  });
+
+  if (!res.ok) throw new Error(`getSharedRecipe failed: ${res.status} ${await sbJson(res)}`);
+
+  // Function returns JSON (usually jsonb)
+  return res.json();
 }
