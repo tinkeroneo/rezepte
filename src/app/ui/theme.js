@@ -1,5 +1,7 @@
 import { readTheme, readWinter } from "../localSettings.js";
 import { refreshDefaultRecipeImages } from "../../utils.js";
+import { refreshLoaderIcon } from "../../ui/loader.js"; // Pfad ggf. anpassen
+
 
 export function applyThemeAndOverlay() {
   const theme = readTheme();
@@ -13,6 +15,7 @@ export function applyThemeAndOverlay() {
   document.body.classList.toggle("dark", !!wantsDark);
 
   updateFavicon(resolved);
+  refreshLoaderIcon();
   document.body.classList.toggle("winter", readWinter());
 
   // Update already-rendered fallback images (favicon.svg/faviconDark.svg)

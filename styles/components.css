@@ -914,62 +914,6 @@ input[type="search"]:focus, input[type="text"]:focus, textarea:focus, select:foc
 .hint-ok { color: rgba(120, 220, 160, .95); }
 .hint-bad { color: rgba(255, 120, 120, .95); }
 
-/* loader svg*/
-#appLoader {
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  background: color-mix(in oklab, #000 35%, transparent);
-  -webkit-backdrop-filter:  blur(2px);
-  backdrop-filter: blur(2px);
-}
-
-#appLoader.is-on { display: flex; }
-
-.appLoader__card {
-  width: min(320px, calc(100vw - 2rem));
-  padding: 1rem 1rem .9rem;
-  border-radius: 16px;
-  background: var(--panel, #1b1b1b);
-  box-shadow: 0 20px 60px rgba(0,0,0,.35);
-  display: grid;
-  gap: .6rem;
-  justify-items: center;
-}
-
-.appLoader__img {
-  width: 140px;
-  height: 140px;
-  border-radius: 14px;
-  -webkit-user-drag: none;
-  user-select: none;
-}
-
-.appLoader__txt {
-  font-size: .95rem;
-  opacity: .95;
-  text-align: center;
-}
-
-.appLoader__dots { display: flex; gap: .35rem; }
-.appLoader__dots span {
-  width: .45rem; height: .45rem; border-radius: 999px;
-  background: currentColor;
-  opacity: .35;
-  animation: appLoaderDot 1.05s infinite ease-in-out;
-}
-.appLoader__dots span:nth-child(2) { animation-delay: .15s; }
-.appLoader__dots span:nth-child(3) { animation-delay: .30s; }
-
-@keyframes appLoaderDot {
-  0%, 80%, 100% { transform: translateY(0); opacity: .25; }
-  40% { transform: translateY(-4px); opacity: .9; }
-}
-
-
 /* Backend status banner (offline/VPN) */
 #backendStatusBanner{
   position: fixed;
@@ -1021,3 +965,83 @@ input[type="search"]:focus, input[type="text"]:focus, textarea:focus, select:foc
   font-weight: 600;
 }
 #backendStatusBanner .bsb-btn:active{ transform: translateY(1px); }
+
+/* App Loader (startup / blocking operations)
+   - Uses theme tokens, so it looks good in light + dark.
+*/
+#appLoader{
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: calc(var(--z-toast) + 10);
+  background: var(--overlay-bg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-2) var(--ease-standard);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+#appLoader.is-on{
+  display: flex;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.appLoader__card{
+  width: min(320px, calc(100vw - 32px));
+  padding: 18px 18px 16px;
+  border-radius: var(--r-2);
+  background: color-mix(in srgb, var(--card) 96%, var(--bg));
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  transform: translateY(6px) scale(.98);
+  opacity: 0;
+  transition: transform var(--dur-2) var(--ease-standard), opacity var(--dur-2) var(--ease-standard);
+}
+
+#appLoader.is-on .appLoader__card{
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.appLoader__img{
+  width: 86px;
+  height: 86px;
+  object-fit: contain;
+  image-rendering: auto;
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,0.35));
+}
+
+.appLoader__txt{
+  font-size: var(--fs-3);
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: var(--text);
+  text-align: center;
+}
+
+.appLoader__dots{
+  display: inline-flex;
+  gap: 6px;
+  opacity: .85;
+}
+.appLoader__dots span{
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 72%, var(--text));
+  animation: appLoaderDot 1.1s var(--ease-standard) infinite;
+}
+.appLoader__dots span:nth-child(2){ animation-delay: .15s; }
+.appLoader__dots span:nth-child(3){ animation-delay: .30s; }
+
+@keyframes appLoaderDot{
+  0%, 100% { transform: translateY(0); opacity: .45; }
+  50% { transform: translateY(-4px); opacity: 1; }
+}

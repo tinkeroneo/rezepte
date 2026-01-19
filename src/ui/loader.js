@@ -1,6 +1,20 @@
 // src/ui/loader.js
 let __el = null;
 let __lock = 0;
+function loaderIconSrc() {
+  const resolved = document.documentElement?.dataset?.theme;
+  const wantsDark =
+    resolved === "dark" ||
+    (!resolved && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
+
+  return wantsDark
+    ? "./src/favicon/iconCookingCatDark.svg"
+    : "./src/favicon/iconCookingCatLight.svg";
+}
+export function refreshLoaderIcon() {
+  const img = __el?.querySelector?.(".appLoader__img");
+  if (img) img.src = loaderIconSrc();
+}
 
 function ensure() {
   if (__el) return __el;
@@ -9,7 +23,7 @@ function ensure() {
   el.id = "appLoader";
   el.innerHTML = `
     <div class="appLoader__card" role="status" aria-live="polite">
-      <img class="appLoader__img" src="./src/favicon/iconCookingCatDark.svg" alt="Lädt..." />
+      <img class="appLoader__img" src="${loaderIconSrc()}" alt="Lädt..." />
       <div class="appLoader__txt" id="appLoaderText">Lade…</div>
       <div class="appLoader__dots" aria-hidden="true">
         <span></span><span></span><span></span>
