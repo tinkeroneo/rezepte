@@ -850,12 +850,7 @@ export async function canReadRecipeAuthed(recipeId) {
   return Array.isArray(rows) && rows.length > 0;
 }
 
-function sbHeadersAnon() {
-  return {
-    apikey: SUPABASE_ANON_KEY,
-    "Content-Type": "application/json",
-  };
-}
+
 
 async function sbFetchAuthed(url, opts = {}, retried = false) {
   const res = await sbFetch(url, opts);
