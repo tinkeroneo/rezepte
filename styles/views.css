@@ -626,3 +626,27 @@ html.dark .ingredients-list.is-interactive .ingredient-item:hover{
 }
 
 .li-media,.grid-media{ position:relative; }
+
+.todo-ribbon{
+  position: absolute;
+  top: 8px;
+  right: -28px;
+  z-index: 2;
+  width: 110px;
+  text-align: center;
+  transform: rotate(34deg);
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  background: rgba(214, 184, 132, .88);
+  border: 1px solid rgba(120, 95, 58, .45);
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+  pointer-events: none;
+}
+html.dark .todo-ribbon{
+  color: #111;
+  background: rgba(232, 203, 153, .9);
+  border-color: rgba(255, 231, 185, .35);
+}
