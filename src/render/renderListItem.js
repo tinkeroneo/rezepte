@@ -34,14 +34,12 @@ export function renderListItem(r, ctx) {
               title="Favorit"
               type="button"
               aria-pressed="${isFavorite(r.id) ? "true" : "false"}"
-            >
-              ?
-            </button>
+            >â˜…</button>
 
             <div class="li-title">${escapeHtml(r.title)}</div>
           </div>
 
-          <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" · "))}</div>
+          <div class="li-sub">${escapeHtml([r.category, r.time].filter(Boolean).join(" Â· "))}</div>
 
           ${(Array.isArray(r.tags) && r.tags.length)
             ? `<div class="li-tags">${r.tags.slice(0, 3).map(tagChip).join("")}</div>`
@@ -50,7 +48,7 @@ export function renderListItem(r, ctx) {
         </div>
       </div>
 
-      <div class="li-actions"><div class="li-chev" aria-hidden="true">›</div></div>
+      <div class="li-actions"><div class="li-chev" aria-hidden="true">â€º</div></div>
     </div>
   `;
 }
