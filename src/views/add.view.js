@@ -1,5 +1,6 @@
 import { escapeHtml, qs, recipeImageOrDefault } from "../utils.js";
 import { compressImageFile } from "../domain/images.js";
+import { normalizeIngredientLines } from "../domain/ingredientUnits.js";
 import { generateId } from "../domain/id.js";
 import { deleteRecipe as sbDelete } from "../supabase.js";
 
@@ -137,7 +138,10 @@ export function renderAddView({
         <div class="muted" id="uploadStatus" style="margin-top:.35rem;"></div>
                  <div id="imgPreviewWrap" style="margin-top:.6rem;"></div>
 
-        <label class="muted">Zutaten (eine pro Zeile)</label>
+        <div class="row" style="justify-content:space-between; align-items:center; margin-top:.25rem;">
+          <label class="muted" style="margin:0;">Zutaten (eine pro Zeile)</label>
+          <button class="btn btn--ghost btn--sm" id="normalizeIngredientsBtn" type="button" title="Einheiten vereinheitlichen">Einheiten</button>
+        </div>
         <textarea id="ingredients" placeholder="z.B. Weiße Bohnen\nTK-Spinat\nKala Namak">${escapeHtml(ingredientsText)}</textarea>
 
         <label class="muted">Zubereitung (eine pro Zeile)</label>
@@ -166,6 +170,7 @@ export function renderAddView({
   const sourceEl = qs(appEl, "#source");
   const tagsEl = qs(appEl, "#tags");
   const ingredientsEl = qs(appEl, "#ingredients");
+  const normalizeIngredientsBtn = qs(appEl, "#normalizeIngredientsBtn");
   const stepsEl = qs(appEl, "#steps");
 
   const fileEl = qs(appEl, "#image_file");
@@ -237,6 +242,18 @@ export function renderAddView({
   ].forEach((el) => el?.addEventListener("input", dirty.markDirty));
 
   fileEl?.addEventListener("change", dirty.markDirty);
+
+  normalizeIngredientsBtn?.addEventListener("click", () => {
+    const lines = String(ingredientsEl?.value || "").split("\n");
+    const normalized = normalizeIngredientLines(lines);
+    ingredientsEl.value = normalized.lines.join("\n");
+    ingredientsEl.dispatchEvent(new window.Event("input"));
+    if (normalized.changedCount > 0) {
+      alert(`${normalized.changedCount} Zeile(n) vereinheitlicht.`);
+    } else {
+      alert("Keine passenden Einheiten zum Vereinheitlichen gefunden.");
+    }
+  });
 
   // --- Delete (edit only)
   qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
