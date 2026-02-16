@@ -10,8 +10,8 @@ const ASSETS = [
   "./styles/components.css",
   "./styles/views.css",
   "./manifest.json",
-  "./favicon.svg",
-  "./faviconDark.svg",
+  "./src/favicon/favicon.svg",
+  "./src/favicon/faviconDark.svg",
 ];
 
 self.addEventListener("install", (event) => {

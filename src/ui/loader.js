@@ -7,9 +7,10 @@ function loaderIconSrc() {
     resolved === "dark" ||
     (!resolved && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches);
 
-  return wantsDark
-    ? "./src/favicon/iconCookingCatDark.svg"
-    : "./src/favicon/iconCookingCatLight.svg";
+  const file = wantsDark
+    ? "src/favicon/iconCookingCatDark.svg"
+    : "src/favicon/iconCookingCatLight.svg";
+  return new URL(file, document.baseURI).toString();
 }
 export function refreshLoaderIcon() {
   const img = __el?.querySelector?.(".appLoader__img");

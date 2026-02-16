@@ -51,7 +51,7 @@ function isDarkThemeForDefaults() {
 }
 
 export function defaultRecipeImageUrl() {
-  const file = isDarkThemeForDefaults() ? "faviconDark.svg" : "favicon.svg";
+  const file = isDarkThemeForDefaults() ? "src/favicon/faviconDark.svg" : "src/favicon/favicon.svg";
   return new URL(file, document.baseURI).toString();
 }
 

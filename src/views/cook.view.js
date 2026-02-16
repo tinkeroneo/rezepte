@@ -109,7 +109,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
                 data-default-img="${r.image_url ? "" : "1"}"
                 alt="${escapeHtml(r.title)}"
                 style="width:100%; border-radius:12px; display:block;"
-                onerror="this.onerror=null;this.src=new URL((document.documentElement?.dataset?.theme==='dark' ? 'faviconDark.svg' : 'favicon.svg'), document.baseURI).toString();" />
+                onerror="this.onerror=null;this.src=new URL((document.documentElement?.dataset?.theme==='dark' ? 'src/favicon/faviconDark.svg' : 'src/favicon/favicon.svg'), document.baseURI).toString();" />
             </div>
         ` : ""}</details>
 

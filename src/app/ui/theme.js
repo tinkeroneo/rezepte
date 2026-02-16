@@ -18,7 +18,7 @@ export function applyThemeAndOverlay() {
   refreshLoaderIcon();
   document.body.classList.toggle("winter", readWinter());
 
-  // Update already-rendered fallback images (favicon.svg/faviconDark.svg)
+  // Update already-rendered fallback images (src/favicon/favicon.svg variants)
   refreshDefaultRecipeImages(document);
 }
 
@@ -26,10 +26,6 @@ function updateFavicon(resolvedTheme) {
   const icon = document.getElementById("app-favicon");
   if (!icon) return;
 
-  icon.href =
-    (resolvedTheme === "dark"
-      ? "./src/favicon/iconCookingCatDark.svg"
-      : "./src/favicon/iconCookingCatLight.svg")
-    + "?v=" + (resolvedTheme === "dark" ? "d" : "l");
+  const file = resolvedTheme === "dark" ? "src/favicon/faviconDark.svg" : "src/favicon/favicon.svg";
+  icon.href = `${new URL(file, document.baseURI).toString()}?v=${resolvedTheme === "dark" ? "d" : "l"}`;
 }
-
