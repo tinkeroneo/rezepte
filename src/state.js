@@ -93,7 +93,7 @@ export function initRouter({ onViewChange, canNavigate }) {
 
   let __reverting = false;
 
-  window.addEventListener("hashchange", () => {
+  function syncFromLocation(reason = "hashchange") {
     const nextView = parseHash();
     const prevView = view;
 
@@ -101,20 +101,36 @@ export function initRouter({ onViewChange, canNavigate }) {
       __reverting = false;
       view = nextView;
       onViewChange(view);
-      return;
+      return true;
     }
 
     if (typeof canNavigate === "function") {
-      const ok = canNavigate({ from: prevView, to: nextView, reason: "hashchange" });
+      const ok = canNavigate({ from: prevView, to: nextView, reason });
       if (ok === false) {
         __reverting = true;
         setHash(prevView);
-        return;
+        return false;
       }
     }
 
     view = nextView;
     onViewChange(view);
+    return true;
+  }
+
+  window.addEventListener("hashchange", () => {
+    syncFromLocation("hashchange");
+  });
+
+  // Also react when only query/path changes (e.g. magic-link URL updates
+  // without a hashchange in existing app contexts).
+  window.addEventListener("popstate", () => {
+    syncFromLocation("popstate");
+  });
+
+  // BFCache restore can skip normal navigation events; resync explicitly.
+  window.addEventListener("pageshow", () => {
+    syncFromLocation("pageshow");
   });
 
 return { getView, setView };

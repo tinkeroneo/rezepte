@@ -817,7 +817,17 @@ export async function requestMagicLink({ email, redirectTo }) {
     }),
   });
 
-  if (!res.ok) throw new Error(`Magic link failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text();
+    const retryAfterRaw = Number(res.headers.get("retry-after") || "0");
+    const retryAfterSec = Number.isFinite(retryAfterRaw) && retryAfterRaw > 0 ? retryAfterRaw : 0;
+
+    const err = new Error(`Magic link failed: ${res.status} ${body}`);
+    err.status = res.status;
+    err.retryAfterSec = retryAfterSec;
+    err.body = body;
+    throw err;
+  }
   return true;
 }
 
