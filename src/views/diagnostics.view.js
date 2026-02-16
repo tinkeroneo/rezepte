@@ -3,6 +3,7 @@ import { escapeHtml, qs } from "../utils.js";
 export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
   const errors = info?.recentErrors ?? [];
   const stored = info?.storedErrors ?? [];
+  const magic = info?.magicLinkDiag || null;
   const backendLatency = info?.useBackend
     ? (Number.isFinite(info?.backendMs) ? `${escapeHtml(String(info.backendMs))} ms` : "—")
     : "—";
@@ -31,6 +32,24 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
 
           <div class="row" style="margin-top:.75rem; gap:.5rem; flex-wrap:wrap;">
             ${info?.onRetrySync ? `<button class="btn btn--ghost" id="syncRetryBtn">Sync erneut versuchen</button>` : ``}
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Magic-Link Diagnose</h3>
+          ${magic
+            ? `
+            <div class="kv"><span>Zeit</span><span>${escapeHtml(new Date(Number(magic.ts || 0)).toLocaleString())}</span></div>
+            <div class="kv"><span>Status</span><span>${escapeHtml(String(magic.status || "-"))}</span></div>
+            <div class="kv"><span>Retry-After</span><span>${escapeHtml(String(magic.retryAfterSec || 0))} s</span></div>
+            <div class="kv"><span>Email-Domain</span><span>${escapeHtml(String(magic.emailDomain || "-"))}</span></div>
+            <div class="kv"><span>Redirect</span><span style="word-break:break-all;">${escapeHtml(String(magic.redirectTo || "-"))}</span></div>
+            <pre class="errstack" style="margin-top:.5rem;">${escapeHtml(String(magic.body || ""))}</pre>
+          `
+            : `<div class="muted">Noch kein Magic-Link Fehler gespeichert.</div>`}
+
+          <div class="row" style="margin-top:.75rem; gap:.5rem;">
+            <button class="btn btn--ghost" id="copyMagicDiagBtn" ${magic ? "" : "disabled"}>Magic-Diagnose kopieren</button>
           </div>
         </div>
 
@@ -131,6 +150,15 @@ export function renderDiagnosticsView({ appEl, state: _state, info, setView }) {
       await info?.onRetrySync?.();
     } finally {
       setView({ name: "diagnostics" });
+    }
+  });
+
+  qs("#copyMagicDiagBtn")?.addEventListener("click", async () => {
+    try {
+      if (!magic) return;
+      await navigator.clipboard.writeText(JSON.stringify(magic, null, 2));
+    } catch {
+      // ignore
     }
   });
 }

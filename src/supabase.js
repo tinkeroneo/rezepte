@@ -25,6 +25,7 @@ const BUCKET = "recipe-images";
 
 const LS_AUTH_KEY = "tinkeroneo_sb_auth_v1";
 const LS_FORCE_DEFAULT_ONCE = "tinkeroneo_force_default_space_once_v1";
+const LS_MAGICLINK_DIAG = "tinkeroneo_magiclink_diag_v1";
 
 /* ---------- debug helpers ---------- */
 
@@ -146,6 +147,29 @@ function clearStoredAuth() {
     localStorage.removeItem(LS_AUTH_KEY);
   } catch {
     /* ignore */
+  }
+}
+
+function storeMagicLinkDiag(diag) {
+  try {
+    if (!diag) {
+      localStorage.removeItem(LS_MAGICLINK_DIAG);
+      return;
+    }
+    localStorage.setItem(LS_MAGICLINK_DIAG, JSON.stringify(diag));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getLastMagicLinkDiag() {
+  try {
+    const raw = localStorage.getItem(LS_MAGICLINK_DIAG);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === "object" ? obj : null;
+  } catch {
+    return null;
   }
 }
 
@@ -801,6 +825,19 @@ function normalizeRedirectTo(redirectTo) {
   return u.toString();
 }
 
+function parseRetryAfterSec(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return 0;
+
+  const asNumber = Number(raw);
+  if (Number.isFinite(asNumber) && asNumber > 0) return Math.ceil(asNumber);
+
+  const asDateMs = Date.parse(raw);
+  if (!Number.isFinite(asDateMs)) return 0;
+
+  return Math.max(0, Math.ceil((asDateMs - Date.now()) / 1000));
+}
+
 export async function requestMagicLink({ email, redirectTo }) {
   const safeRedirect = normalizeRedirectTo(redirectTo || `${location.origin}/index.html`);
 
@@ -819,8 +856,16 @@ export async function requestMagicLink({ email, redirectTo }) {
 
   if (!res.ok) {
     const body = await res.text();
-    const retryAfterRaw = Number(res.headers.get("retry-after") || "0");
-    const retryAfterSec = Number.isFinite(retryAfterRaw) && retryAfterRaw > 0 ? retryAfterRaw : 0;
+    const retryAfterSec = parseRetryAfterSec(res.headers.get("retry-after"));
+    const diag = {
+      ts: Date.now(),
+      status: res.status,
+      retryAfterSec,
+      body: String(body || "").slice(0, 800),
+      redirectTo: safeRedirect,
+      emailDomain: String(email || "").includes("@") ? String(email).split("@").pop() : "",
+    };
+    storeMagicLinkDiag(diag);
 
     const err = new Error(`Magic link failed: ${res.status} ${body}`);
     err.status = res.status;
@@ -828,6 +873,7 @@ export async function requestMagicLink({ email, redirectTo }) {
     err.body = body;
     throw err;
   }
+  storeMagicLinkDiag(null);
   return true;
 }
 

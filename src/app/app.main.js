@@ -37,7 +37,8 @@ import {
   copyRecipeToSpace,
   getSharedRecipe,
   deleteRecipe,
-  createRecipeShare
+  createRecipeShare,
+  getLastMagicLinkDiag
 } from "../supabase.js";
 import { __debugAuthSnapshot } from "../supabase.js";
 
@@ -636,6 +637,7 @@ async function render(view, setView) {
       onRetrySync: () => drainOfflineQueue({ reason: "diagnostics" }),
       recentErrors: getRecentErrors(),
       storedErrors: getStoredErrors?.() || [],
+      magicLinkDiag: getLastMagicLinkDiag?.() || null,
       onClearErrors: () => clearRecentErrors(),
       onClearStoredErrors: () => clearStoredErrors?.(),
     };
