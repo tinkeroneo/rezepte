@@ -1,4 +1,4 @@
-import { escapeHtml, recipeImageOrDefault } from "../utils.js";
+import { escapeHtml, recipeImageOrDefault, recipeImageForCard } from "../utils.js";
 import { isFavorite } from "../domain/favorites.js";
 
 export function renderGridItem(r, ctx) {
@@ -14,7 +14,7 @@ export function renderGridItem(r, ctx) {
     <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
       <div class="grid-media">
         ${recipeImageOrDefault(r.image_url)
-          ? `<img class="grid-img" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" data-default-img="${r.image_url ? "" : "1"}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+          ? `<img class="grid-img" src="${escapeHtml(recipeImageForCard(r.image_url, "grid"))}" data-default-img="${r.image_url ? "" : "1"}" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
           : coverFallbackHtml(r, "grid-img")
         }
 

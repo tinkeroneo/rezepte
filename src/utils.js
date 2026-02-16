@@ -9,6 +9,37 @@ export function recipeImageOrDefault(imageUrl) {
   return defaultRecipeImageUrl();
 }
 
+function isSupabasePublicObjectUrl(url) {
+  return url.pathname.includes("/storage/v1/object/public/");
+}
+
+function withImageTransform(url, { width, height, quality = 72, resize = "cover", format = "webp" } = {}) {
+  if (!isSupabasePublicObjectUrl(url)) return url.toString();
+  if (width) url.searchParams.set("width", String(width));
+  if (height) url.searchParams.set("height", String(height));
+  if (quality) url.searchParams.set("quality", String(quality));
+  if (resize) url.searchParams.set("resize", String(resize));
+  if (format) url.searchParams.set("format", String(format));
+  return url.toString();
+}
+
+// Returns a smaller image variant for list/grid cards when the source is a
+// Supabase Storage public-object URL. Other URLs are returned unchanged.
+export function recipeImageForCard(imageUrl, kind = "list") {
+  const raw = recipeImageOrDefault(imageUrl);
+  if (!raw) return raw;
+
+  try {
+    const url = new URL(raw, window.location.origin);
+    if (kind === "grid") {
+      return withImageTransform(url, { width: 420, height: 420, quality: 74, resize: "cover", format: "webp" });
+    }
+    return withImageTransform(url, { width: 128, height: 128, quality: 72, resize: "cover", format: "webp" });
+  } catch {
+    return raw;
+  }
+}
+
 function isDarkThemeForDefaults() {
   const t = (document.documentElement?.dataset?.theme || "").toLowerCase();
   // dataset wins (prevents "sticky" dark when a class is left behind)

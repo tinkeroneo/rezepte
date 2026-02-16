@@ -1,4 +1,4 @@
-import { escapeHtml, recipeImageOrDefault } from "../utils.js";
+import { escapeHtml, recipeImageOrDefault, recipeImageForCard } from "../utils.js";
 import { isFavorite } from "../domain/favorites.js";
 
 export function renderListItem(r, ctx) {
@@ -19,7 +19,7 @@ export function renderListItem(r, ctx) {
       <div class="li-left">
         <div class="li-media">
           ${recipeImageOrDefault(r.image_url)
-            ? `<img class="li-thumb" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" data-default-img="${r.image_url ? "" : "1"}" alt="${escapeHtml(r.title)}" loading="lazy" />`
+            ? `<img class="li-thumb" src="${escapeHtml(recipeImageForCard(r.image_url, "list"))}" data-default-img="${r.image_url ? "" : "1"}" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
             : coverFallbackHtml(r, "li-thumb li-thumb--empty")
         }
 
