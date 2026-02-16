@@ -170,12 +170,35 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
   const timerRoot = qs(appEl, "#timerRoot");
   const sheetRoot = qs(appEl, "#sheetRoot");
 
+  const ingredientsUsedKey = `tinkeroneo_ingredients_used_${r.id}`;
+  let _ingredientsUsed = new Set();
+  try {
+    _ingredientsUsed = new Set(JSON.parse(localStorage.getItem(ingredientsUsedKey) || "[]"));
+  } catch {
+    _ingredientsUsed = new Set();
+  }
+  let _ingredientsShowHidden = false;
+  const _ingredientsHideTimers = new Map();
+  const _ingredientsDelayHide = new Set();
+
+  function saveIngredientsUsed() {
+    localStorage.setItem(ingredientsUsedKey, JSON.stringify([..._ingredientsUsed]));
+  }
+
   function renderIngredientsSheet() {
+    _ingredientsHideTimers.forEach(t => window.clearTimeout(t));
+    _ingredientsHideTimers.clear();
+    _ingredientsDelayHide.clear();
+
+    const counter = { i: 0 };
     sheetRoot.innerHTML = `
       <div class="sheet-backdrop" id="sheetBackdrop"></div>
       <div class="sheet" role="dialog" aria-label="Zutaten">
         <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
-          <h3 style="margin:0;">Zutaten</h3>
+          <div class="row" style="gap:.5rem;">
+            <h3 style="margin:0;">Zutaten</h3>
+            <button class="btn btn--ghost btn--sm ingredients-toggle" id="ingredientsToggle" type="button">Alle</button>
+          </div>
           <button class="btn btn--ghost" id="closeSheet" type="button" title="Schließen">✕</button>
         </div>
         <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:flex-end; margin-top:.5rem;">
@@ -197,9 +220,9 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
           ${isMenu
             ? buildMenuIngredients(r, recipes, partsByParent).map(section => `
               <div class="muted" style="font-weight:900; margin:.75rem 0 .35rem;">${escapeHtml(section.title)}</div>
-              ${renderIngredientsHtml(section.items.map(x => scaleIngredientLine(x, __ingFactor)))}
+              ${renderIngredientsHtml(section.items.map(x => scaleIngredientLine(x, __ingFactor)), { interactive: true, counter })}
             `).join("")
-            : renderIngredientsHtml((r.ingredients ?? []).map(x => scaleIngredientLine(x, __ingFactor)))}
+            : renderIngredientsHtml((r.ingredients ?? []).map(x => scaleIngredientLine(x, __ingFactor)), { interactive: true, counter })}
         </div>
       </div>
     `;
@@ -209,6 +232,41 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
     if (close) close.addEventListener("click", () => (sheetRoot.innerHTML = ""));
     if (back) back.addEventListener("click", () => (sheetRoot.innerHTML = ""));
 
+    function applyIngredientStates() {
+      const hasUsed = _ingredientsUsed.size > 0;
+      const toggle = qs(sheetRoot, "#ingredientsToggle");
+      if (toggle) {
+        toggle.textContent = _ingredientsShowHidden ? "Nur offen" : "Alle";
+        toggle.style.visibility = hasUsed ? "visible" : "hidden";
+        toggle.disabled = !hasUsed;
+      }
+
+      qsa(sheetRoot, "[data-ing-idx]").forEach(li => {
+        const idx = Number(li.getAttribute("data-ing-idx"));
+        const used = _ingredientsUsed.has(idx);
+        li.classList.toggle("is-used", used);
+
+        if (!used) {
+          li.classList.remove("is-hidden", "is-pending-hide");
+          return;
+        }
+
+        if (_ingredientsShowHidden) {
+          li.classList.remove("is-hidden", "is-pending-hide");
+          return;
+        }
+
+        if (_ingredientsDelayHide.has(idx)) {
+          li.classList.add("is-pending-hide");
+          li.classList.remove("is-hidden");
+          return;
+        }
+
+        li.classList.add("is-hidden");
+        li.classList.remove("is-pending-hide");
+      });
+    }
+
     const sf = qs(sheetRoot, "#servingsFactor");
     if (sf) {
       sf.value = String(__ingFactor);
@@ -217,6 +275,51 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
         renderIngredientsSheet();
       });
     }
+
+    const toggle = qs(sheetRoot, "#ingredientsToggle");
+    if (toggle) {
+      toggle.addEventListener("click", () => {
+        _ingredientsShowHidden = !_ingredientsShowHidden;
+        applyIngredientStates();
+      });
+    }
+
+    qsa(sheetRoot, "[data-ing-idx]").forEach(li => {
+      li.addEventListener("click", () => {
+        const idx = Number(li.getAttribute("data-ing-idx"));
+        if (!Number.isFinite(idx)) return;
+
+        if (_ingredientsUsed.has(idx)) {
+          _ingredientsUsed.delete(idx);
+          _ingredientsDelayHide.delete(idx);
+          const t = _ingredientsHideTimers.get(idx);
+          if (t) window.clearTimeout(t);
+          _ingredientsHideTimers.delete(idx);
+          saveIngredientsUsed();
+          applyIngredientStates();
+          return;
+        }
+
+        _ingredientsUsed.add(idx);
+        _ingredientsDelayHide.add(idx);
+        saveIngredientsUsed();
+        applyIngredientStates();
+
+        const t = window.setTimeout(() => {
+          _ingredientsHideTimers.delete(idx);
+          _ingredientsDelayHide.delete(idx);
+          if (_ingredientsShowHidden) return;
+          const el = qs(sheetRoot, `[data-ing-idx="${idx}"]`);
+          if (el) {
+            el.classList.add("is-hidden");
+            el.classList.remove("is-pending-hide");
+          }
+        }, 3000);
+        _ingredientsHideTimers.set(idx, t);
+      });
+    });
+
+    applyIngredientStates();
   }
 
   let __ingFactor = 1;

@@ -579,6 +579,38 @@ html.dark .timerdock-count{ background: rgba(255,255,255,.06); }
 html.dark .timerroot-dock .timer-toggle--mini{
   background: rgba(255,255,255,.08);
 }
+
+/* Ingredients sheet: mark + auto-hide */
+.ingredients-list.is-interactive{
+  list-style: none;
+  padding-left: 0;
+  margin: .25rem 0 0;
+}
+.ingredients-list.is-interactive .ingredient-item{
+  cursor: pointer;
+  padding: .15rem 0;
+  border-radius: var(--r-0);
+}
+.ingredients-list.is-interactive .ingredient-item:hover{
+  background: rgba(0,0,0,.04);
+}
+html.dark .ingredients-list.is-interactive .ingredient-item:hover{
+  background: rgba(255,255,255,.06);
+}
+.ingredients-list.is-interactive .ingredient-item.is-used{
+  color: var(--muted);
+}
+.ingredients-list.is-interactive .ingredient-item.is-hidden{
+  display: none;
+}
+.ingredients-list.is-interactive .ingredient-item.is-pending-hide{
+  opacity: .7;
+}
+.ingredients-toggle{
+  min-height: 26px;
+  padding: 0 .4rem;
+  font-size: .85rem;
+}
 .timerroot-dock .timer-pill-left{
   display: flex;
   align-items: center;
