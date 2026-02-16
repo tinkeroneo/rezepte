@@ -13,6 +13,9 @@ export function applyThemeAndOverlay() {
   document.documentElement.dataset.theme = resolved;
   document.documentElement.classList.toggle("dark", !!wantsDark);
   document.body.classList.toggle("dark", !!wantsDark);
+  document.documentElement.style.backgroundColor = wantsDark ? "#0f1114" : "#f4efe6";
+  const themeMeta = document.getElementById("themeColorMeta");
+  if (themeMeta) themeMeta.setAttribute("content", wantsDark ? "#0f1114" : "#f4efe6");
 
   updateFavicon(resolved);
   refreshLoaderIcon();

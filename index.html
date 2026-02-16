@@ -3,7 +3,31 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta id="themeColorMeta" name="theme-color" content="#0f1114" />
     <title>Rezeptwerk</title>
+
+    <script>
+      // Early theme bootstrap to avoid wrong startup background flash
+      (function () {
+        try {
+          const raw = localStorage.getItem("tinkeroneo_theme_v1") || "system";
+          const theme = String(raw || "system").toLowerCase();
+          const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const wantsDark = theme === "dark" || (theme === "system" && prefersDark);
+          const resolved = wantsDark ? "dark" : "light";
+          const bg = wantsDark ? "#0f1114" : "#f4efe6";
+
+          document.documentElement.dataset.theme = resolved;
+          document.documentElement.classList.toggle("dark", wantsDark);
+          document.documentElement.style.backgroundColor = bg;
+
+          const meta = document.getElementById("themeColorMeta");
+          if (meta) meta.setAttribute("content", bg);
+        } catch {
+          // ignore
+        }
+      })();
+    </script>
 
     <link rel="manifest" href="manifest.json" />
     <link rel="stylesheet" href="styles/tokens.css" />
