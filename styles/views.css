@@ -15,13 +15,39 @@
 
 .grid-card {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: var(--r-2);
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
 }
 .grid-card:hover {
-  transform: translateY(-.7px);
-  border-top: var(--primary);
-  border-bottom: var(--primary);
-  border-left: var(--primary-soft);
-  border-right: var(--primary-soft); }
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+}
+
+.grid-body{
+  padding: .55rem .65rem .7rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+}
+
+.grid-title > span{
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-weight: 700;
+}
+
+.grid-meta{
+  margin-top: .4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
 
 /* --- Detail: image must be embedded/clipped --- */
 .img-focus-frame {
@@ -463,13 +489,12 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   overflow: hidden;
 }
 .grid-img{
-  width: 97%;
-  height: 98% !important;
+  width: 100%;
+  height: 100% !important;
   object-fit: cover;
   display: block;
   z-index: var(--z-base);
   border-radius: var(--r-1);
-  
 }
 
 /* === Bottom Sheet / Overlay === */
