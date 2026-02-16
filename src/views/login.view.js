@@ -60,6 +60,13 @@ export function renderLoginView({ appEl, state, setView, info, useBackend, setUs
   $("#btnLogout")?.addEventListener("click", () => {
     try { logout(); } catch { /* ignore */ }
     setMsg("Logout: Token lokal gelöscht. (Du bist jetzt ausgeloggt)", "ok");
+    setTimeout(() => {
+      try {
+        window.location.replace(location.pathname + "#login");
+      } catch {
+        setView({ name: "login", selectedId: null, q: "" });
+      }
+    }, 120);
   });
 
   $("#btnSend")?.addEventListener("click", async () => {

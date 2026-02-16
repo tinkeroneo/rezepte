@@ -585,10 +585,27 @@ export async function initAuthAndSpace() {
 }
 
 export function logout() {
+  const uid = _user?.id ? String(_user.id) : "";
   _session = null;
   _spaceId = null;
   _user = null;
   clearStoredAuth();
+
+  // Clear transient auth-related local keys to avoid stale post-logout state.
+  try {
+    localStorage.removeItem(LS_FORCE_DEFAULT_ONCE);
+    if (uid) localStorage.removeItem(activeSpaceLsKey(uid));
+
+    // Defensive cleanup for older/multiple user scopes.
+    const toDelete = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) || "";
+      if (k.startsWith("tinkeroneo_active_space_v1:")) toDelete.push(k);
+    }
+    toDelete.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
 }
 
 export function getAuthContext() {
