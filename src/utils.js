@@ -51,7 +51,8 @@ function isDarkThemeForDefaults() {
 }
 
 export function defaultRecipeImageUrl() {
-  return isDarkThemeForDefaults() ? "/faviconDark.svg" : "/favicon.svg";
+  const file = isDarkThemeForDefaults() ? "faviconDark.svg" : "favicon.svg";
+  return new URL(file, document.baseURI).toString();
 }
 
 // Replaces already-rendered fallback images after a theme switch.
