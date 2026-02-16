@@ -51,7 +51,7 @@ function parseHash() {
   };
 }
 
-function setHash(view) {
+function setHash(view, { replace = false } = {}) {
   const params = new URLSearchParams();
   if (view.selectedId) params.set("id", view.selectedId);
   if (view.q) params.set("q", view.q);
@@ -63,13 +63,23 @@ function setHash(view) {
   const qs = params.toString();
   const next = `#${view.name}${qs ? "?" + qs : ""}`;
 
-  if (location.hash !== next) location.hash = next;
+  if (location.hash === next) return;
+
+  if (replace) {
+    try {
+      window.history.replaceState(null, "", location.pathname + location.search + next);
+      return;
+    } catch {
+      // ignore and fall back to hash navigation
+    }
+  }
+  location.hash = next;
 }
 
 export function initRouter({ onViewChange, canNavigate }) {
   let view = parseHash();
 
-  function setView(next) {
+  function setView(next, opts = {}) {
   const prev = view;
   const candidate = { ...view, ...next };
   if (typeof canNavigate === "function") {
@@ -81,7 +91,8 @@ export function initRouter({ onViewChange, canNavigate }) {
     // persist (optional) – keep your existing NAV behavior
     try { lsSet(KEYS.NAV, view); } catch { /* ignore */ }
 
-    setHash(view);
+    const replace = opts?.push === false;
+    setHash(view, { replace });
     onViewChange(view);
   }
 

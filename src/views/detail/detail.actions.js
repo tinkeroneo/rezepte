@@ -114,7 +114,8 @@ export function bindDetailActions({
     if (canWrite && !editBtn.__bound) {
       editBtn.__bound = true;
       editBtn.addEventListener("click", () => {
-        setView({ name: "add", selectedId: recipe.id, q: state.q });
+        // Replace detail route so save/back does not require two browser-back steps.
+        setView({ name: "add", selectedId: recipe.id, q: state.q }, { push: false });
       });
     }
   }

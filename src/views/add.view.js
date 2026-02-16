@@ -355,7 +355,8 @@ export function renderAddView({
         window.history.replaceState(null, "", targetHash);
       }
 
-      setView({ name: "detail", selectedId: updated.id, q: state.q });
+      // Replace edit route in history so "Back" doesn't jump to stale edit form.
+      setView({ name: "detail", selectedId: updated.id, q: state.q }, { push: false });
     } catch (e) {
       // Stay on page, keep dirty state so user can retry
       alert(`Konnte nicht zum Backend speichern.\nFehler: ${e?.message ?? e}`);
