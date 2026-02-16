@@ -148,7 +148,7 @@ export function bindCooklogCard({ appEl, recipeId, useBackend, onRefresh }) {
 
       const removed = deleteCookEvent(recipeId, id);
       if (useBackend && removed) {
-        try { await removeCookEventFromBackend(recipeId, id); } catch {
+        try { await removeCookEventFromBackend(id); } catch {
            // continue regardless of error
         }
       }
@@ -268,6 +268,11 @@ function openEditCookEventDialog({ recipeId, ev, useBackend, onDone }) {
 
     <div class="card" style="padding:.85rem; margin:.75rem;">
       <div class="row" style="gap:.35rem; align-items:center;">
+        <div class="muted" style="min-width:90px;">Datum</div>
+        <input id="cookEditAt" class="input" type="datetime-local" />
+      </div>
+
+      <div class="row" style="gap:.35rem; align-items:center;">
         <div class="muted" style="min-width:90px;">Rating</div>
         <select id="cookEditRating" class="input">
           <option value="">—</option>
@@ -288,19 +293,22 @@ function openEditCookEventDialog({ recipeId, ev, useBackend, onDone }) {
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
 
+  const atEl = sheet.querySelector("#cookEditAt");
   const ratingEl = sheet.querySelector("#cookEditRating");
   const noteEl = sheet.querySelector("#cookEditNote");
+  if (atEl) atEl.value = toDatetimeLocalValue(ev?.at);
 
   sheet.querySelector("#cookEditCancel")?.addEventListener("click", close);
   sheet.querySelector("#cookEditCancel2")?.addEventListener("click", close);
 
   sheet.querySelector("#cookEditSave")?.addEventListener("click", async () => {
+    const nextAt = parseDatetimeLocalValue(atEl?.value, ev?.at);
     const nextRatingRaw = ratingEl?.value;
     const nextRating = nextRatingRaw ? Number(nextRatingRaw) : null;
     const nextNote = String(noteEl?.value ?? "").trim();
 
-    const next = { ...ev, rating: nextRating, note: nextNote };
-    updateCookEvent(recipeId, next);
+    const next = { ...ev, at: nextAt, rating: nextRating, note: nextNote };
+    updateCookEvent(recipeId, ev.id, { at: nextAt, rating: nextRating, note: nextNote });
 
     if (useBackend) {
       try { await pushCookEventToBackend(recipeId, next); } catch {
@@ -311,4 +319,23 @@ function openEditCookEventDialog({ recipeId, ev, useBackend, onDone }) {
     close();
     onDone?.();
   });
+}
+
+function toDatetimeLocalValue(ms) {
+  const d = Number.isFinite(ms) ? new Date(ms) : new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+function parseDatetimeLocalValue(raw, fallbackMs) {
+  const v = String(raw || "").trim();
+  if (!v) return Number.isFinite(fallbackMs) ? fallbackMs : Date.now();
+
+  const ms = new Date(v).getTime();
+  if (!Number.isFinite(ms)) return Number.isFinite(fallbackMs) ? fallbackMs : Date.now();
+  return ms;
 }
