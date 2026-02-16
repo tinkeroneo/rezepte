@@ -7,6 +7,11 @@ function parseHash() {
   const [namePartRaw, qsPart] = raw.split("?");
   const namePart = namePartRaw || "list";
   const params = new URLSearchParams(qsPart || "");
+  const search = new URLSearchParams(location.search || "");
+
+  const token_hash = params.get("token_hash") || search.get("token_hash") || "";
+  const type = params.get("type") || search.get("type") || "";
+  const next = params.get("next") || search.get("next") || "";
 
   // Short share links: #s/<token>
   if (namePart.startsWith("s/")) {
@@ -15,9 +20,23 @@ function parseHash() {
       selectedId: null,
       q: params.get("q") || "",
       token: decodeURIComponent(namePart.slice(2) || ""),
-      token_hash: params.get("token_hash") || "",
-      type: params.get("type") || "",
-      next: params.get("next") || ""
+      token_hash,
+      type,
+      next
+    };
+  }
+
+  // If token_hash is present (often in query for magic links), force confirm route.
+  // This prevents losing the confirmation step when URL wrappers modify the hash.
+  if (token_hash) {
+    return {
+      name: "confirm",
+      selectedId: null,
+      q: params.get("q") || "",
+      token: "",
+      token_hash,
+      type: type || "magiclink",
+      next,
     };
   }
 
@@ -26,9 +45,9 @@ function parseHash() {
     selectedId: params.get("id"),
     q: params.get("q") || "",
     token: params.get("token") || "",
-    token_hash: params.get("token_hash") || "",
-    type: params.get("type") || "",
-    next: params.get("next") || ""
+    token_hash,
+    type,
+    next
   };
 }
 
@@ -36,6 +55,10 @@ function setHash(view) {
   const params = new URLSearchParams();
   if (view.selectedId) params.set("id", view.selectedId);
   if (view.q) params.set("q", view.q);
+  if (view.token) params.set("token", view.token);
+  if (view.token_hash) params.set("token_hash", view.token_hash);
+  if (view.type) params.set("type", view.type);
+  if (view.next) params.set("next", view.next);
 
   const qs = params.toString();
   const next = `#${view.name}${qs ? "?" + qs : ""}`;

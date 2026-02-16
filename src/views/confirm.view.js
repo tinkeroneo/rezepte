@@ -3,13 +3,13 @@ import { verifyOtpAndStore, isAuthenticated } from "../supabase.js";
 import { readUseBackend, writeUseBackend } from "../app/localSettings.js";
 
 // View: #confirm?token_hash=...&type=magiclink&next=...
-export function renderConfirmView({ appEl, state, router }) {
-  const setView = router?.setView ? router.setView.bind(router) : null;
+export function renderConfirmView({ appEl, state, setView }) {
+  const nav = typeof setView === "function" ? setView : null;
   // If already authed, just continue
   if (isAuthenticated?.()) {
     const next = state?.next || null;
     if (next) return hardNavigate(next);
-    if (setView) setView({ name: "list", selectedId: null, q: state?.q }); else hardNavigate("#list");
+    if (nav) nav({ name: "list", selectedId: null, q: state?.q }); else hardNavigate("#list");
     return;
   }
 
@@ -57,7 +57,8 @@ export function renderConfirmView({ appEl, state, router }) {
   }
 
   $("#btnCancel")?.addEventListener("click", () => {
-    setView({ name: "login" });
+    if (nav) nav({ name: "login" });
+    else hardNavigate("#login");
   });
 
   $("#btnConfirm")?.addEventListener("click", async () => {
@@ -79,7 +80,7 @@ export function renderConfirmView({ appEl, state, router }) {
       // After storing the session, jump to next (full URL) or back into the app.
       if (next) return hardNavigate(next);
 
-      if (setView) setView({ name: "list", selectedId: null, q: state?.q }); else hardNavigate("#list");
+      if (nav) nav({ name: "list", selectedId: null, q: state?.q }); else hardNavigate("#list");
     } catch (e) {
       setMsg(String(e?.message || e), "bad");
       $("#btnConfirm").disabled = false;
