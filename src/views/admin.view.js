@@ -193,6 +193,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
             <div class="row" style="flex-wrap:wrap;">
               <button class="btn" id="btnDiagnostics" type="button">Diagnostics</button>
               <button class="btn" id="btnSelftest" type="button">Selftest</button>
+              <button class="btn" id="btnSwReload" type="button">SW Reload</button>
               <button class="btn" id="btnReload" type="button">Reload</button>
             </div>
 
@@ -326,6 +327,52 @@ export function renderAdminView({ appEl, recipes, setView }) {
   // Tools
   q("#btnDiagnostics")?.addEventListener("click", () => setView({ name: "diagnostics" }));
   q("#btnSelftest")?.addEventListener("click", () => setView({ name: "selftest" }));
+  q("#btnSwReload")?.addEventListener("click", async () => {
+    try {
+      if (!("serviceWorker" in navigator)) {
+        setMsg("Service Worker nicht verfügbar.", "bad");
+        return;
+      }
+
+      const isDevHost = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+      if (isDevHost) {
+        setMsg("SW ist auf localhost deaktiviert.", "bad");
+        return;
+      }
+
+      setMsg("SW wird aktualisiert …", "");
+      const reg =
+        (await navigator.serviceWorker.getRegistration("./sw.js")) ||
+        (await navigator.serviceWorker.register("./sw.js"));
+
+      await reg.update();
+
+      let reloaded = false;
+      const doReload = () => {
+        if (reloaded) return;
+        reloaded = true;
+        location.reload();
+      };
+
+      navigator.serviceWorker.addEventListener("controllerchange", doReload, { once: true });
+
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: "SKIP_WAITING" });
+      } else if (reg.installing) {
+        reg.installing.addEventListener("statechange", () => {
+          if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
+        });
+      } else {
+        // No new worker waiting; do a normal reload to pick latest network assets.
+        doReload();
+        return;
+      }
+
+      window.setTimeout(doReload, 1800);
+    } catch (e) {
+      setMsg(String(e?.message || e), "bad");
+    }
+  });
   q("#btnReload")?.addEventListener("click", () => location.reload());
 
   // category colors
