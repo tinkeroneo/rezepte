@@ -539,13 +539,15 @@ html.dark .timerdock-count{ background: rgba(255,255,255,.06); }
   width: 100%;
   max-width: 520px;
   margin: 0;
-  padding: .35rem .5rem;
+  padding: .25rem .5rem;
 }
 .timerroot-dock .timer-list{
-  margin-top: .35rem;
+  margin-top: .2rem;
 }
 .timerroot-dock .timer-pill{
-  padding: .45rem .5rem;
+  padding: .3rem .45rem;
+  align-items: center;
+  gap: .5rem;
 }
 .timerroot-dock .timer-pill-title{
   white-space: nowrap;
@@ -553,9 +555,42 @@ html.dark .timerdock-count{ background: rgba(255,255,255,.06); }
   text-overflow: ellipsis;
 }
 .timerroot-dock .timer-actions button{
-  padding: .25rem .4rem;
+  padding: .2rem .35rem;
+  font-size: .85rem;
+}
+.timerroot-dock .timer-actions{
+  display: none;
+}
+.timerroot-dock .timer-pill.is-open .timer-actions{
+  display: flex;
+}
+.timerroot-dock .timer-pill{
+  cursor: pointer;
+}
+.timerroot-dock .timer-toggle--mini{
+  padding: .2rem .4rem;
+  font-size: .8rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: rgba(0,0,0,.05);
+  color: var(--text);
+  margin-left: .35rem;
+}
+html.dark .timerroot-dock .timer-toggle--mini{
+  background: rgba(255,255,255,.08);
+}
+.timerroot-dock .timer-pill-left{
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  min-width: 0;
+}
+.timerroot-dock .timer-pill-left .muted{
+  font-size: .85rem;
+  white-space: nowrap;
+}
+.timerroot-dock .timer-more-hint{
+  display: none;
 }
 
 .li-media,.grid-media{ position:relative; }
-
-

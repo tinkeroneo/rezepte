@@ -338,32 +338,14 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
   if (!list.length) return "";
 
   const total = list.length;
-  const showToggle = total > 1;
-
   const visible = expanded ? list : list.slice(0, Math.max(1, maxCollapsed));
+  const canToggle = total > visible.length || expanded;
+  const toggleLabel = expanded ? "Weniger" : "Alle";
 
   return `
-    <div class="timerbar" data-timerbar>
-      <div class="row" style="justify-content: space-between;">
-        <div style="font-weight:800; display:flex; gap:.5rem; align-items:center;">
-          <span>Timer</span>
-          <span class="timer-count" title="${total} Timer aktiv">${total}</span>
-        </div>
-
-        ${showToggle ? `
-          <button type="button"
-                  class="timer-toggle"
-                  data-timer-toggle="1"
-                  aria-expanded="${expanded ? "true" : "false"}">
-            ${expanded ? "Weniger" : "Alle anzeigen"}
-          </button>
-        ` : `
-          <div class="muted" style="font-size:.9rem;">top</div>
-        `}
-      </div>
-
+    <div class="timerbar" data-timerbar="1" data-can-toggle="${canToggle ? "1" : "0"}">
       <div class="timer-list">
-        ${visible.map(t => {
+        ${visible.map((t, idx) => {
           const isOverdue = t.remainingSec <= 0;
           const over = Math.max(0, t.overdueSec || 0);
           const label = isOverdue
@@ -371,7 +353,7 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
             : `⏱ ${formatTime(t.remainingSec)}`;
 
           return `
-            <div class="timer-pill ${isOverdue ? "is-overdue" : ""}">
+            <div class="timer-pill ${isOverdue ? "is-overdue" : ""}" data-timer-pill="1" data-timer-id="${escapeHtml(t.id)}">
               <div class="timer-pill-left" style="min-width:0;">
                 <div class="timer-pill-title" title="${escapeHtml(t.title)}">
                   ${escapeHtml(t.title)}
@@ -385,19 +367,19 @@ export function renderTimersBarHtml(snap, { expanded = false, maxCollapsed = 1 }
                 <button type="button" data-timer-ext="${t.id}" data-sec="60">+1m</button>
                 <button type="button" data-timer-ext="${t.id}" data-sec="300">+5m</button>
                 <button type="button" data-timer-stop="${t.id}" aria-label="Stop timer">✕</button>
+                ${canToggle && idx === 0 ? `
+                  <button type="button"
+                          class="timer-toggle timer-toggle--mini"
+                          data-timer-toggle="1"
+                          aria-expanded="${expanded ? "true" : "false"}">
+                    ${toggleLabel}
+                  </button>
+                ` : ``}
               </div>
             </div>
           `;
         }).join("")}
       </div>
-
-      ${!expanded && total > visible.length ? `
-        <div class="timer-more-hint">
-          +${total - visible.length} weitere … tippe „Alle anzeigen“
-        </div>
-      ` : ``}
     </div>
   `;
 }
-
-

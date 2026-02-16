@@ -227,6 +227,8 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
 
   let timersExpanded = false;
   let _lastOverdueKeys = new Set();
+  const _timerOpenUntil = new Map();
+  const TIMER_ACTIONS_OPEN_MS = 5000;
   function flashTimerRootOnce() {
     // nur kurz sichtbar, dann wieder aus
     timerRoot.classList.remove("timer-flash");
@@ -295,6 +297,29 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
       }
 
       // Toggle alle / weniger
+      const now = Date.now();
+      qsa(timerRoot, "[data-timer-pill]").forEach(pill => {
+        const id = pill.getAttribute("data-timer-id") || "";
+        const openUntil = _timerOpenUntil.get(id) || 0;
+        if (openUntil > now) {
+          pill.classList.add("is-open");
+        }
+
+        pill.addEventListener("click", (e) => {
+          if (e.target?.closest("button")) return;
+          const nextOpen = (_timerOpenUntil.get(id) || 0) > Date.now()
+            ? 0
+            : (Date.now() + TIMER_ACTIONS_OPEN_MS);
+          if (nextOpen) {
+            _timerOpenUntil.set(id, nextOpen);
+            pill.classList.add("is-open");
+          } else {
+            _timerOpenUntil.delete(id);
+            pill.classList.remove("is-open");
+          }
+        });
+      });
+
       qsa(timerRoot, "[data-timer-toggle]").forEach(b => {
         b.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -424,4 +449,3 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
     renderCookView({ appEl, state, recipes, partsByParent, setView });
   });
 }
-
