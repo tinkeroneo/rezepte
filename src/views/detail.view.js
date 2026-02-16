@@ -60,6 +60,15 @@ export function renderDetailView({
     return;
   }
 
+  // Ensure detail view always starts at the top, regardless of previous view scroll.
+  const resetScrollTop = () => {
+    try { window.scrollTo(0, 0); } catch { /* ignore */ }
+    try { document.documentElement.scrollTop = 0; } catch { /* ignore */ }
+    try { document.body.scrollTop = 0; } catch { /* ignore */ }
+    try { appEl.scrollTop = 0; } catch { /* ignore */ }
+  };
+  resetScrollTop();
+
   const writable = canWrite === true;
 
   // Pull cooklog once, then refresh current view (push:false to avoid history spam)
@@ -89,6 +98,7 @@ export function renderDetailView({
       <div id="sheetRoot"></div>
     </div>
   `;
+  window.requestAnimationFrame(() => resetScrollTop());
 
   // Optionaler Dirty-Tracker (aktuell wird hier nichts "halbfertig" editiert,
   // aber wir sind vorbereitet, falls du z.B. Fokusänderungen erst "Apply"en willst).
