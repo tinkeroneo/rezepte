@@ -18,9 +18,7 @@ export function renderListShell({ q = "" } = {}) {
             </div>
 
             <div class="row" style="justify-content:space-between; gap:.5rem; margin-top:.65rem; flex-wrap:wrap;">
-              <button class="btn btn--ghost" id="extraFiltersToggle" type="button" title="Zusätzliche Filter">Filter ▾</button>
-
-              <div id="extraFilters" class="row" style="gap:.5rem; flex-wrap:wrap; display:none;">
+              <div id="extraFilters" class="row" style="gap:.5rem; flex-wrap:wrap; display:flex;">
                 <select id="catFilter" title="Kategorie">
                   <option value="">Kategorie +</option>
                 </select>
@@ -72,3 +70,4 @@ export function renderListShell({ q = "" } = {}) {
     </div>
   `;
 }
+

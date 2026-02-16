@@ -1,4 +1,4 @@
-// src/controllers/listToolbar.controller.js
+﻿// src/controllers/listToolbar.controller.js
 import { escapeHtml } from "../utils.js";
 
 function uniqStrings(values) {
@@ -34,7 +34,6 @@ export function initListToolbar({
   const qEl = qs("#q");
   const catEl = qs("#catFilter");
   const tagEl = qs("#tagFilter");
-  const extraFiltersBtn = qs("#extraFiltersToggle");
   const extraFiltersWrap = qs("#extraFilters");
   const sortEl = qs("#sortSelect");
   const sortDirBtn = qs("#sortDirBtn");
@@ -102,30 +101,10 @@ export function initListToolbar({
   };
   applySortDirUi();
 
-  if (typeof ui.extraOpen !== "boolean") ui.extraOpen = !!((ui.cats || []).length || (ui.tags || []).length);
-  const syncExtraFilters = () => {
-    if (!extraFiltersWrap || !extraFiltersBtn) return;
-    const open = !!getUi().extraOpen;
-    extraFiltersWrap.style.display = open ? "flex" : "none";
-    extraFiltersBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    extraFiltersBtn.textContent = open ? "Filter ▴" : "Filter ▾";
-  };
-  syncExtraFilters();
+  if (extraFiltersWrap) extraFiltersWrap.style.display = "flex";
 
   renderCategoryOptions();
   renderTagOptions();
-
-  if (extraFiltersBtn && !extraFiltersBtn.__wired) {
-    extraFiltersBtn.__wired = true;
-    extraFiltersBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      const u = getUi();
-      u.extraOpen = !u.extraOpen;
-      setUi(u);
-      syncExtraFilters();
-      onPersist?.({ extraOpen: u.extraOpen });
-    });
-  }
 
   if (qEl) {
     qEl.addEventListener("input", () => {
@@ -144,7 +123,6 @@ export function initListToolbar({
       const u = getUi();
       u.cats = uniqStrings([...(u.cats || []), next]);
       u.cat = u.cats[0] || "";
-      if (typeof u.extraOpen !== "boolean") u.extraOpen = true;
       setUi(u);
       pruneInvalidSelectedTags();
       renderCategoryOptions();
@@ -162,7 +140,6 @@ export function initListToolbar({
       const u = getUi();
       u.tags = uniqStrings([...(u.tags || []), next]);
       u.tag = u.tags[0] || "";
-      if (typeof u.extraOpen !== "boolean") u.extraOpen = true;
       setUi(u);
       renderTagOptions();
       onPersist?.({ tags: u.tags, tag: u.tag });
@@ -229,7 +206,6 @@ export function initListToolbar({
     if (qEl && typeof merged.q === "string") qEl.value = merged.q;
     if (sortEl) sortEl.value = merged.sort || "az";
     if (typeof merged.sortDir === "string") applySortDirUi();
-    if (typeof merged.extraOpen === "boolean") syncExtraFilters();
     pruneInvalidSelectedTags();
     renderCategoryOptions();
     renderTagOptions();
@@ -238,6 +214,6 @@ export function initListToolbar({
   return {
     qEl,
     syncFromUi,
-    getControls: () => ({ qEl, catEl, tagEl, sortEl, sortDirBtn, resetEl, extraFiltersBtn, extraFiltersWrap })
+    getControls: () => ({ qEl, catEl, tagEl, sortEl, sortDirBtn, resetEl, extraFiltersWrap })
   };
 }
