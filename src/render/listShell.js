@@ -22,11 +22,11 @@ export function renderListShell({ q = "" } = {}) {
 
               <div id="extraFilters" class="row" style="gap:.5rem; flex-wrap:wrap; display:none;">
                 <select id="catFilter" title="Kategorie">
-                  <option value="">Alle Kategorien</option>
+                  <option value="">Kategorie +</option>
                 </select>
 
                 <select id="tagFilter" title="Tag">
-                  <option value="">Alle Tags</option>
+                  <option value="">Tag +</option>
                 </select>
               </div>
 

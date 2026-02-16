@@ -67,6 +67,8 @@ export function applyListQuery({
   query = "",
   cat = "",
   tag = "",
+  cats = [],
+  tags = [],
   sort = "new",
   sortDir = "desc",
   pendingOnly = false,
@@ -74,16 +76,26 @@ export function applyListQuery({
 }) {
   const listIn = Array.isArray(recipes) ? recipes : [];
   const qq = norm(query);
+  const catList = Array.isArray(cats) && cats.length
+    ? cats
+    : (cat ? [cat] : []);
+  const tagList = Array.isArray(tags) && tags.length
+    ? tags
+    : (tag ? [tag] : []);
 
   // 1) filter
   let list = listIn.filter((r) => {
     if (pendingOnly && !pendingIds.has(r.id)) return false;
 
-    if (cat && (r.category ?? "") !== cat) return false;
+    if (catList.length) {
+      const rc = String(r.category ?? "");
+      if (!catList.includes(rc)) return false;
+    }
 
-    if (tag) {
+    if (tagList.length) {
       const rt = Array.isArray(r.tags) ? r.tags : [];
-      if (!rt.includes(tag)) return false;
+      // OR within selected tags: recipe must contain at least one selected tag
+      if (!tagList.some((t) => rt.includes(t))) return false;
     }
 
     if (!qq) return true;

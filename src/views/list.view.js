@@ -117,6 +117,8 @@ export function renderListView({
   // Local UI state (toolbar writes into this)
 let ui = {
   q: state?.q ?? "",
+  cats: Array.isArray(persistedUi.cats) ? persistedUi.cats : (persistedUi.cat ? [persistedUi.cat] : []),
+  tags: Array.isArray(persistedUi.tags) ? persistedUi.tags : (persistedUi.tag ? [persistedUi.tag] : []),
   cat: persistedUi.cat,
   tag: persistedUi.tag,
   sort: persistedUi.sort,
@@ -138,7 +140,8 @@ let ui = {
     const filtered = applyListQuery({
       recipes,
       query: u.q ?? (qEl?.value ?? ""),
-
+      cats: u.cats,
+      tags: u.tags,
       cat: u.cat,
       tag: u.tag,
       sort: u.sort,
@@ -206,8 +209,16 @@ const toolbarApi = initListToolbar({
       const u = getUi();
 
       if (key === "q") u.q = "";
-      if (key === "cat") u.cat = "";
-      if (key === "tag") u.tag = "";
+      if (key?.startsWith("cat:")) {
+        const val = key.slice(4);
+        u.cats = (u.cats || []).filter((x) => x !== val);
+        u.cat = u.cats[0] || "";
+      }
+      if (key?.startsWith("tag:")) {
+        const val = key.slice(4);
+        u.tags = (u.tags || []).filter((x) => x !== val);
+        u.tag = u.tags[0] || "";
+      }
       if (key === "pendingOnly") u.pendingOnly = false;
       if (key === "sort") {
         u.sort = "new";
@@ -215,12 +226,14 @@ const toolbarApi = initListToolbar({
       }
 
       // keep extra filters open if user had it open, but also derive if not explicit
-      if (typeof u.extraOpen !== "boolean") u.extraOpen = !!(u.cat || u.tag);
+      if (typeof u.extraOpen !== "boolean") u.extraOpen = !!((u.cats || []).length || (u.tags || []).length);
 
       setUi(u);
 
       // persist the relevant fields
       patchListUiState({ KEYS }, {
+        cats: u.cats,
+        tags: u.tags,
         cat: u.cat,
         tag: u.tag,
         sort: u.sort,

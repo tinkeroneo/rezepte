@@ -3,11 +3,13 @@ import { escapeHtml } from "../utils.js";
 
 export function renderActiveFilterChips({ ui }) {
   const chips = [];
+  const cats = Array.isArray(ui.cats) ? ui.cats : (ui.cat ? [ui.cat] : []);
+  const tags = Array.isArray(ui.tags) ? ui.tags : (ui.tag ? [ui.tag] : []);
 
   if (ui.q && String(ui.q).trim()) chips.push(chip("q", `Suche: ${ui.q}`));
-  if (ui.cat) chips.push(chip("cat", `Kategorie: ${ui.cat}`));
-  if (ui.tag) chips.push(chip("tag", `Tag: ${ui.tag}`));
-  if (ui.pendingOnly) chips.push(chip("pendingOnly", "⏳ Nur offene"));
+  cats.forEach((c) => chips.push(chip(`cat:${c}`, `Kategorie: ${c}`)));
+  tags.forEach((t) => chips.push(chip(`tag:${t}`, `Tag: ${t}`)));
+  if (ui.pendingOnly) chips.push(chip("pendingOnly", "Nur offene"));
 
   if (ui.sort && ui.sort !== "new") {
     const labelMap = {
@@ -26,7 +28,7 @@ export function renderActiveFilterChips({ ui }) {
     return `
       <button class="chip" type="button" data-chip="${escapeHtml(key)}" title="Entfernen">
         <span>${escapeHtml(label)}</span>
-        <span aria-hidden="true">×</span>
+        <span aria-hidden="true">&times;</span>
       </button>
     `;
   }

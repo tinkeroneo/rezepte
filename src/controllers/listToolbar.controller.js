@@ -1,86 +1,91 @@
 // src/controllers/listToolbar.controller.js
 import { escapeHtml } from "../utils.js";
 
-/**
- * Storage-free toolbar controller.
- *
- * It:
- * - builds category/tag options
- * - wires events for q/cat/tag/sort/sortDir/reset + extra filter toggle
- *
- * It does NOT touch localStorage.
- * Persist & NAV updates are delegated via callbacks.
- */
+function uniqStrings(values) {
+  return Array.from(new Set((values || []).map((v) => String(v || "").trim()).filter(Boolean)));
+}
+
+function collectCategories(recipes) {
+  return uniqStrings((Array.isArray(recipes) ? recipes : []).map((r) => r.category)).sort((a, b) => a.localeCompare(b, "de"));
+}
+
+function collectTags(recipes, selectedCats) {
+  const catSet = new Set(uniqStrings(selectedCats));
+  const source = (Array.isArray(recipes) ? recipes : []).filter((r) => {
+    if (!catSet.size) return true;
+    return catSet.has(String(r.category || "").trim());
+  });
+  return uniqStrings(source.flatMap((r) => (Array.isArray(r.tags) ? r.tags : []))).sort((a, b) => a.localeCompare(b, "de"));
+}
+
 export function initListToolbar({
   appEl,
   state,
   recipes,
-
-  // state plumbing
   getUi,
   setUi,
-
-  // helpers
   defaultDirFor,
-
-  // callbacks
-  onRender,        // () => void
-  onResetNavigate, // () => void
-  onPersist,       // (patchObj) => void
-  onNavUpdate      // (navObj) => void
+  onRender,
+  onResetNavigate,
+  onPersist,
+  onNavUpdate
 }) {
   const qs = (sel) => appEl.querySelector(sel);
-
   const qEl = qs("#q");
   const catEl = qs("#catFilter");
   const tagEl = qs("#tagFilter");
-
   const extraFiltersBtn = qs("#extraFiltersToggle");
   const extraFiltersWrap = qs("#extraFilters");
-
   const sortEl = qs("#sortSelect");
   const sortDirBtn = qs("#sortDirBtn");
   const resetEl = qs("#resetFilters");
 
   let ui = getUi();
+  ui.cats = uniqStrings(ui.cats || (ui.cat ? [ui.cat] : []));
+  ui.tags = uniqStrings(ui.tags || (ui.tag ? [ui.tag] : []));
+  ui.cat = ui.cats[0] || "";
+  ui.tag = ui.tags[0] || "";
+  setUi(ui);
 
-  // --- build tag options
-  const tags = Array.from(
-    new Set(
-      (Array.isArray(recipes) ? recipes : [])
-        .flatMap((r) => (Array.isArray(r.tags) ? r.tags : []))
-        .map((t) => String(t || "").trim())
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b, "de"));
+  const allCategories = collectCategories(recipes);
 
-  if (tagEl) {
-    tagEl.innerHTML = `
-      <option value="">Alle Tags</option>
-      ${tags.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("")}
-    `;
-  }
-
-  // --- build category options
-  const cats = Array.from(
-    new Set(
-      (Array.isArray(recipes) ? recipes : [])
-        .map((r) => (r.category ?? "").trim())
-        .filter(Boolean)
-    )
-  ).sort((a, b) => a.localeCompare(b, "de"));
-
-  if (catEl) {
+  function renderCategoryOptions() {
+    if (!catEl) return;
+    const selected = new Set(getUi().cats || []);
+    const options = allCategories.filter((c) => !selected.has(c));
     catEl.innerHTML = `
-      <option value="">Alle Kategorien</option>
-      ${cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}
+      <option value="">Kategorie +</option>
+      ${options.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("")}
     `;
+    catEl.value = "";
   }
 
-  // --- init UI values
+  function renderTagOptions() {
+    if (!tagEl) return;
+    const u = getUi();
+    const selectedTags = new Set(u.tags || []);
+    const available = collectTags(recipes, u.cats || []);
+    const options = available.filter((t) => !selectedTags.has(t));
+    tagEl.innerHTML = `
+      <option value="">Tag +</option>
+      ${options.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("")}
+    `;
+    tagEl.value = "";
+  }
+
+  function pruneInvalidSelectedTags() {
+    const u = getUi();
+    const available = new Set(collectTags(recipes, u.cats || []));
+    const pruned = uniqStrings((u.tags || []).filter((t) => available.has(t)));
+    if (pruned.length !== (u.tags || []).length) {
+      u.tags = pruned;
+      u.tag = pruned[0] || "";
+      setUi(u);
+      onPersist?.({ tags: u.tags, tag: u.tag });
+    }
+  }
+
   if (qEl && typeof ui.q === "string") qEl.value = ui.q;
-  if (catEl) catEl.value = ui.cat || "";
-  if (tagEl) tagEl.value = ui.tag || "";
   if (sortEl) sortEl.value = ui.sort || "az";
 
   if (ui.sortDir !== "asc" && ui.sortDir !== "desc") {
@@ -97,10 +102,7 @@ export function initListToolbar({
   };
   applySortDirUi();
 
-  // --- extra filters open/close
-  // if not provided, derive it from active filters
-  if (typeof ui.extraOpen !== "boolean") ui.extraOpen = !!(ui.cat || ui.tag);
-
+  if (typeof ui.extraOpen !== "boolean") ui.extraOpen = !!((ui.cats || []).length || (ui.tags || []).length);
   const syncExtraFilters = () => {
     if (!extraFiltersWrap || !extraFiltersBtn) return;
     const open = !!getUi().extraOpen;
@@ -108,8 +110,10 @@ export function initListToolbar({
     extraFiltersBtn.setAttribute("aria-expanded", open ? "true" : "false");
     extraFiltersBtn.textContent = open ? "Filter ▴" : "Filter ▾";
   };
-  setUi(ui);
   syncExtraFilters();
+
+  renderCategoryOptions();
+  renderTagOptions();
 
   if (extraFiltersBtn && !extraFiltersBtn.__wired) {
     extraFiltersBtn.__wired = true;
@@ -119,18 +123,15 @@ export function initListToolbar({
       u.extraOpen = !u.extraOpen;
       setUi(u);
       syncExtraFilters();
-      // optional persist (not necessary, but allowed)
       onPersist?.({ extraOpen: u.extraOpen });
     });
   }
 
-  // --- events
   if (qEl) {
     qEl.addEventListener("input", () => {
       const u = getUi();
       u.q = qEl.value;
       setUi(u);
-
       onNavUpdate?.({ ...state, q: qEl.value });
       onRender?.();
     });
@@ -138,13 +139,17 @@ export function initListToolbar({
 
   if (catEl) {
     catEl.addEventListener("change", () => {
+      const next = String(catEl.value || "").trim();
+      if (!next) return;
       const u = getUi();
-      u.cat = catEl.value;
-      // keep extraOpen derived if not explicit
-      if (typeof u.extraOpen !== "boolean") u.extraOpen = !!(u.cat || u.tag);
+      u.cats = uniqStrings([...(u.cats || []), next]);
+      u.cat = u.cats[0] || "";
+      if (typeof u.extraOpen !== "boolean") u.extraOpen = true;
       setUi(u);
-
-      onPersist?.({ cat: u.cat });
+      pruneInvalidSelectedTags();
+      renderCategoryOptions();
+      renderTagOptions();
+      onPersist?.({ cats: u.cats, cat: u.cat });
       onNavUpdate?.({ ...state, q: qEl?.value ?? "" });
       onRender?.();
     });
@@ -152,12 +157,15 @@ export function initListToolbar({
 
   if (tagEl) {
     tagEl.addEventListener("change", () => {
+      const next = String(tagEl.value || "").trim();
+      if (!next) return;
       const u = getUi();
-      u.tag = tagEl.value;
-      if (typeof u.extraOpen !== "boolean") u.extraOpen = !!(u.cat || u.tag);
+      u.tags = uniqStrings([...(u.tags || []), next]);
+      u.tag = u.tags[0] || "";
+      if (typeof u.extraOpen !== "boolean") u.extraOpen = true;
       setUi(u);
-
-      onPersist?.({ tag: u.tag });
+      renderTagOptions();
+      onPersist?.({ tags: u.tags, tag: u.tag });
       onNavUpdate?.({ ...state, q: qEl?.value ?? "" });
       onRender?.();
     });
@@ -169,7 +177,6 @@ export function initListToolbar({
       u.sort = sortEl.value;
       u.sortDir = defaultDirFor(u.sort);
       setUi(u);
-
       onPersist?.({ sort: u.sort, sortDir: u.sortDir });
       applySortDirUi();
       onNavUpdate?.({ ...state, q: qEl?.value ?? "" });
@@ -182,7 +189,6 @@ export function initListToolbar({
       const u = getUi();
       u.sortDir = u.sortDir === "asc" ? "desc" : "asc";
       setUi(u);
-
       onPersist?.({ sortDir: u.sortDir });
       applySortDirUi();
       onNavUpdate?.({ ...state, q: qEl?.value ?? "" });
@@ -193,23 +199,20 @@ export function initListToolbar({
   if (resetEl) {
     resetEl.addEventListener("click", () => {
       const u = getUi();
+      u.cats = [];
+      u.tags = [];
       u.cat = "";
       u.tag = "";
       u.sort = "new";
       u.sortDir = defaultDirFor(u.sort);
       u.q = "";
-
-      // reflect in DOM
-      if (catEl) catEl.value = "";
-      if (tagEl) tagEl.value = "";
-      if (sortEl) sortEl.value = "az";
+      if (sortEl) sortEl.value = "new";
       if (qEl) qEl.value = "";
-
       setUi(u);
-
-      onPersist?.({ cat: "", tag: "", sort: "az", sortDir: u.sortDir });
+      renderCategoryOptions();
+      renderTagOptions();
+      onPersist?.({ cats: [], tags: [], cat: "", tag: "", sort: "new", sortDir: u.sortDir });
       applySortDirUi();
-
       onResetNavigate?.();
       onRender?.();
     });
@@ -217,45 +220,24 @@ export function initListToolbar({
 
   const syncFromUi = (nextUi) => {
     if (!nextUi) return;
-
-    // write values to DOM controls
-    if (qEl && typeof nextUi.q === "string") qEl.value = nextUi.q;
-    if (catEl) catEl.value = nextUi.cat || "";
-    if (tagEl) tagEl.value = nextUi.tag || "";
-    if (sortEl) sortEl.value = nextUi.sort || "az";
-
-    // sort dir arrow
-    if (typeof nextUi.sortDir === "string") {
-      const isAsc = nextUi.sortDir === "asc";
-      if (sortDirBtn) {
-        sortDirBtn.textContent = isAsc ? "↑" : "↓";
-        sortDirBtn.title = isAsc ? "Aufsteigend" : "Absteigend";
-      }
-    }
-
-    // extra filters open state
-    if (typeof nextUi.extraOpen === "boolean") {
-      const open = !!nextUi.extraOpen;
-      if (extraFiltersWrap) extraFiltersWrap.style.display = open ? "flex" : "none";
-      if (extraFiltersBtn) {
-        extraFiltersBtn.setAttribute("aria-expanded", open ? "true" : "false");
-        extraFiltersBtn.textContent = open ? "Filter ▴" : "Filter ▾";
-      }
-    }
+    const merged = {
+      ...nextUi,
+      cats: uniqStrings(nextUi.cats || (nextUi.cat ? [nextUi.cat] : [])),
+      tags: uniqStrings(nextUi.tags || (nextUi.tag ? [nextUi.tag] : [])),
+    };
+    setUi(merged);
+    if (qEl && typeof merged.q === "string") qEl.value = merged.q;
+    if (sortEl) sortEl.value = merged.sort || "az";
+    if (typeof merged.sortDir === "string") applySortDirUi();
+    if (typeof merged.extraOpen === "boolean") syncExtraFilters();
+    pruneInvalidSelectedTags();
+    renderCategoryOptions();
+    renderTagOptions();
   };
+
   return {
     qEl,
     syncFromUi,
-    getControls: () => ({
-      qEl,
-      catEl,
-      tagEl,
-      sortEl,
-      sortDirBtn,
-      resetEl,
-      extraFiltersBtn,
-      extraFiltersWrap
-    })
+    getControls: () => ({ qEl, catEl, tagEl, sortEl, sortDirBtn, resetEl, extraFiltersBtn, extraFiltersWrap })
   };
-
 }

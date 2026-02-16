@@ -9,6 +9,8 @@ export const KEYS = {
   LIST_SORT_DIR: "tinkeroneo_list_sort_dir_v1",
   LIST_CAT: "tinkeroneo_list_cat_v1",
   LIST_TAG: "tinkeroneo_list_tag_v1",
+  LIST_CATS: "tinkeroneo_list_cats_v1",
+  LIST_TAGS: "tinkeroneo_list_tags_v1",
   OFFLINE_QUEUE: "tinkeroneo_offline_queue_v1",
   USE_BACKEND: "tinkeroneo_use_backend_v1",
   THEME: "tinkeroneo_theme_v1",
