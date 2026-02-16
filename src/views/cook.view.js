@@ -549,6 +549,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
     if (!confirm("Alle Schritt-Häkchen zurücksetzen?")) return;
     done = {};
     saveDone();
+    localStorage.removeItem(ingredientsUsedKey);
     renderCookView({ appEl, state, recipes, partsByParent, setView });
   });
 }
