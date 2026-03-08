@@ -7,6 +7,24 @@ export function isStepTitleLine(line) {
   return true;
 }
 
+function fallbackStepTitle(line, index) {
+  const raw = String(line ?? "").trim();
+  if (!raw) return `Schritt ${index + 1}`;
+
+  const words = raw
+    .replace(/^[-*•]\s*/, "")
+    .split(/\s+/)
+    .map((word) => word.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  if (!words.length) return `Schritt ${index + 1}`;
+
+  let title = words.join(" ");
+  title = title.replace(/[.,;:!?]+$/g, "");
+  return title || `Schritt ${index + 1}`;
+}
+
 export function splitStepsToCards(lines) {
   const cards = [];
   let current = null;
@@ -27,7 +45,10 @@ export function splitStepsToCards(lines) {
   if (current) cards.push(current);
 
   if (cards.length === 1 && cards[0].title === "Schritt") {
-    return (lines ?? []).filter(Boolean).map((l, i) => ({ title: `Schritt ${i + 1}`, body: [l.trim()] }));
+    return (lines ?? []).filter(Boolean).map((line, index) => ({
+      title: fallbackStepTitle(line, index),
+      body: [line.trim()]
+    }));
   }
 
   return cards;
