@@ -127,7 +127,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
     const title = `${sec.title}: ${c.title}`.slice(0, 80);
 
     return `
-                    <li data-stepwrap="${escapeHtml(key)}">
+                    <li data-stepwrap="${escapeHtml(key)}" class="${done[key] ? "step-item-done" : ""}">
                       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; margin-bottom:.25rem;">
                         <div style="font-weight:800; min-width:0; flex:1;">${escapeHtml(c.title)}</div>
                         <label style="display:flex; align-items:center; justify-content:center; cursor:pointer; flex:0 0 auto; margin:0;">
@@ -136,7 +136,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
                       </div>
 
                       ${c.body.length ? `
-                        <div class="${done[key] ? "step-done" : ""}" data-stepbody="${escapeHtml(key)}" style="margin-bottom:.35rem;">
+                        <div class="${done[key] ? "step-done" : ""}" data-stepbody="${escapeHtml(key)}" style="margin-bottom:.35rem;${done[key] ? "display:none;" : ""}">
                           ${escapeHtml(c.body.join(" "))}
                         </div>
                       ` : ""}
@@ -504,6 +504,9 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
         // auto-collapse step text when done
         body.style.display = cb.checked ? "none" : "";
       }
+
+      const wrap = cb.closest("[data-stepwrap]");
+      if (wrap) wrap.classList.toggle("step-item-done", cb.checked);
 
       // re-highlight current step (first open checkbox)
       highlightCurrentStep();
