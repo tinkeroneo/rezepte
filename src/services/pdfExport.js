@@ -1,7 +1,7 @@
 // src/services/pdfExport.js
 import { escapeHtml } from "../utils.js";
 import { buildMenuIngredients, buildMenuStepSections, isMenuRecipe } from "../domain/menu.js";
-import { showError } from "./errors.js";
+import { showError, showSuccess } from "./errors.js";
 
 export function exportRecipesToPdfViaPrint({
   recipes,
@@ -33,6 +33,7 @@ export function exportRecipesToPdfViaPrint({
   // warten bis Bilder geladen sind, dann drucken
   const imgs = Array.from(w.document.images || []);
   if (!imgs.length) {
+    showSuccess("PDF-Ansicht ge?ffnet.");
     w.focus();
     w.print();
     return;
@@ -42,6 +43,7 @@ export function exportRecipesToPdfViaPrint({
   const finish = () => {
     done++;
     if (done >= imgs.length) {
+      showSuccess("PDF-Ansicht ge?ffnet.");
       w.focus();
       w.print();
     }

@@ -1,6 +1,6 @@
 // src/ui/importSheet.js
 import { qs } from "../utils.js";
-import { reportError, showError } from "../services/errors.js";
+import { reportError, showError, showSuccess } from "../services/errors.js";
 function esc(s) {
   return String(s)
     .replaceAll("&", "&amp;")
@@ -148,6 +148,7 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
       doBtn.textContent = "Importiere…";
       const targetSpaceId = String(spaceEl?.value || "").trim();
       await onImportRecipes?.({ items: parsedItems, mode: modeEl.value, targetSpaceId });
+      showSuccess(`${parsedItems.length} Rezept${parsedItems.length === 1 ? "" : "e"} importiert.`);
       close();
       location.reload();
     } catch (e) {
