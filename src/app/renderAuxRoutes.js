@@ -53,7 +53,8 @@ export async function renderAuxRoute({
     }
 
     results.push({ name: "Import-Funktion geladen", ok: typeof importRecipesIntoApp === "function" });
-    return renderSelftestView({ appEl, state: view, results, setView });
+    renderSelftestView({ appEl, state: view, results, setView });
+    return true;
   }
 
   if (view.name === "diagnostics") {
@@ -97,7 +98,8 @@ export async function renderAuxRoute({
       onClearStoredErrors: () => clearStoredErrors?.(),
     };
 
-    return renderDiagnosticsView({ appEl, state: view, info, setView });
+    renderDiagnosticsView({ appEl, state: view, info, setView });
+    return true;
   }
 
   if (view.name === "account") {
