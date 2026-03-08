@@ -108,6 +108,7 @@ import { installAdminCorner } from "./adminCorner.js";
 import { refreshSpaceSelect, getActiveSpaceRole } from "./spaces/spaces.js";
 import { renderInvitesRoute } from "./invitesRoute.js";
 import { createReloadAllAndRender, wireOnlineOfflineHandlers } from "./lifecycle.js";
+import { installSettingsBridge } from "./settingsBridge.js";
 import {
 
 
@@ -186,52 +187,36 @@ export async function setUseBackend(next) {
   }
 }
 
-// Allow admin view to change settings without circular imports
-window.__tinkeroneoSettings = {
+installSettingsBridge({
   readUseBackend,
-  setUseBackend: async (v) => setUseBackend(v),
-
-  // auth/space context (only meaningful in CLOUD)
-  getAuthContext: () => {
-    try { return getAuthContext(); } catch { return null; }
-  },
-  getMySpaces: () => {
-    try { return appState.mySpaces || []; } catch { return []; }
-  },
-  inviteToSpace: async ({ email, role, spaceId }) => inviteToSpace({ email, role, spaceId }),
-  listPendingInvites: async ({ spaceId } = {}) => listPendingInvites({ spaceId }),
-  listSpaceMembers: async ({ spaceId } = {}) => listSpaceMembers({ spaceId }),
-  revokeInvite: async (inviteId) => revokeInvite(inviteId),
-
+  setUseBackend,
+  getAuthContext,
+  getMySpaces: () => appState.mySpaces,
+  inviteToSpace,
+  listPendingInvites,
+  listSpaceMembers,
+  revokeInvite,
   readTheme,
-  setTheme: (v) => setTheme(v),
-
+  setTheme,
   readWinter,
-  setWinter: (on) => setWinter(on),
-
+  setWinter,
   readRadioFeature,
-  setRadioFeature: (on) => setRadioFeature(on),
+  setRadioFeature,
   readRadioConsent,
   clearRadioConsent,
-
   readTimerRingIntervalMs,
   setTimerRingIntervalMs,
-
   readTimerMaxRingSeconds,
   setTimerMaxRingSeconds,
-
   readTimerStepHighlight,
   setTimerStepHighlight,
-
   readTimerSoundEnabled,
   setTimerSoundEnabled,
-
   readTimerSoundId,
   setTimerSoundId,
-
   readTimerSoundVolume,
   setTimerSoundVolume,
-};
+});
 
 /* =========================
    UI / BADGES / THEME
