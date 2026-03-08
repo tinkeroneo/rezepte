@@ -1,118 +1,160 @@
-# 🥗 Tinkeroneo – Rezepte & Kochen (Private App)
+# 🥗 Tinkeroneo – Rezepte & Kochen
 
-Kleine private Rezept-Web-App (Vanilla JS), optimiert für Kochen am Handy/Tablet.
-Optional mit Supabase-Backend, sonst LocalStorage. Bewusst minimal – kein Framework, kein Build-Step.
+Kleine private Rezept-Web-App in Vanilla JS, optimiert für Kochen am Handy oder Tablet.
+Optional mit Supabase-Backend, sonst rein lokal über `localStorage`.
 
 ---
 
 ## ✨ Features
 
-- 📋 Rezeptliste mit Suche
-- 📖 Detail- & Kochansicht
-- ⏱️ Globale Timer (immer sichtbar, auch außerhalb der Kochansicht)
-- 🛒 Einkaufsliste aus Rezepten
-- 📦 Import & Export (JSON)
-- ☁️ Optionales Backend (Supabase)
-- 💾 LocalStorage Fallback
-- 📄 PDF-Export (Print-basiert)
+- Rezeptliste mit Suche
+- Detail- und Kochansicht
+- Globale Timer
+- Einkaufsliste aus Rezepten
+- Import und Export als JSON
+- Optionales Supabase-Backend
+- LocalStorage-Fallback
+- PDF-Export
+- Selftest und Diagnostics
+- Öffentliche Share-Links für Rezepte
+- Space-/Invite-Unterstützung im Backend-Modus
 
 ---
 
-## 🧱 Architektur (Kurz)
+## 🧱 Architektur
 
-```
+```text
 src/
- ├─ app.js              // Bootstrapping & App-Glue
- ├─ state.js            // Hash-Routing
- ├─ views/              // UI-Rendering
- ├─ domain/             // Fachlogik (Rezepte, Import, Timer, Shopping)
- ├─ services/           // Errors, Locks, Export, WakeLock
- ├─ storage.js          // LocalStorage Wrapper (robust)
- └─ supabase.js         // Backend API (optional)
+├─ app.js              // side-effect-freie Re-Exports
+├─ entry.js            // echter Browser-Entrypoint
+├─ state.js            // Hash-Routing
+├─ views/              // UI-Rendering
+├─ domain/             // Fachlogik
+├─ services/           // technische Helfer
+├─ storage.js          // robuster LocalStorage-Wrapper
+└─ supabase.js         // optionales Backend
 ```
 
 Prinzip:
+
 - `views` = Darstellung
 - `domain` = Fachlogik
 - `services` = technische Helfer
-- `app.js` verklebt alles, enthält aber keine Fachlogik.
+- `app.main.js` orchestriert, Fachlogik bleibt außerhalb
 
 ---
 
 ## ☁️ Backend vs. Local Mode
 
-In `src/app.js`:
+Die App unterstützt zwei Betriebsarten:
 
-```js
-const USE_BACKEND = true;
-```
+- Backend-Modus: Laden/Speichern über Supabase
+- Local-Modus: Alles lokal im Browser
 
-- `true`: Laden/Speichern über Supabase, LocalStorage als Fallback/Cache.
-- `false`: Alles lokal (LocalStorage).
+Die Umschaltung läuft über die App-Einstellungen und das Wiring in `src/app/app.main.js`.
 
 ---
 
-## 📦 Rezept-Import
+## 📦 Import
 
-Import ist zentral in `src/domain/import.js` implementiert (`importRecipesIntoApp(...)`).
-Wichtig: keine gleichnamige Funktion in `app.js` anlegen (sonst wird der Import überschrieben).
+Der Import ist zentral in `src/domain/import.js` implementiert.
 
-### Import-Modi
+Wichtige Modi:
 
 | Modus | Verhalten |
-|------|-----------|
-| `backendWins` (Default) | Backend bleibt führend; neue Rezepte werden im Backend angelegt |
+| --- | --- |
+| `backendWins` | Backend bleibt führend; neue Rezepte werden angelegt |
 | `jsonWins` | Import überschreibt bestehende Rezepte |
-| `merge` | Ergänzt fehlende Felder, ohne vorhandene zu überschreiben |
+| `mergePreferBackend` | Merge mit Vorrang für Backend-Daten |
+| `mergePreferJson` | Merge mit Vorrang für JSON-Daten |
 
 ---
 
 ## 🧪 Selftest
 
-Für schnellen Gesundheitscheck (auch am Handy):
+Für schnellen Gesundheitscheck:
 
-- Öffne `/#selftest`
-- Optional: `/#diagnostics` (Latenz, Fehlerspeicher)
+- `/#selftest`
+- `/#diagnostics`
 
-Checks:
-- LocalStorage read/write (falls möglich)
-- Backend erreichbar (nur wenn `USE_BACKEND=true`)
-- Basisfunktionen geladen
+Geprüft werden u. a.:
+
+- LocalStorage read/write
+- Backend-Erreichbarkeit
+- geladene Basisfunktionen
 
 ---
 
-## 🧪 Smoke-Tests (empfohlen)
+## 🧪 Smoke-Tests
 
-### Import (BackendWins)
-1. Import JSON mit *neuem* Rezept
-2. Rezept erscheint in Liste
+**Import**
+
+1. JSON mit neuem Rezept importieren
+2. Rezept erscheint in der Liste
 3. Browser neu laden
-4. Rezept ist weiterhin da
-5. Import erneut → kein Duplikat
+4. Rezept bleibt vorhanden
+5. Import erneut ausführen und auf Duplikate prüfen
 
-### Timer
-- Timer starten → View wechseln → Timer bleibt sichtbar
-- Timer verlängern (auch nach Ablauf möglich)
+**Timer**
 
-### Shopping
-- Items abhaken → rutschen nach unten
-- Erledigte ein-/ausklappen
-- Reload → Zustand bleibt erhalten
+- Timer starten
+- View wechseln
+- Timer bleibt sichtbar
+- Timer nach Ablauf verlängern
+
+**Shopping**
+
+- Items abhaken
+- erledigte Einträge ein-/ausklappen
+- neu laden und Persistenz prüfen
 
 ---
 
 ## 🛡️ Stabilität
 
-- Globaler Error-Handler (`services/errors.js`)
-- Fetch-Timeouts (AbortController)
-- Locking gegen parallele Aktionen (`services/locks.js`)
-- Robustes LocalStorage-Handling (kein Crash bei kaputtem JSON / Quota)
+- globaler Error-Handler in `src/services/errors.js`
+- Fetch-Timeouts via `AbortController`
+- Locking gegen parallele Aktionen
+- robuster Umgang mit kaputtem oder vollem `localStorage`
+- Offline-App-Shell über `sw.js`
 
 ---
 
-## 🧹 Coding-Standards (optional)
+## 🧹 Do not break these rules
 
-Minimales Setup für Formatierung und Linting:
+1. Keine Fachlogik in `app.js`
+2. Import-Logik nur in `src/domain/import.js`
+3. Persistenz nur über `src/domain/recipeRepo.js`
+4. Async-Fehler nicht still schlucken
+
+Wenn du unsicher bist: lieber in `domain/` kapseln als schnell in die App-Orchestrierung patchen.
+
+---
+
+## ✅ Cleanup
+
+Siehe `CLEANUP_DONE.md` für Checkliste und Stand.
+
+---
+
+## ⚠️ Nicht-Ziele
+
+- kein Benutzer-/Rechtemanagement außerhalb des vorhandenen Space-Modells
+- kein Sync-Konflikt-Resolver
+- kein Framework-Migrationsprojekt
+
+---
+
+## 📴 Offline
+
+Es gibt einen minimalen Service Worker in `sw.js`, der die App-Shell cached.
+Dadurch kann die UI auch ohne Netz starten.
+
+Hinweis: Rezeptdaten kommen weiterhin aus Backend oder Local-Modus, je nach Einstellung.
+
+---
+
+## 🧰 Entwicklung
 
 ```bash
 npm i
@@ -120,73 +162,15 @@ npm run format
 npm run lint
 ```
 
----
+Vorhandene kleine Tests:
 
----
-
-## 🚫 Do not break these rules
-
-Diese Regeln verhindern die meisten „unsichtbaren“ Bugs (Import, Persistenz, Doppelklick):
-
-1) **Keine Fachlogik in `app.js`** – nur orchestrieren/wiren.
-2) **Import-Logik nur in `src/domain/import.js`** (keine gleichnamige Funktion in `app.js`).
-3) **Persistenz nur über `src/domain/recipeRepo.js`** (nicht direkt `localStorage` oder `supabase` aus Views).
-4) **Nie still scheitern:** async Handler sollen Fehler an den globalen Banner geben (oder `throw`en).
-
-Wenn du unsicher bist: lieber in `domain/` kapseln, statt schnell in `app.js` zu patchen.
-
----
-
-## ✅ Cleanup done (Tag)
-
-Siehe `CLEANUP_DONE.md` für die Checkliste und den aktuellen Stand.
----
-## 🚫 Do not break these rules
-Diese Regeln verhindern die meisten „unsichtbaren“ Bugs (Import, Persistenz, Doppelklick):
-1) **Keine Fachlogik in `app.js`** – nur orchestrieren/wiren.
-2) **Import-Logik nur in `src/domain/import.js`** (keine gleichnamige Funktion in `app.js`).
-3) **Persistenz nur über `src/domain/recipeRepo.js`** (nicht direkt `localStorage` oder `supabase` aus Views).
-4) **Nie still scheitern:** async Handler sollen Fehler an den globalen Banner geben (oder `throw`en).
-Wenn du unsicher bist: lieber in `domain/` kapseln, statt schnell in `app.js` zu patchen.
----
-## ✅ Cleanup done (Tag)
-Siehe `CLEANUP_DONE.md` für Checkliste und Stand.
-
----
-
-## 🚫 Do not break these rules
-
-Diese Regeln verhindern die meisten „unsichtbaren“ Bugs (Import, Persistenz, Doppelklick):
-
-1) **Keine Fachlogik in `app.js`** – nur orchestrieren/wiren.
-2) **Import-Logik nur in `src/domain/import.js`** (keine gleichnamige Funktion in `app.js`).
-3) **Persistenz nur über `src/domain/recipeRepo.js`** (nicht direkt `localStorage` oder `supabase` aus Views).
-4) **Nie still scheitern:** Async Handler sollen Fehler an den globalen Banner geben (oder `throw`en).
-
-Wenn du unsicher bist: lieber in `domain/` kapseln, statt schnell in `app.js` zu patchen.
-
----
-
-## ✅ Cleanup done (Tag)
-
-Siehe `CLEANUP_DONE.md` für die Checkliste und den aktuellen Stand.
-
-## ⚠️ Nicht-Ziele
-
-- Kein Benutzer-/Rechtemanagement
-- Kein Sync-Konflikt-Resolver
-- Kein Framework / kein Build-System
+```bash
+npm run test:list
+npm run test:list2
+```
 
 ---
 
 ## Lizenz
 
 Private Nutzung.
-
-
----
-
-## 📴 Offline (App-Shell Cache)
-
-Es gibt einen minimalen Service Worker (`sw.js`), der die App-Shell cached. Dadurch kann die UI auch ohne Netz starten.
-Hinweis: Daten (Rezepte) kommen weiterhin aus Backend/Local je nach Mode.
