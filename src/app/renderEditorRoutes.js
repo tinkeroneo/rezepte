@@ -27,7 +27,7 @@ export function renderEditorRoute({
   uploadRecipeImage,
 }) {
   if (view.name === "cook") {
-    return renderCookView({
+    renderCookView({
       canWrite,
       appEl,
       state: view,
@@ -37,13 +37,14 @@ export function renderEditorRoute({
       setViewCleanup,
       setDirtyGuard,
     });
+    return true;
   }
 
   if (view.name === "add") {
     const existing = view.selectedId ? recipes.find((recipe) => recipe.id === view.selectedId) : null;
     const addCanWrite = canWriteForSpace(existing?.space_id || activeSpaceId);
 
-    return renderAddView({
+    renderAddView({
       appEl,
       state: view,
       recipes,
@@ -77,6 +78,7 @@ export function renderEditorRoute({
       },
       uploadRecipeImage,
     });
+    return true;
   }
 
   return false;

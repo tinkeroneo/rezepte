@@ -73,7 +73,7 @@ export function bindDetailActions({
           const url = cookLinkFor(recipe.id);
           const ok = await copyText(url);
           if (ok) ack(shareLinkBtn);
-          else prompt("Link kopieren:", url);
+          else showError(`Link konnte nicht automatisch kopiert werden: ${url}`);
           return;
         }
 
@@ -84,7 +84,7 @@ export function bindDetailActions({
         const url = shareLinkFor(token);
         const ok = await copyText(url);
         if (ok) ack(shareLinkBtn);
-        else prompt("Share-Link:", url);
+        else showError(`Share-Link konnte nicht automatisch kopiert werden: ${url}`);
       } catch (e) {
         showError(`Teilen fehlgeschlagen: ${e?.message || e}`);
       }
