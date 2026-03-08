@@ -10,13 +10,17 @@ function renderSelftestList(results) {
   if (!items.length) return `<li class="muted">Keine Ergebnisse.</li>`;
   return items.map((entry) => {
     const ok = !!entry?.ok;
-    const label = ok ? "[OK]" : "[FAIL]";
+    const label = ok ? "OK" : "FAIL";
+    const labelClass = ok ? "selftest-badge ok" : "selftest-badge fail";
     const detail = entry?.detail
-      ? `<div class="muted" style="margin-top:.25rem;">${escapeHtml(String(entry.detail))}</div>`
+      ? `<div class="selftest-detail muted">${escapeHtml(String(entry.detail))}</div>`
       : "";
     return `
-      <li style="margin:.5rem 0;">
-        <div><strong>${label} ${escapeHtml(String(entry?.name || "-"))}</strong></div>
+      <li class="selftest-item">
+        <div class="selftest-line">
+          <span class="${labelClass}">[${label}]</span>
+          <strong>${escapeHtml(String(entry?.name || "-"))}</strong>
+        </div>
         ${detail}
       </li>
     `;
@@ -57,6 +61,36 @@ export function renderDiagnosticsView({ appEl, state, info, setView, selftestRes
 
   appEl.innerHTML = `
     <div class="page">
+      <style>
+        .selftest-wrap { padding: .35rem 0 .25rem; }
+        .selftest-list { margin: .75rem 0 0 1.1rem; }
+        .selftest-item { margin: .75rem 0; line-height: 1.35; }
+        .selftest-line { display: flex; align-items: center; gap: .55rem; }
+        .selftest-badge {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 3.9rem;
+          padding: .12rem .45rem;
+          border-radius: 999px;
+          font-size: .76rem;
+          font-weight: 800;
+          letter-spacing: .02em;
+          border: 1px solid var(--line);
+          background: color-mix(in srgb, var(--card) 84%, var(--bg));
+        }
+        .selftest-badge.ok {
+          color: #1f7a42;
+          border-color: color-mix(in srgb, #1f7a42 45%, var(--line));
+          background: color-mix(in srgb, #1f7a42 14%, var(--card));
+        }
+        .selftest-badge.fail {
+          color: #b13737;
+          border-color: color-mix(in srgb, #b13737 45%, var(--line));
+          background: color-mix(in srgb, #b13737 14%, var(--card));
+        }
+        .selftest-detail { margin-top: .28rem; margin-left: 4.45rem; font-size: .94rem; }
+      </style>
       <header class="topbar">
         <div class="title">${inSelftest ? "Selftest" : "Diagnostics"}</div>
         <button class="btn btn--ghost" type="button" id="refreshBtn">Refresh</button>
@@ -74,8 +108,8 @@ export function renderDiagnosticsView({ appEl, state, info, setView, selftestRes
           ${inSelftest
             ? `
               <div class="muted">Schneller Gesundheitscheck (Storage/Backend/Grundfunktionen).</div>
-              <div style="padding:1rem 0;">
-                <ul class="list" style="margin-left:1.2rem;">
+              <div class="selftest-wrap">
+                <ul class="list selftest-list">
                   ${renderSelftestList(selftestResults)}
                 </ul>
               </div>
