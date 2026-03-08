@@ -1,62 +1,13 @@
 import { escapeHtml, qs, qsa, recipeImageOrDefault } from "../utils.js";
 import { splitStepsToCards, stepDoneKey, parseDurationSeconds, formatTime } from "../domain/steps.js";
-import { buildMenuIngredients, buildMenuStepSections } from "../domain/menu.js";
-import { renderIngredientsHtml } from "./shared.ingredients.js";
+import { buildMenuStepSections } from "../domain/menu.js";
 import { createBeep, createTimerManager, renderTimersBarHtml } from "../domain/timers.js";
 import { ack } from "../ui/feedback.js";
+import { createCookIngredientsSheet } from "./cook.ingredients.js";
 
 // Kochverlauf/Bewertung ist in der Detail-View (nicht hier),
 // damit Steps/Timer nicht verdeckt werden.
 let __audioPrimedOnce = false;
-
-
-function __parseNumberToken(tok) {
-  const t = String(tok).trim();
-  // ranges like 2-3
-  const range = t.match(/^(\d+(?:[.,]\d+)?|\d+\/\d+)\s*-\s*(\d+(?:[.,]\d+)?|\d+\/\d+)$/);
-  if (range) return { kind: "range", a: __parseNumberToken(range[1]), b: __parseNumberToken(range[2]) };
-
-  const frac = t.match(/^(\d+)\s*\/\s*(\d+)$/);
-  if (frac) return { kind: "num", v: (Number(frac[1]) / Number(frac[2])) };
-
-  const num = t.match(/^\d+(?:[.,]\d+)?$/);
-  if (num) return { kind: "num", v: Number(t.replace(",", ".")) };
-
-  return null;
-}
-
-function __formatNumberDE(n) {
-  // keep up to 2 decimals when needed
-  const rounded = Math.round(n * 100) / 100;
-  // avoid scientific notation
-  const out = rounded.toFixed(rounded % 1 === 0 ? 0 : (rounded*10)%1===0 ? 1 : 2);
-  return out.replace(".", ",");
-}
-
-function scaleIngredientLine(line, factor) {
-  const s = String(line || "");
-
-  // match leading number token like "1", "0,5", "1/2", "2-3"
-  const m = s.match(/^\s*([0-9]+(?:[.,][0-9]+)?|[0-9]+\s*\/\s*[0-9]+|[0-9]+(?:[.,][0-9]+)?\s*-\s*[0-9]+(?:[.,][0-9]+)?)(\s+.*)?$/);
-  if (!m) return s;
-  const tok = m[1];
-  const rest = m[2] || "";
-  const parsed = __parseNumberToken(tok.replace(/\s+/g,""));
-  if (!parsed) return s;
-
-  const apply = (p) => {
-    if (p.kind === "num") return __formatNumberDE(p.v * factor);
-    if (p.kind === "range") {
-      const a = apply(p.a);
-      const b = apply(p.b);
-      return `${a}-${b}`;
-    }
-    return tok;
-  };
-
-  return apply(parsed) + rest;
-}
-
 
 
 export function renderCookView({ appEl, state, recipes, partsByParent, setView, setViewCleanup }) {
@@ -96,7 +47,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
 
 
         <div class="muted">
-          <button class="btn btn--ghost" id="resetBtn">Reset Steps</button>
+          <button class="btn btn--ghost" id="resetBtn">Schritte zurücksetzen</button>
           ${escapeHtml(r.category ?? "")}
           ${r.time ? " · " + escapeHtml(r.time) : ""}
         </div>
@@ -170,161 +121,13 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
   const timerRoot = qs(appEl, "#timerRoot");
   const sheetRoot = qs(appEl, "#sheetRoot");
 
-  const ingredientsUsedKey = `tinkeroneo_ingredients_used_${r.id}`;
-  let _ingredientsUsed = new Set();
-  try {
-    _ingredientsUsed = new Set(JSON.parse(localStorage.getItem(ingredientsUsedKey) || "[]"));
-  } catch {
-    _ingredientsUsed = new Set();
-  }
-  let _ingredientsShowHidden = false;
-  const _ingredientsHideTimers = new Map();
-  const _ingredientsDelayHide = new Set();
-
-  function saveIngredientsUsed() {
-    localStorage.setItem(ingredientsUsedKey, JSON.stringify([..._ingredientsUsed]));
-  }
-
-  function renderIngredientsSheet() {
-    _ingredientsHideTimers.forEach(t => window.clearTimeout(t));
-    _ingredientsHideTimers.clear();
-    _ingredientsDelayHide.clear();
-
-    const counter = { i: 0 };
-    sheetRoot.innerHTML = `
-      <div class="sheet-backdrop" id="sheetBackdrop"></div>
-      <div class="sheet" role="dialog" aria-label="Zutaten">
-        <div class="row" style="justify-content:space-between; align-items:center; gap:.5rem;">
-          <div class="row" style="gap:.5rem;">
-            <h3 style="margin:0;">Zutaten</h3>
-            <button class="btn btn--ghost btn--sm ingredients-toggle" id="ingredientsToggle" type="button">Alle</button>
-          </div>
-          <button class="btn btn--ghost" id="closeSheet" type="button" title="Schließen">✕</button>
-        </div>
-        <div class="row" style="gap:.5rem; flex-wrap:wrap; align-items:flex-end; margin-top:.5rem;">
-          <div class="field" style="flex:1; min-width:170px;">
-            <div class="muted" style="font-weight:700;">Menge</div>
-            <div class="muted" style="font-size:.9rem;">Basis: ${escapeHtml(r.servings ?? "—")}</div>
-          </div>
-          <div class="field" style="min-width:160px;">
-            <label class="label" for="servingsFactor">Umrechnen</label>
-            <select id="servingsFactor" class="input">
-              <option value="1">1×</option>
-              <option value="0.5">½×</option>
-              <option value="1.5">1,5×</option>
-              <option value="2">2×</option>
-            </select>
-          </div>
-        </div>
-        <div style="margin-top:.75rem;">
-          ${isMenu
-            ? buildMenuIngredients(r, recipes, partsByParent).map(section => `
-              <div class="muted" style="font-weight:900; margin:.75rem 0 .35rem;">${escapeHtml(section.title)}</div>
-              ${renderIngredientsHtml(section.items.map(x => scaleIngredientLine(x, __ingFactor)), { interactive: true, counter })}
-            `).join("")
-            : renderIngredientsHtml((r.ingredients ?? []).map(x => scaleIngredientLine(x, __ingFactor)), { interactive: true, counter })}
-        </div>
-      </div>
-    `;
-
-    const close = qs(sheetRoot, "#closeSheet");
-    const back = qs(sheetRoot, "#sheetBackdrop");
-    if (close) close.addEventListener("click", () => (sheetRoot.innerHTML = ""));
-    if (back) back.addEventListener("click", () => (sheetRoot.innerHTML = ""));
-
-    function applyIngredientStates() {
-      const hasUsed = _ingredientsUsed.size > 0;
-      const toggle = qs(sheetRoot, "#ingredientsToggle");
-      if (toggle) {
-        toggle.textContent = _ingredientsShowHidden ? "Nur offen" : "Alle";
-        toggle.style.visibility = hasUsed ? "visible" : "hidden";
-        toggle.disabled = !hasUsed;
-      }
-
-      qsa(sheetRoot, "[data-ing-idx]").forEach(li => {
-        const idx = Number(li.getAttribute("data-ing-idx"));
-        const used = _ingredientsUsed.has(idx);
-        li.classList.toggle("is-used", used);
-
-        if (!used) {
-          li.classList.remove("is-hidden", "is-pending-hide");
-          return;
-        }
-
-        if (_ingredientsShowHidden) {
-          li.classList.remove("is-hidden", "is-pending-hide");
-          return;
-        }
-
-        if (_ingredientsDelayHide.has(idx)) {
-          li.classList.add("is-pending-hide");
-          li.classList.remove("is-hidden");
-          return;
-        }
-
-        li.classList.add("is-hidden");
-        li.classList.remove("is-pending-hide");
-      });
-    }
-
-    const sf = qs(sheetRoot, "#servingsFactor");
-    if (sf) {
-      sf.value = String(__ingFactor);
-      sf.addEventListener("change", () => {
-        __ingFactor = Number(String(sf.value).replace(",", ".")) || 1;
-        renderIngredientsSheet();
-      });
-    }
-
-    const toggle = qs(sheetRoot, "#ingredientsToggle");
-    if (toggle) {
-      toggle.addEventListener("click", () => {
-        _ingredientsShowHidden = !_ingredientsShowHidden;
-        applyIngredientStates();
-      });
-    }
-
-    qsa(sheetRoot, "[data-ing-idx]").forEach(li => {
-      li.addEventListener("click", () => {
-        const idx = Number(li.getAttribute("data-ing-idx"));
-        if (!Number.isFinite(idx)) return;
-
-        if (_ingredientsUsed.has(idx)) {
-          _ingredientsUsed.delete(idx);
-          _ingredientsDelayHide.delete(idx);
-          const t = _ingredientsHideTimers.get(idx);
-          if (t) window.clearTimeout(t);
-          _ingredientsHideTimers.delete(idx);
-          saveIngredientsUsed();
-          applyIngredientStates();
-          return;
-        }
-
-        _ingredientsUsed.add(idx);
-        _ingredientsDelayHide.add(idx);
-        saveIngredientsUsed();
-        applyIngredientStates();
-
-        const t = window.setTimeout(() => {
-          _ingredientsHideTimers.delete(idx);
-          _ingredientsDelayHide.delete(idx);
-          if (_ingredientsShowHidden) return;
-          const el = qs(sheetRoot, `[data-ing-idx="${idx}"]`);
-          if (el) {
-            el.classList.add("is-hidden");
-            el.classList.remove("is-pending-hide");
-          }
-        }, 3000);
-        _ingredientsHideTimers.set(idx, t);
-      });
-    });
-
-    applyIngredientStates();
-  }
-
-  let __ingFactor = 1;
-
-
+  const ingredientsSheet = createCookIngredientsSheet({
+    sheetRoot,
+    recipe: r,
+    recipes,
+    partsByParent,
+    isMenu,
+  });
 
   // Kochverlauf / Bewertung ist in der Detail-View
 
@@ -484,9 +287,11 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
   appEl.addEventListener("click", audio.prime, { once: true });
 
   qs(appEl, "#ingredientsBtn").addEventListener("click", () => {
-    // toggle: zweiter Klick schließt wieder
-    if (sheetRoot.innerHTML && sheetRoot.innerHTML.trim() !== "") { sheetRoot.innerHTML = ""; return; }
-    renderIngredientsSheet();
+    if (ingredientsSheet.hasOpenSheet()) {
+      ingredientsSheet.close();
+      return;
+    }
+    ingredientsSheet.render();
   });
 
   // Radio ist global (Header-Button + Radio-Dock). In der CookView kein extra Button,
@@ -552,7 +357,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
     if (!confirm("Alle Schritt-Häkchen zurücksetzen?")) return;
     done = {};
     saveDone();
-    localStorage.removeItem(ingredientsUsedKey);
+    ingredientsSheet.reset();
     renderCookView({ appEl, state, recipes, partsByParent, setView });
   });
 }
