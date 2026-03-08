@@ -1,10 +1,10 @@
-import { escapeHtml, qs, qsa, recipeImageOrDefault } from "../utils.js";
+import { escapeHtml, qs, recipeImageOrDefault } from "../utils.js";
 import { splitStepsToCards, stepDoneKey, parseDurationSeconds, formatTime } from "../domain/steps.js";
 import { buildMenuStepSections } from "../domain/menu.js";
 import { createBeep } from "../domain/timers.js";
-import { ack } from "../ui/feedback.js";
 import { createCookIngredientsSheet } from "./cook.ingredients.js";
 import { createCookTimers } from "./cook.timers.js";
+import { wireCookSteps } from "./cook.steps.js";
 
 // Kochverlauf/Bewertung ist in der Detail-View (nicht hier),
 // damit Steps/Timer nicht verdeckt werden.
@@ -153,61 +153,16 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
   // Radio ist global (Header-Button + Radio-Dock). In der CookView kein extra Button,
   // damit der Fokus auf Steps + Timern bleibt.
 
-  qsa(appEl, 'input[type="checkbox"][data-stepkey]').forEach(cb => {
-    cb.addEventListener("change", () => {
-      const key = cb.dataset.stepkey;
-      done[key] = cb.checked;
-      saveDone();
-
-      const body = qs(appEl, `[data-stepbody="${CSS.escape(key)}"]`);
-      if (body) {
-        body.classList.toggle("step-done", cb.checked);
-        // auto-collapse step text when done
-        body.style.display = cb.checked ? "none" : "";
-      }
-
-      const wrap = cb.closest("[data-stepwrap]");
-      if (wrap) wrap.classList.toggle("step-item-done", cb.checked);
-
-      // re-highlight current step (first open checkbox)
-      highlightCurrentStep();
-    });
+  wireCookSteps({
+    appEl,
+    audio,
+    getAudioPrimed: () => __audioPrimedOnce,
+    setAudioPrimed: (next) => { __audioPrimedOnce = !!next; },
+    done,
+    saveDone,
+    timerManager: tm,
+    recipeId: r.id,
   });
-
-  function highlightCurrentStep() {
-    // remove old markers
-    qsa(appEl, ".step-current").forEach(el => el.classList.remove("step-current"));
-
-    const next = qsa(appEl, 'input[type="checkbox"][data-stepkey]').find(x => !x.checked);
-    const li = next?.closest?.("li");
-    if (li) li.classList.add("step-current");
-  }
-
-  // initial highlighting
-  highlightCurrentStep();
-
-  qsa(appEl, "[data-start-timer]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const key = btn.dataset.startTimer;
-      const title = btn.dataset.title || "Timer";
-      const dur = parseInt(btn.dataset.seconds, 10);
-      if (!dur) return;
-
-      // Prime only once (best effort). If it fails, we still allow timers.
-      if (!__audioPrimedOnce) {
-        __audioPrimedOnce = true;
-        try { await audio.prime(); } catch { /* ignore */ }
-      }
-
-      // store recipeId so the global timer chip can jump back to the right recipe
-      tm.addTimer(key, title, dur, r.id);
-      ack(btn);
-
-      // IMPORTANT: no manual tick here; global overlay tick handles updates
-      // tm.tick();
-    });
-  });
-
 
   qs(appEl, "#resetBtn").addEventListener("click", () => {
     if (!confirm("Alle Schritt-Häkchen zurücksetzen?")) return;
