@@ -1,9 +1,10 @@
 import { escapeHtml, qs, qsa, recipeImageOrDefault } from "../utils.js";
 import { splitStepsToCards, stepDoneKey, parseDurationSeconds, formatTime } from "../domain/steps.js";
 import { buildMenuStepSections } from "../domain/menu.js";
-import { createBeep, createTimerManager, renderTimersBarHtml } from "../domain/timers.js";
+import { createBeep } from "../domain/timers.js";
 import { ack } from "../ui/feedback.js";
 import { createCookIngredientsSheet } from "./cook.ingredients.js";
+import { createCookTimers } from "./cook.timers.js";
 
 // Kochverlauf/Bewertung ist in der Detail-View (nicht hier),
 // damit Steps/Timer nicht verdeckt werden.
@@ -15,7 +16,6 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
    if (!r) return setView({ name: "list", selectedId: null, q: state.q });
 
   const settings = window.__tinkeroneoSettings || {};
-  const timerSoundEnabled = settings.readTimerSoundEnabled ? !!settings.readTimerSoundEnabled() : true;
   const timerSoundId = settings.readTimerSoundId ? String(settings.readTimerSoundId() || "bowl") : "gong";
   const timerSoundVolume = settings.readTimerSoundVolume ? Number(settings.readTimerSoundVolume() ?? 0.65) : 0.65;
   const audio = createBeep({ soundId: timerSoundId, volume: timerSoundVolume });
@@ -131,156 +131,12 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
 
   // Kochverlauf / Bewertung ist in der Detail-View
 
-  let timersExpanded = false;
-  let _lastOverdueKeys = new Set();
-  const _timerOpenUntil = new Map();
-  const TIMER_ACTIONS_OPEN_MS = 5000;
-  function flashTimerRootOnce() {
-    // nur kurz sichtbar, dann wieder aus
-    timerRoot.classList.remove("timer-flash");
-    // reflow, damit Animation neu startet
-    void timerRoot.offsetWidth;
-    timerRoot.classList.add("timer-flash");
-    window.clearTimeout(timerRoot._flashT);
-    timerRoot._flashT = window.setTimeout(() => {
-      timerRoot.classList.remove("timer-flash");
-    }, 220);
-  }
-
-  const ringIntervalMs = settings.readTimerRingIntervalMs?.() ?? 2800;
-  const maxRingSeconds = settings.readTimerMaxRingSeconds?.() ?? 120;
-  const stepHighlightEnabled = settings.readTimerStepHighlight?.() ?? true;
-
-  const tm = createTimerManager({
+  const tm = createCookTimers({
+    appEl,
+    timerRoot,
+    settings,
     storageKey: timersKey,
-    ringIntervalMs,
-    maxRingSeconds,
-
-    onRender: (snap) => {
-      timerRoot.innerHTML = renderTimersBarHtml(snap, {
-        expanded: timersExpanded,
-        maxCollapsed: 1
-      });
-
-      // Highlight steps whose timers are overdue (soft pulse) until the timer is stopped/dismissed.
-      if (stepHighlightEnabled) {
-        try {
-          const overdueKeys = new Set(
-            (snap?.list ?? [])
-              .filter(t => (t.remainingSec ?? 1) <= 0 && t.key)
-              .map(t => String(t.key))
-          );
-
-          // one-time subtle nudge: if a timer just turned overdue, briefly outline that step
-          const newlyOverdue = [];
-          overdueKeys.forEach(k => { if (!_lastOverdueKeys.has(k)) newlyOverdue.push(k); });
-          _lastOverdueKeys = overdueKeys;
-
-          qsa(appEl, "li[data-stepwrap]").forEach(li => {
-            const k = li.getAttribute("data-stepwrap") || "";
-            li.classList.toggle("step-overdue", overdueKeys.has(k));
-          });
-
-          if (newlyOverdue.length) {
-            const first = newlyOverdue[0];
-            const li = qs(appEl, `li[data-stepwrap="${CSS.escape(first)}"]`);
-            if (li) {
-              li.classList.add("step-current");
-              // only scroll if far away; keep it calm
-              const rect = li.getBoundingClientRect();
-              if (rect.top < 0 || rect.bottom > window.innerHeight) {
-                li.scrollIntoView({ block: "center", behavior: "smooth" });
-              }
-              window.setTimeout(() => li.classList.remove("step-current"), 2000);
-            }
-          }
-        } catch {
-          // ignore
-        }
-      } else {
-        // ensure clean UI when disabled
-        qsa(appEl, "li.step-overdue").forEach(li => li.classList.remove("step-overdue"));
-      }
-
-      // Toggle alle / weniger
-      const now = Date.now();
-      qsa(timerRoot, "[data-timer-pill]").forEach(pill => {
-        const id = pill.getAttribute("data-timer-id") || "";
-        const openUntil = _timerOpenUntil.get(id) || 0;
-        if (openUntil > now) {
-          pill.classList.add("is-open");
-        }
-
-        pill.addEventListener("click", (e) => {
-          if (e.target?.closest("button")) return;
-          const nextOpen = (_timerOpenUntil.get(id) || 0) > Date.now()
-            ? 0
-            : (Date.now() + TIMER_ACTIONS_OPEN_MS);
-          if (nextOpen) {
-            _timerOpenUntil.set(id, nextOpen);
-            pill.classList.add("is-open");
-          } else {
-            _timerOpenUntil.delete(id);
-            pill.classList.remove("is-open");
-          }
-        });
-      });
-
-      qsa(timerRoot, "[data-timer-toggle]").forEach(b => {
-        b.addEventListener("click", (e) => {
-          e.stopPropagation();
-          timersExpanded = !timersExpanded;
-          flashTimerRootOnce();
-          tm.tick(); // sofort neu rendern
-        });
-      });
-
-
-
-
-      // Stop
-      qsa(timerRoot, "[data-timer-stop]").forEach(b => {
-        b.addEventListener("click", (e) => {
-          e.stopPropagation();
-          ack(b.closest(".timer-pill") || b);
-          tm.removeTimer(b.dataset.timerStop);
-          tm.tick();
-        });
-      });
-
-
-      // Shorten (-1m / -5m)
-      qsa(timerRoot, "[data-timer-dec]").forEach(b => {
-        b.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const id = b.dataset.timerDec;
-          const sec = parseInt(b.dataset.sec, 10) || 0;
-          if (!id || !sec) return;
-          ack(b.closest(".timer-pill") || b);
-          tm.adjustTimer(id, -sec);
-          tm.tick();
-        });
-      });
-
-      // Extend (+1m / +5m)
-      qsa(timerRoot, "[data-timer-ext]").forEach(b => {
-        b.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const id = b.dataset.timerExt;
-          const sec = parseInt(b.dataset.sec, 10) || 0;
-          if (!id || !sec) return;
-          ack(b.closest(".timer-pill") || b);
-          tm.extendTimer(id, sec);
-          tm.tick();
-        });
-      });
-
-
-    },
-    onFire: () => {
-      if (!timerSoundEnabled) return;
-      audio.beep();
-    }
+    audio,
   });
 
   // prime audio on any user click inside cook view (mobile reliable)
