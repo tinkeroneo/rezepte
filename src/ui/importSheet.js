@@ -88,6 +88,16 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
   let parseError = "";
   let validationError = "";
 
+  const importTemplate = `{
+  "title": "",
+  "ingredients": [
+    "1 Zutat"
+  ],
+  "steps": [
+    "1 Schritt"
+  ]
+}`;
+
   const parsePayload = (text) => {
     const raw = String(text ?? "");
     const cleaned = raw
@@ -182,6 +192,35 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
       doBtn.disabled = false;
       doBtn.textContent = "Import starten";
     }
+  });
+
+  // Prefill with a minimal template, auto-select for fast copy/paste overwrite.
+  pasteEl.value = importTemplate;
+  pasteEl.dataset.prefilled = "1";
+  const initial = parsePayload(pasteEl.value);
+  parsedItems = initial.items;
+  parseError = initial.error;
+  validationError = parseError ? "" : validateItems(parsedItems);
+
+  const selectTemplate = () => {
+    try {
+      pasteEl.focus();
+      pasteEl.select();
+    } catch {
+      // ignore focus/select issues
+    }
+  };
+
+  requestAnimationFrame(selectTemplate);
+
+  pasteEl.addEventListener("focus", () => {
+    if (pasteEl.dataset.prefilled === "1") {
+      selectTemplate();
+    }
+  });
+
+  pasteEl.addEventListener("input", () => {
+    pasteEl.dataset.prefilled = "0";
   });
 
   refreshHint();
