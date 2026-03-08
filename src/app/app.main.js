@@ -62,7 +62,6 @@ import { renderTimersOverlay } from "../views/timers.view.js";
 import { renderLoginView } from "../views/login.view.js";
 import { renderConfirmView } from "../views/confirm.view.js";
 import { renderShareView } from "../views/share.view.js";
-import { renderInvitesView } from "../views/invites.view.js";
 import { renderAccountView } from "../views/account.view.js";
 import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds, compactOfflineQueue, dequeueOfflineAction } from "../domain/offlineQueue.js";
 
@@ -107,6 +106,7 @@ import { wireAccountControls } from "./ui/accountControls.js";
 import { createHeaderBadgesUpdater } from "./ui/headerBadges.js";
 import { installAdminCorner } from "./adminCorner.js";
 import { refreshSpaceSelect, getActiveSpaceRole } from "./spaces/spaces.js";
+import { renderInvitesRoute } from "./invitesRoute.js";
 import {
 
 
@@ -481,86 +481,24 @@ async function render(view, setView) {
 
   // Invites confirmation view
   if (view.name === "invites") {
-    const inv = window.__tinkeroneoPendingInvites || [];
-    return renderInvitesView({
+    return renderInvitesRoute({
       appEl,
-      invites: inv,
-      onAccept: async (inviteId) => {
-        try { await acceptInvite(inviteId); } catch (e) { showError(String(e?.message || e)); }
-        try {
-          const ctx = await initAuthAndSpace();
-          try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) {
-            reportError(e, { scope: "app.js", action: String(e?.message) });
-            showError(String(e?.message));
-          }
-
-          try {
-            if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
-              try {
-                await listRecipes();
-                await upsertProfile({ last_space_id: ctx.spaceId });
-              } catch (e) {
-                reportError(e, { scope: "app.js", action: String(e?.message) });
-                showError(String(e?.message));
-              }
-            }
-          } catch (e) {
-            reportError(e, { scope: "app.js", action: String(e?.message) });
-            showError(String(e?.message));
-          }
-          window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
-        } catch {
-          window.__tinkeroneoPendingInvites = [];
-        }
-        if (!(window.__tinkeroneoPendingInvites || []).length) {
-          await drainOfflineQueue({ reason: "boot" });
-          await runExclusive("loadAll", () => loadAll());
-          setView({ name: "list", selectedId: null, q: "" });
-          return;
-        }
-        render({ name: "invites" }, setView);
-      },
-      onDecline: async (inviteId) => {
-        try { await declineInvite(inviteId); } catch (e) {
-          reportError(e, { scope: "app.js", action: String(e?.message) });
-          showError(String(e?.message));
-        }
-        try {
-          const ctx = await initAuthAndSpace();
-          try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) {
-            reportError(e, { scope: "app.js", action: String(e?.message) });
-            showError(String(e?.message));
-          }
-
-          try {
-            if (useBackend && isAuthenticated?.() && ctx?.spaceId) {
-              try {
-                await listRecipes();
-                await upsertProfile({ last_space_id: ctx.spaceId });
-              } catch (e) {
-                reportError(e, { scope: "app.js", action: String(e?.message) });
-                showError(String(e?.message));
-              }
-            }
-          } catch (e) {
-            reportError(e, { scope: "app.js", action: String(e?.message) });
-            showError(String(e?.message));
-          }
-          window.__tinkeroneoPendingInvites = ctx?.pendingInvites || [];
-        } catch {
-          window.__tinkeroneoPendingInvites = [];
-        }
-        if (!(window.__tinkeroneoPendingInvites || []).length) {
-          await runExclusive("loadAll", () => loadAll());
-          setView({ name: "list", selectedId: null, q: "" });
-          return;
-        }
-        render({ name: "invites" }, setView);
-      },
-      onSkip: async () => {
-        await runExclusive("loadAll", () => loadAll());
-        setView({ name: "list", selectedId: null, q: "" });
-      },
+      setView,
+      render,
+      acceptInvite,
+      declineInvite,
+      initAuthAndSpace,
+      ensureProfileLoaded,
+      getProfile,
+      upsertProfile,
+      isAuthenticated,
+      useBackend,
+      listRecipes,
+      reportError,
+      showError,
+      drainOfflineQueue,
+      runExclusive,
+      loadAll,
     });
   }
 
