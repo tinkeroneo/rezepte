@@ -49,22 +49,28 @@ export function createRecipeRepo({
 
     /** Upsert locally first; then backend + optional refresh. */
     async upsert(recipe, { refresh = true } = {}) {
+      const safeRecipe = { ...(recipe || {}) };
+      safeRecipe.title = String(safeRecipe.title || "").trim();
+      if (!safeRecipe.title) {
+        throw new Error("Titel fehlt: Rezept kann nicht gespeichert werden.");
+      }
+
       // local merge first
       const local = getLocal();
-      const idx = local.findIndex((x) => x.id === recipe.id);
-      if (idx >= 0) local[idx] = recipe;
-      else local.push(recipe);
+      const idx = local.findIndex((x) => x.id === safeRecipe.id);
+      if (idx >= 0) local[idx] = safeRecipe;
+      else local.push(safeRecipe);
       setLocal(local);
 
       if (!_useBackend) return local;
 
       try {
-        await upsertRecipe(recipe);
+        await upsertRecipe(safeRecipe);
         markBackendOnline?.();
       } catch (e) {
         markBackendOffline?.(String(e?.message || e || "Backend nicht erreichbar"));
         // Keep local UX, queue for later retry
-        enqueueOfflineAction({ kind: "recipe_upsert", recipeId: recipe.id, recipe });
+        enqueueOfflineAction({ kind: "recipe_upsert", recipeId: safeRecipe.id, recipe: safeRecipe });
         return local;
       }
       if (!refresh) return local;

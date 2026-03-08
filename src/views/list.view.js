@@ -5,7 +5,7 @@ import { KEYS, lsSet } from "../storage.js";
 import { toggleFavorite } from "../domain/favorites.js";
 import { getTagColors } from "../domain/tagColors.js";
 import { getColorForCategory } from "../domain/categories.js";
-import { getPendingRecipeIds, getOfflineQueue } from "../domain/offlineQueue.js";
+import { getPendingRecipeIds } from "../domain/offlineQueue.js";
 
 import { applyListQuery, defaultDirFor } from "../domain/listQuery.js";
 
@@ -29,6 +29,7 @@ import { renderListShell } from "../render/listShell.js";
 import { loadListUiState, patchListUiState } from "../services/listUiStateStore.js";
 
 import { renderActiveFilterChips } from "../render/activeFilterChips.js";
+import { showInfo, showSuccess, showError } from "../services/errors.js";
 
 
 export function renderListView({
@@ -45,7 +46,7 @@ export function renderListView({
   onSyncNow
 }) {
   const __pendingIds = getPendingRecipeIds();
-  const pendingQueueLen = (getOfflineQueue?.() || []).length;
+  const pendingRecipeCount = __pendingIds.size;
   const canWriteFlag = !!canWrite;
 
   const tagColors = getTagColors();
@@ -287,14 +288,25 @@ onModeChanged: (m) => {
   renderResults();
 
   if (syncNowBtn) {
-    const canSyncNow = typeof onSyncNow === "function" && pendingQueueLen > 0;
+    const canSyncNow = typeof onSyncNow === "function" && pendingRecipeCount > 0;
     syncNowBtn.style.display = canSyncNow ? "" : "none";
     if (canSyncNow) {
-      syncNowBtn.textContent = `⟳ Jetzt syncen (${pendingQueueLen})`;
+      syncNowBtn.textContent = `⟳ Jetzt syncen (${pendingRecipeCount})`;
       syncNowBtn.addEventListener("click", async () => {
         try {
           syncNowBtn.disabled = true;
-          await onSyncNow();
+          const result = await onSyncNow();
+          if (result?.skipped === "useBackendOff") {
+            showInfo("Sync ist nur im CLOUD-Modus möglich.");
+          } else if (result?.skipped === "offline") {
+            showInfo("Du bist offline. Sync startet automatisch sobald du wieder online bist.");
+          } else if (result?.skipped === "notAuthed") {
+            showInfo("Bitte einloggen, um zu synchronisieren.");
+          } else if (result?.ok) {
+            showSuccess("Sync abgeschlossen.");
+          } else {
+            showError("Sync fehlgeschlagen.");
+          }
         } finally {
           setView({ name: "list", selectedId: null, q: getUi().q ?? (qEl?.value ?? "") }, { push: false });
         }

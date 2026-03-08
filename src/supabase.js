@@ -1159,7 +1159,7 @@ export async function logClientEvent(evt) {
     timeoutMs: 8000,
   });
 
-  if (!res.ok) throw new Error(`client log failed: ${res.status} ${await sbJson(res)}`);
+  if (!res.ok) return false;
   return true;
 }
 
