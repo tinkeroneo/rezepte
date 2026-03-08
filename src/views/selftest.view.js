@@ -1,5 +1,5 @@
 // src/views/selftest.view.js
-export function renderSelftestView({ appEl, results, setView }) {
+export function renderSelftestView({ appEl, state, results, setView }) {
   const items = (results || []).map(r => {
     const icon = r.ok ? "✅" : "❌";
     const detail = r.detail ? `<div class="muted" style="margin-top:.25rem">${escapeHtml(r.detail)}</div>` : "";
@@ -37,7 +37,7 @@ export function renderSelftestView({ appEl, results, setView }) {
   `;
 
   document.getElementById("backBtn")?.addEventListener("click", () => {
-    setView({ name: "list" });
+    setView({ name: "list", selectedId: null, q: state?.q || "" });
   });
 }
 
