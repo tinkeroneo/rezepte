@@ -115,9 +115,15 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
 
 
   const refreshHint = () => {
-    hintEl.textContent = parseError
-      ? `${parsedItems.length} Eintraege erkannt - ${parseError}`
-      : `${parsedItems.length} Eintraege erkannt`;
+    if (parseError) {
+      hintEl.textContent = `Ungueltiges JSON: ${parseError}`;
+      hintEl.style.color = "var(--danger, #b13737)";
+      hintEl.style.fontWeight = "700";
+    } else {
+      hintEl.textContent = `${parsedItems.length} Eintraege erkannt`;
+      hintEl.style.color = "";
+      hintEl.style.fontWeight = "";
+    }
     doBtn.disabled = parsedItems.length === 0;
   };
 
