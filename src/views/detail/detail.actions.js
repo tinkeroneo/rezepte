@@ -2,6 +2,7 @@
 import { qs } from "../../utils.js";
 import { ack } from "../../ui/feedback.js";
 import { buildMenuIngredients, isMenuRecipe } from "../../domain/menu.js";
+import { showError } from "../../services/errors.js";
 
 function cookLinkFor(recipeId) {
   // konsistent zum Router
@@ -85,7 +86,7 @@ export function bindDetailActions({
         if (ok) ack(shareLinkBtn);
         else prompt("Share-Link:", url);
       } catch (e) {
-        alert(`Teilen fehlgeschlagen: ${e?.message || e}`);
+        showError(`Teilen fehlgeschlagen: ${e?.message || e}`);
       }
 
     });

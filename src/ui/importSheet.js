@@ -154,7 +154,6 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
       console.error(e);
       reportError(e, { scope: "importSheet", action: "parse" });
       showError("Import fehlgeschlagen");
-      alert("Import fehlgeschlagen");
       doBtn.disabled = false;
       doBtn.textContent = "Import starten";
     }

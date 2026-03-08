@@ -486,7 +486,7 @@ async function render(view, setView) {
       appEl,
       invites: inv,
       onAccept: async (inviteId) => {
-        try { await acceptInvite(inviteId); } catch (e) { alert(String(e?.message || e)); }
+        try { await acceptInvite(inviteId); } catch (e) { showError(String(e?.message || e)); }
         try {
           const ctx = await initAuthAndSpace();
           try { await ensureProfileLoaded({ getProfile, upsertProfile, isAuthenticated }); } catch (e) {
@@ -524,7 +524,6 @@ async function render(view, setView) {
         try { await declineInvite(inviteId); } catch (e) {
           reportError(e, { scope: "app.js", action: String(e?.message) });
           showError(String(e?.message));
-          alert(String(e?.message || e));
         }
         try {
           const ctx = await initAuthAndSpace();

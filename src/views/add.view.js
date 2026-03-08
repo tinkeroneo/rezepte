@@ -8,6 +8,7 @@ import { createDirtyTracker } from "../ui/dirtyTracker.js";
 import { createImagePicker } from "../ui/imagePicker.js";
 
 import { withLoader } from "../ui/loader.js";
+import { showError } from "../services/errors.js";
 
 
 function normalizeRecipe(existing) {
@@ -249,9 +250,9 @@ export function renderAddView({
     ingredientsEl.value = normalized.lines.join("\n");
     ingredientsEl.dispatchEvent(new window.Event("input"));
     if (normalized.changedCount > 0) {
-      alert(`${normalized.changedCount} Zeile(n) vereinheitlicht.`);
+      statusEl.textContent = `${normalized.changedCount} Zeile(n) vereinheitlicht.`;
     } else {
-      alert("Keine passenden Einheiten zum Vereinheitlichen gefunden.");
+      statusEl.textContent = "Keine passenden Einheiten zum Vereinheitlichen gefunden.";
     }
   });
 
@@ -265,7 +266,10 @@ export function renderAddView({
   // --- Save
   qs(appEl, "#saveBtn")?.addEventListener("click", async () => {
     const title = (titleEl?.value || "").trim();
-    if (!title) return alert("Bitte einen Titel angeben.");
+    if (!title) {
+      showError("Bitte einen Titel angeben.");
+      return;
+    }
 
     const category = (categoryEl?.value || "").trim();
     const time = (timeEl?.value || "").trim();
@@ -297,7 +301,7 @@ export function renderAddView({
         img.setStatus("Upload fertig.");
       } catch (e) {
         img.setStatus("");
-        alert(`Bild-Upload fehlgeschlagen.\nFehler: ${e?.message ?? e}`);
+        showError(`Bild-Upload fehlgeschlagen. Fehler: ${e?.message ?? e}`);
         return;
       }
     }
@@ -359,7 +363,7 @@ export function renderAddView({
       setView({ name: "detail", selectedId: updated.id, q: state.q }, { push: false });
     } catch (e) {
       // Stay on page, keep dirty state so user can retry
-      alert(`Konnte nicht zum Backend speichern.\nFehler: ${e?.message ?? e}`);
+      showError(`Konnte nicht speichern. Fehler: ${e?.message ?? e}`);
     } finally {
       if (saveBtn) {
         saveBtn.disabled = false;

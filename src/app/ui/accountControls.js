@@ -123,7 +123,6 @@ export function wireAccountControls(ctx) {
       } catch (e) {
         reportError?.(e, { scope: "accountControls", action: String(e?.message || e) });
         showError?.(String(e?.message || e));
-        alert(String(e?.message || e));
       }
     });
   }
@@ -147,7 +146,6 @@ export function wireAccountControls(ctx) {
         reportError?.(e, { scope: "accountControls", action: String(e?.message || e) });
         showError?.(String(e?.message || e));
         updateHeaderBadges?.({ syncing: false });
-        alert(`Default-Space speichern fehlgeschlagen: ${String(e?.message || e)}`);
       }
     });
   }
@@ -158,7 +156,7 @@ export function wireAccountControls(ctx) {
     saveProfileBtn.__installed = true;
     saveProfileBtn.addEventListener("click", async () => {
       if (!(getUseBackend() && isAuthenticated?.())) {
-        alert("Nicht eingeloggt oder Backend aus (useBackend=false).");
+        showError?.("Nicht eingeloggt oder Backend aus (useBackend=false).");
         return;
       }
       const dn = document.getElementById("profileDisplayName");
@@ -171,7 +169,6 @@ export function wireAccountControls(ctx) {
       } catch (e) {
         reportError?.(e, { scope: "accountControls", action: "saveProfile" });
         showError?.(String(e?.message || e));
-        alert(`Profil speichern fehlgeschlagen: ${String(e?.message || e)}`);
       }
     });
   }
@@ -182,7 +179,7 @@ export function wireAccountControls(ctx) {
     saveSpaceNameBtn.__installed = true;
     saveSpaceNameBtn.addEventListener("click", async () => {
       if (!(getUseBackend() && isAuthenticated?.())) {
-        alert("Nicht eingeloggt oder Backend aus (useBackend=false).");
+        showError?.("Nicht eingeloggt oder Backend aus (useBackend=false).");
         return;
       }
       const ctxAuth = (() => { try { return getAuthContext?.(); } catch { return null; } })();
@@ -194,11 +191,9 @@ export function wireAccountControls(ctx) {
         await updateSpaceName?.({ spaceId: sid, name });
         await refreshSpaceSelect?.();
         await refreshProfileUi?.();
-        alert("Space-Name gespeichert ✅");
       } catch (e) {
         reportError?.(e, { scope: "accountControls", action: "saveSpaceName" });
         showError?.(String(e?.message || e));
-        alert(`Space-Name speichern fehlgeschlagen: ${String(e?.message || e)}`);
       }
     });
   }

@@ -1,6 +1,7 @@
 // src/views/detail/detail.spaceCopy.js
 import { escapeHtml, qs } from "../../utils.js";
 import { ack } from "../../ui/feedback.js";
+import { showError } from "../../services/errors.js";
 
 const SHEET_BACKDROP_ID = "copySpaceBackdrop";
 const SHEET_ID = "copySpaceSheet";
@@ -34,7 +35,7 @@ function openCopySheet({
 
   const options = buildOptions(mySpaces, currentSid);
   if (!options) {
-    alert("Kein anderer Space verfügbar.");
+    showError("Kein anderer Space verfügbar.");
     return;
   }
 
@@ -95,7 +96,7 @@ qs(sheet, "#doCopyBtn")?.addEventListener("click", async () => {
   const includeParts = !!cb?.checked;
 
   if (!targetSid) {
-    alert("Bitte einen Ziel-Space auswählen.");
+    showError("Bitte einen Ziel-Space auswählen.");
     return;
   }
 
@@ -106,8 +107,7 @@ qs(sheet, "#doCopyBtn")?.addEventListener("click", async () => {
     await onConfirm?.({ targetSid, includeParts });
     close();
   } catch (e) {
-    // ⬅️ DAS ist neu
-    alert(e?.message ?? String(e));
+    showError(e?.message ?? String(e));
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -178,11 +178,11 @@ export function bindCopyToSpace({
 
       onConfirm: async ({ targetSid, includeParts }) => {
         if (!targetSid) {
-          alert("Ungültiger Ziel-Space.");
+          showError("Ungültiger Ziel-Space.");
           return;
         }
         if (!isWritableSpace(targetSid)) {
-          alert("In diesen Space kannst du nicht schreiben (View/Read-only).");
+          showError("In diesen Space kannst du nicht schreiben (View/Read-only).");
           return;
         }
 
