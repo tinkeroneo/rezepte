@@ -51,18 +51,10 @@ import { addToShopping } from "../domain/shopping.js";
 
 import { renderListView } from "../views/list.view.js";
 import { renderDetailView } from "../views/detail.view.js";
-import { renderCookView } from "../views/cook.view.js";
-import { renderAddView } from "../views/add.view.js";
-import { renderShoppingView } from "../views/shopping.view.js";
-import { renderVegan101View } from "../views/vegan101.view.js";
-import { renderAdminView } from "../views/admin.view.js";
-import { renderSelftestView } from "../views/selftest.view.js";
-import { renderDiagnosticsView } from "../views/diagnostics.view.js";
 import { renderTimersOverlay } from "../views/timers.view.js";
 import { renderLoginView } from "../views/login.view.js";
 import { renderConfirmView } from "../views/confirm.view.js";
 import { renderShareView } from "../views/share.view.js";
-import { renderAccountView } from "../views/account.view.js";
 import { setOfflineQueueScope, getOfflineQueue, getPendingRecipeIds, compactOfflineQueue, dequeueOfflineAction } from "../domain/offlineQueue.js";
 
 import { initRadioDock } from "../ui/radioDock.js";
@@ -111,6 +103,8 @@ import { createReloadAllAndRender, wireOnlineOfflineHandlers } from "./lifecycle
 import { installSettingsBridge } from "./settingsBridge.js";
 import { createOfflineQueueDrainer } from "./offlineSync.js";
 import { createLoadAll, createPartsStore } from "./dataLoader.js";
+import { renderAuxRoute } from "./renderAuxRoutes.js";
+import { renderEditorRoute } from "./renderEditorRoutes.js";
 import {
 
 
@@ -423,84 +417,6 @@ async function render(view, setView) {
   // Global overlay always (except login)
   renderTimersOverlay({ appEl, state: view, setView });
 
-  if (view.name === "selftest") {
-    const results = [];
-
-    try {
-      const k = "__selftest__" + Math.random().toString(16).slice(2);
-      localStorage.setItem(k, "1");
-      const v = localStorage.getItem(k);
-      localStorage.removeItem(k);
-      results.push({ name: "LocalStorage read/write", ok: v === "1" });
-    } catch (e) {
-      reportError(e, { scope: "app.js", action: String(e?.message) });
-      showError(String(e?.message));
-      results.push({ name: "LocalStorage read/write", ok: false, detail: String(e?.message || e) });
-    }
-
-    if (useBackend) {
-      try {
-        await listRecipes();
-        results.push({ name: "Backend erreichbar (listRecipes)", ok: true });
-      } catch (e) {
-        reportError(e, { scope: "app.js", action: String(e?.message) });
-        showError(String(e?.message));
-        results.push({ name: "Backend erreichbar (listRecipes)", ok: false, detail: String(e?.message || e) });
-      }
-    } else {
-      results.push({ name: "Backend erreichbar (übersprungen)", ok: true, detail: "useBackend=false" });
-    }
-
-    results.push({ name: "Import-Funktion geladen", ok: typeof importRecipesIntoApp === "function" });
-
-    return renderSelftestView({ appEl, state: view, results, setView });
-  }
-
-  if (view.name === "diagnostics") {
-    let storageOk = true;
-    try {
-      const k = "__diag__" + Math.random().toString(16).slice(2);
-      localStorage.setItem(k, "1");
-      const v = localStorage.getItem(k);
-      localStorage.removeItem(k);
-      storageOk = v === "1";
-    } catch {
-      storageOk = false;
-    }
-
-    let backendOk = true;
-    let backendMs = null;
-
-    if (useBackend) {
-      const t0 = performance.now();
-      try {
-        await listRecipes();
-        backendMs = Math.round(performance.now() - t0);
-      } catch {
-        backendOk = false;
-        backendMs = Math.round(performance.now() - t0);
-      }
-    }
-
-    const info = {
-      useBackend,
-      storageOk,
-      backendOk: useBackend ? backendOk : true,
-      backendMs,
-      importOk: typeof importRecipesIntoApp === "function",
-      queueLen: (getOfflineQueue?.() || []).length,
-      onRetrySync: () => drainOfflineQueue({ reason: "diagnostics" }),
-      recentErrors: getRecentErrors(),
-      storedErrors: getStoredErrors?.() || [],
-      magicLinkDiag: getLastMagicLinkDiag?.() || null,
-      onClearErrors: () => clearRecentErrors(),
-      onClearStoredErrors: () => clearStoredErrors?.(),
-    };
-
-    return renderDiagnosticsView({ appEl, state: view, info, setView });
-  }
-
-
   const onImportRecipesHandler = async ({ items, mode, targetSpaceId }) =>
     runExclusive("importRecipes", async () => {
       // optional: import into selected space (backend only)
@@ -530,48 +446,64 @@ async function render(view, setView) {
       await loadAll();
     });
 
-
-  if (view.name === "account") {
-    renderAccountView({ appEl, state: view, setView });
-    await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated });
-    await refreshProfileUi({ getAuthContext, getProfile, upsertProfile, isAuthenticated });
-    wireAccountControls({
-      readTheme,
-      setTheme,
-      applyThemeAndOverlay,
-      isAuthenticated,
-      sbLogout,
-      setUseBackend,
-      getUseBackend: () => useBackend,
-      router,
-      setActiveSpaceId,
-      getAuthContext,
-      getMySpaces: () => appState.mySpaces,
-      inviteToSpace,
-      listPendingInvites,
-      listSpaceMembers,
-      revokeInvite,
-      setOfflineQueueScope,
-      updateHeaderBadges,
-      runExclusive,
-      loadAll,
-      reportError,
-      showError,
-      upsertProfile,
-      getProfileCache,
-      setProfileCache,
-
+  const handledAuxRoute = await renderAuxRoute({
+    view,
+    appEl,
+    setView,
+    useBackend,
+    listRecipes,
+    importRecipesIntoApp,
+    getOfflineQueue,
+    drainOfflineQueue,
+    getRecentErrors,
+    getStoredErrors,
+    getLastMagicLinkDiag,
+    clearRecentErrors,
+    clearStoredErrors,
+    renderAccountCtx: {
       refreshSpaceSelect: () => refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }),
       refreshProfileUi: () => refreshProfileUi({ getAuthContext, getProfile, upsertProfile, isAuthenticated }),
-      updateSpaceName,
-      installAdminCorner,
-
-      onImportRecipes: onImportRecipesHandler,
-      getExportData: () => ({ recipes, partsByParent: partsStore.getPartsByParent() }),
-    });
-
-    return;
-  }
+      wireAccountControls: () =>
+        wireAccountControls({
+          readTheme,
+          setTheme,
+          applyThemeAndOverlay,
+          isAuthenticated,
+          sbLogout,
+          setUseBackend,
+          getUseBackend: () => useBackend,
+          router,
+          setActiveSpaceId,
+          getAuthContext,
+          getMySpaces: () => appState.mySpaces,
+          inviteToSpace,
+          listPendingInvites,
+          listSpaceMembers,
+          revokeInvite,
+          setOfflineQueueScope,
+          updateHeaderBadges,
+          runExclusive,
+          loadAll,
+          reportError,
+          showError,
+          upsertProfile,
+          getProfileCache,
+          setProfileCache,
+          refreshSpaceSelect: () => refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }),
+          refreshProfileUi: () => refreshProfileUi({ getAuthContext, getProfile, upsertProfile, isAuthenticated }),
+          updateSpaceName,
+          installAdminCorner,
+          onImportRecipes: onImportRecipesHandler,
+          getExportData: () => ({ recipes, partsByParent: partsStore.getPartsByParent() }),
+        }),
+      reportError,
+      showError,
+    },
+    renderAdminCtx: { canWrite, appEl, recipes, setView },
+    renderVegan101Ctx: { canWrite, appEl, setView },
+    renderShoppingCtx: { appEl, state: view, setView },
+  });
+  if (handledAuxRoute) return;
 
 
   if (view.name === "list") {
@@ -624,63 +556,32 @@ async function render(view, setView) {
     });
   }
 
-  if (view.name === "cook") {
-    return renderCookView({
-      canWrite, appEl, state: view, recipes, partsByParent: partsStore.getPartsByParent(), setView, setViewCleanup, setDirtyGuard
-    });
-  }
-
-  if (view.name === "add") {
-    const existing = view.selectedId ? recipes.find(r => r.id === view.selectedId) : null;
-    const addCanWrite = canWriteForSpace(existing?.space_id || activeSpaceId);
-
-    return renderAddView({
-      appEl,
-      state: view,
-      recipes,
-      activeSpaceId,
-      setView,
-      useBackend,
-      canWrite: addCanWrite,
-      setDirtyGuard,
-      setDirtyIndicator,
-      setViewCleanup,
-      mySpaces: appState.mySpaces,
-      moveRecipeToSpace,
-      upsertProfile,
-      listRecipes,
-      refreshSpaceSelect: () => refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }),
-      upsertSpaceLast: async (sid) => {
-        try {
-          await listRecipes();
-          await upsertProfile({ last_space_id: sid });
-        } catch (e) {
-          reportError(e, { scope: "app.js", action: String(e?.message) });
-          showError(String(e?.message));
-        }
-      },
-      upsertRecipe: async (rec) => {
-        const key = `upsert:${rec.id || "new"}`;
-        return runExclusive(key, async () => {
-          await recipeRepo.upsert(rec, { refresh: useBackend });
-          await runExclusive("loadAll", () => loadAll());
-        });
-      },
-      uploadRecipeImage,
-    });
-  }
-
-  if (view.name === "admin") {
-    return renderAdminView({ canWrite, appEl, recipes, setView });
-  }
-
-  if (view.name === "vegan101") {
-    return renderVegan101View({ canWrite, appEl, setView });
-  }
-
-  if (view.name === "shopping") {
-    return renderShoppingView({ appEl, state: view, setView });
-  }
+  const handledEditorRoute = renderEditorRoute({
+    view,
+    appEl,
+    recipes,
+    partsByParent: partsStore.getPartsByParent(),
+    activeSpaceId,
+    setView,
+    useBackend,
+    canWrite,
+    canWriteForSpace,
+    setDirtyGuard,
+    setDirtyIndicator,
+    setViewCleanup,
+    mySpaces: appState.mySpaces,
+    moveRecipeToSpace,
+    upsertProfile,
+    listRecipes,
+    refreshSpaceSelect: () => refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }),
+    reportError,
+    showError,
+    recipeRepo,
+    runExclusive,
+    loadAll,
+    uploadRecipeImage,
+  });
+  if (handledEditorRoute) return handledEditorRoute;
 
   setView({ name: "list", selectedId: null, q: view.q });
 }
