@@ -1,4 +1,3 @@
-import { renderSelftestView } from "../views/selftest.view.js";
 import { renderDiagnosticsView } from "../views/diagnostics.view.js";
 import { renderAccountView } from "../views/account.view.js";
 import { renderAdminView } from "../views/admin.view.js";
@@ -53,7 +52,26 @@ export async function renderAuxRoute({
     }
 
     results.push({ name: "Import-Funktion geladen", ok: typeof importRecipesIntoApp === "function" });
-    renderSelftestView({ appEl, state: view, results, setView });
+    renderDiagnosticsView({
+      appEl,
+      state: view,
+      info: {
+        useBackend,
+        storageOk: true,
+        backendOk: true,
+        backendMs: null,
+        importOk: typeof importRecipesIntoApp === "function",
+        queueLen: (getOfflineQueue?.() || []).length,
+        onRetrySync: () => drainOfflineQueue({ reason: "selftest" }),
+        recentErrors: getRecentErrors(),
+        storedErrors: getStoredErrors?.() || [],
+        magicLinkDiag: getLastMagicLinkDiag?.() || null,
+        onClearErrors: () => clearRecentErrors(),
+        onClearStoredErrors: () => clearStoredErrors?.(),
+      },
+      setView,
+      selftestResults: results,
+    });
     return true;
   }
 
@@ -98,7 +116,7 @@ export async function renderAuxRoute({
       onClearStoredErrors: () => clearStoredErrors?.(),
     };
 
-    renderDiagnosticsView({ appEl, state: view, info, setView });
+    renderDiagnosticsView({ appEl, state: view, info, setView, selftestResults: [] });
     return true;
   }
 
