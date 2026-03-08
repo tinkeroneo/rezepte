@@ -12,13 +12,13 @@ export function exportRecipesToPdfViaPrint({
 }) {
   const html = buildPrintHtml({ recipes, partsByParent, allRecipes, includeImages, title });
   if (!html || html.trim().length < 50) {
-    showError("PDF Export: keine Inhalte (0 Rezepte ausgewählt?)");
+    showError("PDF Export: keine Inhalte (0 Rezepte ausgewaehlt?)");
     return;
   }
 
   const w = window.open("", "_blank");
   if (!w) {
-    showError("Pop-up blockiert? Bitte Pop-ups für diese Seite erlauben.");
+    showError("Pop-up blockiert? Bitte Pop-ups fuer diese Seite erlauben.");
     return;
   }
 
@@ -33,7 +33,7 @@ export function exportRecipesToPdfViaPrint({
   // warten bis Bilder geladen sind, dann drucken
   const imgs = Array.from(w.document.images || []);
   if (!imgs.length) {
-    showSuccess("PDF-Ansicht ge?ffnet.");
+    showSuccess("PDF-Ansicht geoeffnet.");
     w.focus();
     w.print();
     return;
@@ -43,7 +43,7 @@ export function exportRecipesToPdfViaPrint({
   const finish = () => {
     done++;
     if (done >= imgs.length) {
-      showSuccess("PDF-Ansicht ge?ffnet.");
+      showSuccess("PDF-Ansicht geoeffnet.");
       w.focus();
       w.print();
     }
