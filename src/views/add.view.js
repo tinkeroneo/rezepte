@@ -8,7 +8,7 @@ import { createDirtyTracker } from "../ui/dirtyTracker.js";
 import { createImagePicker } from "../ui/imagePicker.js";
 
 import { withLoader } from "../ui/loader.js";
-import { showError } from "../services/errors.js";
+import { showError, showSuccess } from "../services/errors.js";
 
 
 function normalizeRecipe(existing) {
@@ -260,6 +260,7 @@ export function renderAddView({
   qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
     if (!confirm("Rezept wirklich löschen?")) return;
     await sbDelete?.(r.id).catch(() => { });
+    showSuccess("Rezept gel?scht.");
     setView({ name: "list", selectedId: null, q: state.q });
   });
 
@@ -352,6 +353,7 @@ export function renderAddView({
 
       dirty.clearDirty();
       img.cleanup();
+      showSuccess(isEdit ? "Rezept gespeichert." : "Rezept angelegt.");
 
       if (isEdit) {
         // Edit-View aus History entfernen
