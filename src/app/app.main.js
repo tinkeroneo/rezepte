@@ -109,6 +109,7 @@ import { refreshSpaceSelect, getActiveSpaceRole } from "./spaces/spaces.js";
 import { renderInvitesRoute } from "./invitesRoute.js";
 import { createReloadAllAndRender, wireOnlineOfflineHandlers } from "./lifecycle.js";
 import { installSettingsBridge } from "./settingsBridge.js";
+import { createOfflineQueueDrainer } from "./offlineSync.js";
 import {
 
 
@@ -232,46 +233,18 @@ const updateHeaderBadges = createHeaderBadgesUpdater({
   getMySpaces: () => appState.mySpaces,
 });
 
-async function drainOfflineQueue({ reason = "auto" } = {}) {
-  // Only relevant when backend is enabled + online + authenticated
-  if (!useBackend) return { ok: true, skipped: "useBackendOff" };
-  if (navigator.onLine === false) return { ok: true, skipped: "offline" };
-  if (!isAuthenticated?.()) return { ok: true, skipped: "notAuthed" };
-
-  // Compact queue first to avoid duplicate upserts.
-  compactOfflineQueue();
-  const q = getOfflineQueue() || [];
-  if (q.length === 0) return { ok: true, skipped: "empty" };
-
-  updateHeaderBadges({ syncing: true, syncError: false });
-  let anyError = false;
-
-  for (const a of q) {
-    try {
-      if (a.kind === "recipe_upsert" && a.recipe?.id) {
-
-        await withLoader("Speichere…", async () => {
-          await upsertRecipe(a.recipe);
-        });
-
-        dequeueOfflineAction(a.id);
-      } else if (a.kind === "recipe_delete" && a.recipeId) {
-        await deleteRecipe(a.recipeId);
-        dequeueOfflineAction(a.id);
-      } else {
-        // Unknown action -> keep (avoid data loss)
-      }
-    } catch (e) {
-      anyError = true;
-      reportError(e, { scope: "offlineSync", action: a?.kind || "unknown", reason });
-      // Stop early; backend might be down; keep remaining actions.
-      break;
-    }
-  }
-
-  updateHeaderBadges({ syncing: false, syncError: anyError });
-  return { ok: !anyError };
-}
+const drainOfflineQueue = createOfflineQueueDrainer({
+  getUseBackend: () => useBackend,
+  isAuthenticated,
+  compactOfflineQueue,
+  getOfflineQueue,
+  dequeueOfflineAction,
+  updateHeaderBadges,
+  withLoader,
+  upsertRecipe,
+  deleteRecipe,
+  reportError,
+});
 
 /* =========================
    DATA STATE
