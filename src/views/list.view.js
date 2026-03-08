@@ -5,7 +5,7 @@ import { KEYS, lsSet } from "../storage.js";
 import { toggleFavorite } from "../domain/favorites.js";
 import { getTagColors } from "../domain/tagColors.js";
 import { getColorForCategory } from "../domain/categories.js";
-import { getPendingRecipeIds } from "../domain/offlineQueue.js";
+import { getPendingRecipeIds, getOfflineQueue } from "../domain/offlineQueue.js";
 
 import { applyListQuery, defaultDirFor } from "../domain/listQuery.js";
 
@@ -41,9 +41,11 @@ export function renderListView({
   mySpaces,
   activeSpaceId,
   useBackend, // currently unused here, kept for signature compatibility
-  onImportRecipes
+  onImportRecipes,
+  onSyncNow
 }) {
   const __pendingIds = getPendingRecipeIds();
+  const pendingQueueLen = (getOfflineQueue?.() || []).length;
   const canWriteFlag = !!canWrite;
 
   const tagColors = getTagColors();
@@ -86,6 +88,7 @@ export function renderListView({
 
   // Elements
   const qEl = qs(appEl, "#q");
+  const syncNowBtn = qs(appEl, "#syncNowBtn");
   const resultsEl = qs(appEl, "#results");
   const countEl = qs(appEl, "#count");
 
@@ -282,6 +285,22 @@ onModeChanged: (m) => {
 
   // Initial render
   renderResults();
+
+  if (syncNowBtn) {
+    const canSyncNow = typeof onSyncNow === "function" && pendingQueueLen > 0;
+    syncNowBtn.style.display = canSyncNow ? "" : "none";
+    if (canSyncNow) {
+      syncNowBtn.textContent = `⟳ Jetzt syncen (${pendingQueueLen})`;
+      syncNowBtn.addEventListener("click", async () => {
+        try {
+          syncNowBtn.disabled = true;
+          await onSyncNow();
+        } finally {
+          setView({ name: "list", selectedId: null, q: getUi().q ?? (qEl?.value ?? "") }, { push: false });
+        }
+      });
+    }
+  }
 
   // FAB menu (modular)
   initFabMenu({

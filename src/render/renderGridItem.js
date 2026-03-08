@@ -19,7 +19,7 @@ export function renderGridItem(r, ctx) {
         <button class="fav-overlay ${isFavorite(r.id) ? "is-fav" : ""}" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button" aria-pressed="${isFavorite(r.id) ? "true" : "false"}">★</button>
 
         ${isPending
-          ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">?</span>`
+          ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">&#9888;</span>`
           : ""
         }
       </div>

@@ -43,7 +43,7 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
         ${r.time ? `<div class="muted">${escapeHtml(r.time)}</div>` : ""}
         ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
         <div class="muted" style="margin-top:.35rem;">
-          Sync-Status: ${isPending ? "? Ausstehend (lokal geaendert)" : "? Synchron"}
+          Sync-Status: ${isPending ? "&#9888; Ausstehend (lokal geaendert)" : "&#9989; Synchron"}
         </div>
       </div>
     </section>

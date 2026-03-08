@@ -44,6 +44,7 @@ export function renderListShell({ q = "" } = {}) {
 
             <div class="row" style="justify-content:space-between; gap:.5rem; align-items:center;">
               <input id="q" type="search" placeholder="Suche… (z.B. Bohnen, scharf, Frühstück)" value="${escapeHtml(q)}" />
+              <button class="btn btn--ghost" id="syncNowBtn" type="button" style="display:none;">&#10227; Jetzt syncen</button>
             </div>
             
               <div id="activeFilters" class="row" style="gap:.5rem; flex-wrap:wrap; margin-top:.5rem;"></div>

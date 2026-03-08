@@ -500,6 +500,7 @@ async function render(view, setView) {
       mySpaces: appState.mySpaces,
       activeSpaceId,
       onImportRecipes: onImportRecipesHandler,
+      onSyncNow: () => drainOfflineQueue({ reason: "listManual" }),
     });
   }
 
