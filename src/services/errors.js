@@ -88,46 +88,61 @@ export function clearStoredErrors() {
  * - Best-effort backend log (rate-limited)
  */
 export function reportError(err, meta = {}, opts = {}) {
-  const { showBanner = false } = opts || {};
+  const { showBanner: shouldShowBanner = false } = opts || {};
   remember(err, meta);
 
   const payload = buildLogEntry(err, meta);
   persistLocal(payload);
   sendToBackend(payload);
 
-  if (showBanner) showError(err, meta);
+  if (shouldShowBanner) showError(err, meta);
 }
 
 export function showError(err, meta = {}) {
+  return showBanner("error", err, meta);
+}
+
+export function showInfo(message, meta = {}) {
+  return showBanner("info", message, meta);
+}
+
+export function showSuccess(message, meta = {}) {
+  return showBanner("success", message, meta);
+}
+
+function showBanner(type, err, meta = {}) {
   remember(err, meta);
 
-  const entry = buildLogEntry(err, meta);
+  const entry = buildLogEntry(err, meta, type);
   persistLocal(entry);
-  sendToBackend(entry);
+  if (type === "error") sendToBackend(entry);
 
   const msg = entry.message;
+  const title = type === "success" ? "Erfolg" : type === "info" ? "Hinweis" : "Fehler";
 
-  let el = document.getElementById("globalErrorBanner");
+  let el = document.getElementById("globalFeedbackBanner");
   if (!el) {
     el = document.createElement("div");
-    el.id = "globalErrorBanner";
-    el.innerHTML = `
-      <div class="geb-inner">
-        <div class="geb-title">Fehler</div>
-        <div class="geb-msg" id="globalErrorBannerMsg"></div>
-        <button class="btn btn-ghost geb-close" id="globalErrorBannerClose" aria-label="Close">×</button>
-      </div>
-    `;
+    el.id = "globalFeedbackBanner";
+    el.innerHTML =             `<div class="geb-inner">
+        <div class="geb-title" id="globalFeedbackBannerTitle"></div>
+        <div class="geb-msg" id="globalFeedbackBannerMsg"></div>
+        <button class="btn btn-ghost geb-close" id="globalFeedbackBannerClose" aria-label="Close">×</button>
+      </div>`;
     document.body.appendChild(el);
 
-    const closeBtn = el.querySelector("#globalErrorBannerClose");
+    const closeBtn = el.querySelector("#globalFeedbackBannerClose");
     closeBtn?.addEventListener("click", () => {
       el.remove();
     });
   }
 
-  const msgEl = el.querySelector("#globalErrorBannerMsg");
+  el.dataset.kind = type;
+  const titleEl = el.querySelector("#globalFeedbackBannerTitle");
+  const msgEl = el.querySelector("#globalFeedbackBannerMsg");
+  if (titleEl) titleEl.textContent = title;
   if (msgEl) msgEl.textContent = msg;
+  return el;
 }
 
 function normalizeErr(e) {
@@ -152,12 +167,12 @@ function safeMeta(meta) {
   }
 }
 
-function buildLogEntry(err, meta = {}) {
+function buildLogEntry(err, meta = {}, type = "error") {
   const msg = normalizeErr(err);
   const m = safeMeta(meta);
   const metaStr = Object.keys(m).length ? ` | meta=${JSON.stringify(m)}` : "";
   return {
-    type: "error",
+    type,
     message: `${msg}${metaStr}`,
     stack: String(err?.stack || ""),
     href: String(location?.href || ""),
@@ -207,4 +222,3 @@ async function sendToBackend(entry) {
     // ignore
   }
 }
-

@@ -2,7 +2,7 @@
 import { qs } from "../../utils.js";
 import { ack } from "../../ui/feedback.js";
 import { buildMenuIngredients, isMenuRecipe } from "../../domain/menu.js";
-import { showError } from "../../services/errors.js";
+import { showError, showSuccess } from "../../services/errors.js";
 
 function cookLinkFor(recipeId) {
   // konsistent zum Router
@@ -72,7 +72,10 @@ export function bindDetailActions({
           // fallback: copy normal link
           const url = cookLinkFor(recipe.id);
           const ok = await copyText(url);
-          if (ok) ack(shareLinkBtn);
+          if (ok) {
+            ack(shareLinkBtn);
+            showSuccess("Link kopiert.");
+          }
           else showError(`Link konnte nicht automatisch kopiert werden: ${url}`);
           return;
         }
@@ -83,7 +86,10 @@ export function bindDetailActions({
         
         const url = shareLinkFor(token);
         const ok = await copyText(url);
-        if (ok) ack(shareLinkBtn);
+        if (ok) {
+          ack(shareLinkBtn);
+          showSuccess("Share-Link kopiert.");
+        }
         else showError(`Share-Link konnte nicht automatisch kopiert werden: ${url}`);
       } catch (e) {
         showError(`Teilen fehlgeschlagen: ${e?.message || e}`);
@@ -104,6 +110,7 @@ export function bindDetailActions({
         const lines = collectShoppingLines({ recipe, recipes, partsByParent });
         addToShopping?.(lines);
         ack(shopBtn);
+        showSuccess("Zur Einkaufsliste hinzugefügt.");
       });
     }
   }
