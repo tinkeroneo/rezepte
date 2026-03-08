@@ -1,6 +1,7 @@
 // src/services/pdfExport.js
 import { escapeHtml } from "../utils.js";
 import { buildMenuIngredients, buildMenuStepSections, isMenuRecipe } from "../domain/menu.js";
+import { showError } from "./errors.js";
 
 export function exportRecipesToPdfViaPrint({
   recipes,
@@ -11,13 +12,13 @@ export function exportRecipesToPdfViaPrint({
 }) {
   const html = buildPrintHtml({ recipes, partsByParent, allRecipes, includeImages, title });
   if (!html || html.trim().length < 50) {
-    alert("PDF Export: keine Inhalte (0 Rezepte ausgewählt?)");
+    showError("PDF Export: keine Inhalte (0 Rezepte ausgewählt?)");
     return;
   }
 
   const w = window.open("", "_blank");
   if (!w) {
-    alert("Pop-up blockiert? Bitte Pop-ups für diese Seite erlauben.");
+    showError("Pop-up blockiert? Bitte Pop-ups für diese Seite erlauben.");
     return;
   }
 

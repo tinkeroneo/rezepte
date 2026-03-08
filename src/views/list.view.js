@@ -133,11 +133,9 @@ let ui = {
     ui = { ...ui, ...(next || {}) };
   };
 
-  // Render results (uses toolbar state + current viewMode)
-  function renderResults() {
+  function getFilteredRecipes() {
     const u = getUi();
-
-    const filtered = applyListQuery({
+    return applyListQuery({
       recipes,
       query: u.q ?? (qEl?.value ?? ""),
       cats: u.cats,
@@ -149,6 +147,12 @@ let ui = {
       pendingOnly: !!u.pendingOnly,
       pendingIds: __pendingIds
     });
+  }
+
+  // Render results (uses toolbar state + current viewMode)
+  function renderResults() {
+    const u = getUi();
+    const filtered = getFilteredRecipes();
 
     if (countEl) countEl.textContent = `${filtered.length} von ${recipes.length}`;
 
@@ -287,7 +291,7 @@ onModeChanged: (m) => {
     onImport: () => openImportSheet({ onImportRecipes, spaces: mySpaces, activeSpaceId }),
     onExport: () =>
       openExportSheet({
-        list: recipes,
+        list: getFilteredRecipes(),
         partsByParent,
         spaceName: activeSpaceName
       })
