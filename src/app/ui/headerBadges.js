@@ -14,7 +14,7 @@ export function createHeaderBadgesUpdater(ctx) {
 
     const mode = document.getElementById("modeBadge");
     if (mode) {
-      mode.textContent = useBackend ? "MODE CLOUD" : "MODE LOCAL";
+      mode.textContent = useBackend ? "☁️" : "🖥️";
       mode.classList.toggle("badge--ok", useBackend);
       mode.classList.toggle("badge--warn", !useBackend);
       mode.title = useBackend
