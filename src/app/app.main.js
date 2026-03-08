@@ -420,7 +420,7 @@ async function render(view, setView) {
       await importRecipesIntoApp({
         items,
         mode,
-        repo: appState.repo,
+        repo: recipeRepo,
         useBackend,
         spaceId: String(getAuthContext?.()?.spaceId || ""),
       });
