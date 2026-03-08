@@ -53,7 +53,7 @@ async function readServiceWorkerInfo() {
   }
 }
 
-export function renderDiagnosticsView({ appEl, state, info, setView, selftestResults = [] }) {
+export function renderDiagnoseView({ appEl, state, info, setView, selftestResults = [] }) {
   const errors = info?.recentErrors ?? [];
   const magic = info?.magicLinkDiag || null;
   const q = state?.q || "";
@@ -92,8 +92,8 @@ export function renderDiagnosticsView({ appEl, state, info, setView, selftestRes
         .selftest-detail { margin-top: .28rem; margin-left: 4.45rem; font-size: .94rem; }
       </style>
       <header class="topbar">
-        <div class="title">${inSelftest ? "Selftest" : "Diagnostics"}</div>
-        <button class="btn btn--ghost" type="button" id="refreshBtn">Refresh</button>
+        <div class="title">${inSelftest ? "Selftest" : "Diagnose"}</div>
+        <button class="btn btn--ghost" type="button" id="refreshBtn">Neu laden</button>
         <div class="spacer"></div>
         <button class="btn btn--ghost" type="button" id="backBtn">Zur Liste</button>
       </header>
@@ -101,7 +101,7 @@ export function renderDiagnosticsView({ appEl, state, info, setView, selftestRes
       <div class="container">
         <div class="card">
           <div class="row" style="gap:.5rem; margin-bottom:.75rem; flex-wrap:wrap;">
-            <button class="btn ${inSelftest ? "btn--ghost" : "btn--solid"}" type="button" id="tabDiagBtn">Diagnostics</button>
+            <button class="btn ${inSelftest ? "btn--ghost" : "btn--solid"}" type="button" id="tabDiagBtn">Diagnose</button>
             <button class="btn ${inSelftest ? "btn--solid" : "btn--ghost"}" type="button" id="tabSelftestBtn">Selftest</button>
           </div>
 
