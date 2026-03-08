@@ -5,7 +5,42 @@ import { splitStepsToCards } from "../domain/steps.js";
 import { recipeImageOrDefault } from "../utils.js";
 import { canReadRecipeAuthed } from "../supabase.js";
 
+function normalizeSharedPayload(data) {
+  if (!data || typeof data !== "object") return { recipe: null, parts: [] };
 
+  const payload =
+    data?.recipe || data?.parts
+      ? data
+      : (data?.result && typeof data.result === "object" ? data.result : data);
+
+  const recipe = payload?.recipe || payload?.data?.recipe || null;
+
+  let rawParts = payload?.parts || payload?.data?.parts || [];
+  if (typeof rawParts === "string") {
+    try {
+      rawParts = JSON.parse(rawParts);
+    } catch {
+      rawParts = [];
+    }
+  }
+  if (!Array.isArray(rawParts)) rawParts = [];
+
+  const parts = rawParts
+    .map((entry) => {
+      const recipePart =
+        entry?.recipe ||
+        entry?.child ||
+        entry?.child_recipe ||
+        entry?.part_recipe ||
+        null;
+
+      if (!recipePart?.id) return null;
+      return { ...entry, recipe: recipePart };
+    })
+    .filter(Boolean);
+
+  return { recipe, parts };
+}
 
 export async function renderShareView({
   appEl,
@@ -65,7 +100,7 @@ export async function renderShareView({
     return;
   }
 
-  const r = data?.recipe || null;
+  const { recipe: r, parts } = normalizeSharedPayload(data);
   if (isAuthenticated?.() && (await canReadRecipeAuthed(r.id))) {
   setView({ name: "detail", selectedId: r.id, q: state?.q || "" });
   return;
@@ -94,7 +129,6 @@ export async function renderShareView({
     })
     .join("");
 
-  const parts = Array.isArray(data?.parts) ? data.parts : [];
   const partsHtml = parts
     .map((p) => {
       const pr = p?.recipe || null;

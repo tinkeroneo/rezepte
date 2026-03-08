@@ -23,7 +23,7 @@ export function ensureCooklogPulledOnce({ recipeId, onPulled }) {
     .catch(() => {});
 }
 
-export function renderCooklogCardHtml({ recipeId, lastStr, avgLabel, avgCount }) {
+export function renderCooklogCardHtml({ recipeId, lastStr, avgLabel, avgCount, canWrite = true }) {
   const events = listCookEvents(recipeId).slice(0, 30);
   const cookLogKey = `tinkeroneo_cooklog_open_${recipeId}`;
   const cookLogOpen = (() => {
@@ -46,13 +46,13 @@ export function renderCooklogCardHtml({ recipeId, lastStr, avgLabel, avgCount })
                 aria-expanded="${cookLogOpen ? "true" : "false"}">
           ${cookLogOpen ? "▾" : "▸"} Verlauf (${events.length})
         </button>
-        <button class="btn btn--ghost" id="cookLogNowBtn" type="button" title="Heute gekocht">✅</button>
+        ${canWrite ? `<button class="btn btn--ghost" id="cookLogNowBtn" type="button" title="Heute gekocht">✅</button>` : ""}
       </div>
     </div>
   </div>
 
   <div class="card__bd">
-    <div class="row" id="cookStars" style="gap:.15rem; align-items:center;">
+    <div class="row" id="cookStars" style="gap:.15rem; align-items:center; ${canWrite ? "" : "display:none;"}">
       <div class="muted" style="margin-right:.35rem;">Bewertung:</div>
       ${[1,2,3,4,5].map(n => `
         <button type="button" class="btn btn--ghost" data-cook-rate="${n}"
@@ -73,7 +73,7 @@ export function renderCooklogCardHtml({ recipeId, lastStr, avgLabel, avgCount })
               </div>
               ${ev.note ? `<div class="muted" style="margin-top:.15rem;">${escapeHtml(ev.note)}</div>` : ""}
             </div>
-            <div class="row" style="gap:.25rem;">
+            <div class="row" style="gap:.25rem; ${canWrite ? "" : "display:none;"}">
               <button class="btn btn--ghost" type="button" data-ev-edit="${escapeHtml(ev.id)}" title="Bearbeiten">✎</button>
               <button class="btn btn--ghost" type="button" data-ev-del="${escapeHtml(ev.id)}" title="Löschen">🗑️</button>
             </div>
@@ -88,7 +88,7 @@ export function renderCooklogCardHtml({ recipeId, lastStr, avgLabel, avgCount })
   `;
 }
 
-export function bindCooklogCard({ appEl, recipeId, useBackend, onRefresh }) {
+export function bindCooklogCard({ appEl, recipeId, useBackend, onRefresh, canWrite = true }) {
   const cookLogKey = `tinkeroneo_cooklog_open_${recipeId}`;
 
   qs(appEl, "#cookLogToggle")?.addEventListener("click", () => {
@@ -109,69 +109,75 @@ export function bindCooklogCard({ appEl, recipeId, useBackend, onRefresh }) {
     }
   });
 
-  qs(appEl, "#cookLogNowBtn")?.addEventListener("click", async () => {
-    const ev = addCookEvent(recipeId, { at: Date.now(), rating: null, note: "" });
-    if (useBackend) {
-      try { await pushCookEventToBackend(recipeId, ev); } catch {  
-        // continue regardless of error 
-        }
-    }
-    onRefresh?.();
-  });
-
-  qsa(appEl, "[data-cook-rate]").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const rating = Number(btn.getAttribute("data-cook-rate")) || 0;
-
-      openCookRatingDialog({
-        rating,
-        onDone: async ({ rating: finalRating, note }) => {
-          const ev = addCookEvent(recipeId, { at: Date.now(), rating: finalRating, note: note || "" });
-          if (useBackend) {
-            try { await pushCookEventToBackend(recipeId, ev); } catch {
-               // continue regardless of error
-            }
-          }
-          onRefresh?.();
-        }
-      });
-    });
-  });
-
-  qsa(appEl, "[data-ev-del]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const id = btn.getAttribute("data-ev-del");
-      if (!id) return;
-      if (!confirm("Eintrag löschen?")) return;
-
-      const removed = deleteCookEvent(recipeId, id);
-      if (useBackend && removed) {
-        try { await removeCookEventFromBackend(id); } catch {
-           // continue regardless of error
+  if (canWrite) {
+    qs(appEl, "#cookLogNowBtn")?.addEventListener("click", async () => {
+      const ev = addCookEvent(recipeId, { at: Date.now(), rating: null, note: "" });
+      if (useBackend) {
+        try { await pushCookEventToBackend(recipeId, ev); } catch {
+          // continue regardless of error
         }
       }
       onRefresh?.();
     });
-  });
+  }
 
-  qsa(appEl, "[data-ev-edit]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-ev-edit");
-      if (!id) return;
+  if (canWrite) {
+    qsa(appEl, "[data-cook-rate]").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const rating = Number(btn.getAttribute("data-cook-rate")) || 0;
 
-      const ev = listCookEvents(recipeId).find(x => x.id === id);
-      if (!ev) return;
-
-      openEditCookEventDialog({
-        recipeId,
-        ev,
-        useBackend,
-        onDone: () => onRefresh?.()
+        openCookRatingDialog({
+          rating,
+          onDone: async ({ rating: finalRating, note }) => {
+            const ev = addCookEvent(recipeId, { at: Date.now(), rating: finalRating, note: note || "" });
+            if (useBackend) {
+              try { await pushCookEventToBackend(recipeId, ev); } catch {
+                // continue regardless of error
+              }
+            }
+            onRefresh?.();
+          }
+        });
       });
     });
-  });
+  }
+
+  if (canWrite) {
+    qsa(appEl, "[data-ev-del]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.getAttribute("data-ev-del");
+        if (!id) return;
+        if (!confirm("Eintrag löschen?")) return;
+
+        const removed = deleteCookEvent(recipeId, id);
+        if (useBackend && removed) {
+          try { await removeCookEventFromBackend(id); } catch {
+            // continue regardless of error
+          }
+        }
+        onRefresh?.();
+      });
+    });
+
+    qsa(appEl, "[data-ev-edit]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-ev-edit");
+        if (!id) return;
+
+        const ev = listCookEvents(recipeId).find(x => x.id === id);
+        if (!ev) return;
+
+        openEditCookEventDialog({
+          recipeId,
+          ev,
+          useBackend,
+          onDone: () => onRefresh?.()
+        });
+      });
+    });
+  }
 }
 
 // ----- dialogs -----

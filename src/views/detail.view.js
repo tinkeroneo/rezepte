@@ -93,7 +93,7 @@ export function renderDetailView({
       ${renderDetailImageHtml({ r })}
       ${renderIngredientsSectionHtml({ r, recipes, partsByParent })}
       ${renderStepsSectionHtml({ r, recipes, partsByParent })}
-      ${renderCooklogCardHtml({ recipeId: r.id, lastStr, avgLabel, avgCount })}
+      ${renderCooklogCardHtml({ recipeId: r.id, lastStr, avgLabel, avgCount, canWrite: writable })}
       ${renderChildrenSectionHtml({ parentId: r.id, children, canWrite: writable })}
       <div id="sheetRoot"></div>
     </div>
@@ -139,6 +139,7 @@ export function renderDetailView({
     appEl,
     recipeId: r.id,
     useBackend,
+    canWrite: writable,
     onRefresh: () => setView({ name: "detail", selectedId: r.id, q: state.q }, { push: false })
   });
 
