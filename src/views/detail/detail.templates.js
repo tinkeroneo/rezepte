@@ -4,6 +4,12 @@ import { splitStepsToCards } from "../../domain/steps.js";
 import { buildMenuIngredients, buildMenuStepSections } from "../../domain/menu.js";
 import { renderIngredientsHtml } from "../shared.ingredients.js";
 
+function formatStepCardTitle(title, index) {
+  const raw = String(title ?? "").trim();
+  if (/^\d+\.\s/.test(raw)) return raw;
+  return `${index + 1}. ${raw}`;
+}
+
 export function buildChildrenFromIndex({ recipeId, recipes, partsByParent }) {
   const childIds = partsByParent.get(recipeId) ?? [];
   return childIds.map(cid => recipes.find(x => x.id === cid)).filter(Boolean);
@@ -103,7 +109,7 @@ export function renderStepsSectionHtml({ r, recipes, partsByParent }) {
                   ${sec.cards
                     .map((c, i) => `
                       <div class="card" style="margin-top:.45rem;">
-                        <div style="font-weight:800;">${escapeHtml(`${i + 1}. ${c.title}`)}</div>
+                        <div style="font-weight:800;">${escapeHtml(formatStepCardTitle(c.title, i))}</div>
                         ${c.body.length ? `<div class="muted" style="margin-top:.35rem;">${escapeHtml(c.body.join(" "))}</div>` : ""}
                       </div>
                     `)
@@ -118,7 +124,7 @@ export function renderStepsSectionHtml({ r, recipes, partsByParent }) {
             ${splitStepsToCards(r.steps ?? [])
               .map((c, i) => `
                 <div class="card" style="margin-top:.6rem;">
-                  <div style="font-weight:800;">${escapeHtml(`${i + 1}. ${c.title}`)}</div>
+                  <div style="font-weight:800;">${escapeHtml(formatStepCardTitle(c.title, i))}</div>
                   ${c.body.length ? `<div class="muted" style="margin-top:.35rem;">${escapeHtml(c.body.join(" "))}</div>` : ""}
                 </div>
               `)

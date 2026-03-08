@@ -512,6 +512,11 @@ body.dark .btn-ghost{ background: rgba(210,179,123,0.10); }
   background: var(--panel);
   box-shadow: var(--shadow-1);
 }
+.steps-checklist > li.step-item-done{
+  padding-top: .75rem;
+  padding-bottom: .75rem;
+  opacity: .78;
+}
 .steps-checklist > li:last-child{ margin-bottom: 0; }
 
 /* List: Favorit rechts neben Bild, vor Titel */
