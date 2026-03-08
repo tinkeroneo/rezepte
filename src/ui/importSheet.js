@@ -108,10 +108,7 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
       if (Array.isArray(obj?.recipes)) return { items: obj.recipes, error: "" };
       if (obj && typeof obj === "object" && (obj.id || obj.title || obj.ingredients || obj.steps)) return { items: [obj], error: "" };
       return { items: [], error: "JSON erkannt, aber kein Recipe-Format." };
-    } catch (e) {
-      reportError(e, { scope: "importSheet", action: "parse" });
-      showError("Import fehlgeschlagen");
-
+    } catch {
       return { items: [], error: "Kein gueltiges JSON." };
     }
   };
@@ -144,6 +141,14 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
 
   doBtn.addEventListener("click", async () => {
     try {
+      if (parseError) {
+        showError("Import fehlgeschlagen: JSON ist ungueltig.");
+        return;
+      }
+      if (!parsedItems.length) {
+        showError("Import fehlgeschlagen: Keine Eintraege erkannt.");
+        return;
+      }
       doBtn.disabled = true;
       doBtn.textContent = "Importiere...";
       const targetSpaceId = String(spaceEl?.value || "").trim();
