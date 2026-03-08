@@ -110,6 +110,7 @@ import { renderInvitesRoute } from "./invitesRoute.js";
 import { createReloadAllAndRender, wireOnlineOfflineHandlers } from "./lifecycle.js";
 import { installSettingsBridge } from "./settingsBridge.js";
 import { createOfflineQueueDrainer } from "./offlineSync.js";
+import { createLoadAll, createPartsStore } from "./dataLoader.js";
 import {
 
 
@@ -251,40 +252,21 @@ const drainOfflineQueue = createOfflineQueueDrainer({
 ========================= */
 
 let recipes = [];
-let recipeParts = [];
-let partsByParent = new Map();
-
-function setParts(newParts) {
-  recipeParts = newParts ?? [];
-  partsByParent = rebuildPartsIndex(recipeParts);
-}
-
-async function loadAll() {
-  if (!recipeRepo) rebuildRecipeRepo(useBackend);
-
-  const pendingIds = getPendingRecipeIds?.() || new Set();
-  const ctx = (() => { try { return getAuthContext?.(); } catch { return null; } })();
-  const activeSid = String(ctx?.spaceId || "");
-  recipes = (await recipeRepo.getAll()).map((r) => ({
-    ...r,
-    space_id: r.space_id || activeSid || r.spaceId || "",
-    _pending: pendingIds.has(r.id),
-  }));
-
-  if (!useBackend) {
-    setParts([]);
-    return;
-  }
-
-  try {
-    const parts = await listAllRecipeParts();
-    setParts(parts);
-    markBackendOnline?.();
-  } catch (e) {
-    markBackendOffline?.(String(e?.message || e || "Backend nicht erreichbar"));
-    setParts([]);
-  }
-}
+const partsStore = createPartsStore({ rebuildPartsIndex });
+const loadAll = createLoadAll({
+  getRecipeRepo: () => recipeRepo,
+  rebuildRecipeRepo,
+  getUseBackend: () => useBackend,
+  getPendingRecipeIds,
+  getAuthContext,
+  getPartsStore: () => partsStore,
+  listAllRecipeParts,
+  markBackendOnline,
+  markBackendOffline,
+  setRecipes: (nextRecipes) => {
+    recipes = nextRecipes;
+  },
+});
 
 
 const reloadAllAndRender = createReloadAllAndRender({
@@ -585,7 +567,7 @@ async function render(view, setView) {
       installAdminCorner,
 
       onImportRecipes: onImportRecipesHandler,
-      getExportData: () => ({ recipes, partsByParent }),
+      getExportData: () => ({ recipes, partsByParent: partsStore.getPartsByParent() }),
     });
 
     return;
@@ -597,7 +579,7 @@ async function render(view, setView) {
       appEl,
       state: view,
       recipes,
-      partsByParent,
+      partsByParent: partsStore.getPartsByParent(),
       setView,
       useBackend,
       canWrite,
@@ -615,8 +597,8 @@ async function render(view, setView) {
       appEl,
       state: view,
       recipes,
-      partsByParent,
-      recipeParts,
+      partsByParent: partsStore.getPartsByParent(),
+      recipeParts: partsStore.getRecipeParts(),
       setView,
       useBackend,
       canWrite: detailCanWrite,
@@ -638,13 +620,13 @@ async function render(view, setView) {
         });
       },
       addToShopping,
-      rebuildPartsIndexSetter: (freshParts) => setParts(freshParts),
+      rebuildPartsIndexSetter: (freshParts) => partsStore.setParts(freshParts),
     });
   }
 
   if (view.name === "cook") {
     return renderCookView({
-      canWrite, appEl, state: view, recipes, partsByParent, setView, setViewCleanup, setDirtyGuard
+      canWrite, appEl, state: view, recipes, partsByParent: partsStore.getPartsByParent(), setView, setViewCleanup, setDirtyGuard
     });
   }
 
