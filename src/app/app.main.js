@@ -107,6 +107,7 @@ import { createHeaderBadgesUpdater } from "./ui/headerBadges.js";
 import { installAdminCorner } from "./adminCorner.js";
 import { refreshSpaceSelect, getActiveSpaceRole } from "./spaces/spaces.js";
 import { renderInvitesRoute } from "./invitesRoute.js";
+import { createReloadAllAndRender, wireOnlineOfflineHandlers } from "./lifecycle.js";
 import {
 
 
@@ -287,20 +288,6 @@ async function drainOfflineQueue({ reason = "auto" } = {}) {
   return { ok: !anyError };
 }
 
-function wireOnlineOfflineHandlers() {
-  const onOnline = () => {
-    updateHeaderBadges();
-    // Try to drain queued actions whenever connection comes back.
-    drainOfflineQueue({ reason: "online" });
-    // Also refresh list data (best-effort) – fixes "logged in but API missing" after sleep/VPN.
-    reloadAllAndRender({ reason: "online" });
-  };
-  const onOffline = () => updateHeaderBadges();
-
-  window.addEventListener("online", onOnline);
-  window.addEventListener("offline", onOffline);
-}
-
 /* =========================
    DATA STATE
 ========================= */
@@ -342,26 +329,17 @@ async function loadAll() {
 }
 
 
-// Reload backend/local data and re-render current view.
-// Used for: backend offline banner retry, browser 'online' event, resume from sleep.
-async function reloadAllAndRender({ reason = "manual" } = {}) {
-  try {
-    updateHeaderBadges({ syncing: true });
-
-    // Best-effort: refresh auth/space when backend is enabled.
-    if (useBackend) {
-      try { await initAuthAndSpace(); } catch { /* ignore */ }
-    }
-
-    await runExclusive("loadAll", () => loadAll());
-    await runExclusive("render", () => render(router.getView(), router.setView));
-  } catch (e) {
-    reportError(e, { scope: "app.main", action: `reloadAllAndRender:${reason}` });
-    showError(String(e?.message || e));
-  } finally {
-    updateHeaderBadges({ syncing: false });
-  }
-}
+const reloadAllAndRender = createReloadAllAndRender({
+  getUseBackend: () => useBackend,
+  initAuthAndSpace,
+  runExclusive,
+  loadAll,
+  render,
+  getRouter: () => router,
+  updateHeaderBadges,
+  reportError,
+  showError,
+});
 
 /* =========================
    RENDER
@@ -776,7 +754,11 @@ const setDirtyIndicator = createDirtyIndicator();
 
 export function startApp() {
   installHeaderWiring();
-  wireOnlineOfflineHandlers();
+  wireOnlineOfflineHandlers({
+    updateHeaderBadges,
+    drainOfflineQueue,
+    reloadAllAndRender,
+  });
 
   // Retry handler used by offline banner.
   window.addEventListener("backend:retry", () => {
