@@ -56,7 +56,7 @@ export function exportRecipesToPdfViaPrint({
   });
 }
 
-function normalizeLines(x) {
+export function normalizePdfLines(x) {
   if (!x) return [];
   if (Array.isArray(x)) return x.map(v => String(v ?? "").trim()).filter(Boolean);
   if (typeof x === "string") {
@@ -74,18 +74,18 @@ function getRecipeImageUrl(r) {
   return r?.image_url || r?.imageUrl || r?.img || "";
 }
 
-function buildPrintHtml({ recipes, partsByParent, allRecipes, includeImages, title }) {
+export function buildPrintHtml({ recipes, partsByParent, allRecipes, includeImages, title }) {
   const pool = allRecipes && Array.isArray(allRecipes) ? allRecipes : (recipes ?? []);
-    const now = new Date();
-const stamp = now.toLocaleString();
-const count = (recipes ?? []).length;
+  const now = new Date();
+  const stamp = now.toLocaleString();
+  const count = (recipes ?? []).length;
 
   const items = (recipes ?? []).map((r) => {
     const isMenu = isMenuRecipe(r, partsByParent);
 
     // ✅ Primär aus dem Rezept selbst (dein Standardmodell)
-    let ingredients = normalizeLines(r.ingredients);
-    let steps = normalizeLines(r.steps);
+    let ingredients = normalizePdfLines(r.ingredients);
+    let steps = normalizePdfLines(r.steps);
 
     // ✅ Menü: Zutaten/Schritte aus verlinkten Teilrezepten mit übernehmen
     if (isMenu) {
@@ -145,12 +145,12 @@ const count = (recipes ?? []).length;
 
         ${ingredients.length ? `
           <h2>Zutaten</h2>
-          ${renderMaybeSections(ingredients)}
+          ${renderPdfSections(ingredients)}
         ` : ``}
 
         ${steps.length ? `
           <h2>Zubereitung</h2>
-          ${renderMaybeSections(steps, { ordered: true })}
+          ${renderPdfSections(steps, { ordered: true })}
         ` : ``}
       </article>
       <div class="pagebreak"></div>
@@ -204,7 +204,7 @@ const count = (recipes ?? []).length;
 `;
 }
 
-function renderMaybeSections(lines, { ordered = false } = {}) {
+export function renderPdfSections(lines, { ordered = false } = {}) {
   // Menü-Export nutzt "## Section" + "- item". Für normale Rezepte sind es simple Lines.
   const out = [];
 
