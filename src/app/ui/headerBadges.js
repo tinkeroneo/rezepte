@@ -14,12 +14,12 @@ export function createHeaderBadgesUpdater(ctx) {
 
     const mode = document.getElementById("modeBadge");
     if (mode) {
-      mode.textContent = useBackend ? "☁️" : "🖥️";
+      mode.textContent = useBackend ? "MODE CLOUD" : "MODE LOCAL";
       mode.classList.toggle("badge--ok", useBackend);
       mode.classList.toggle("badge--warn", !useBackend);
       mode.title = useBackend
-        ? "☁️CLOUD: Sync + Teilen im Space (Supabase). Klick = auf LOCAL (nur dieses Gerät)."
-        : "🖥️LOCAL: nur auf diesem Gerät (offline). Klick = auf CLOUD (Sync + Teilen).";
+        ? "CLOUD: Sync + Teilen im Space (Supabase). Klick = auf LOCAL (nur dieses Geraet)."
+        : "LOCAL: nur auf diesem Geraet (offline). Klick = auf CLOUD (Sync + Teilen).";
     }
 
     const authBtn = document.getElementById("authBadge");

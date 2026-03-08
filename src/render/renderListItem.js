@@ -21,7 +21,7 @@ export function renderListItem(r, ctx) {
           ${isTodo ? `<span class="todo-ribbon" aria-hidden="true">ToDo</span>` : ``}
 
           ${isPending
-            ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">?</span>`
+            ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">SYNC AUSSTEHEND</span>`
             : ""
           }
         </div>
