@@ -20,7 +20,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
   const timerSoundVolume = settings.readTimerSoundVolume ? Number(settings.readTimerSoundVolume() ?? 0.65) : 0.65;
   const audio = createBeep({ soundId: timerSoundId, volume: timerSoundVolume });
 
-  // Cook-View soll möglichst „koch-fokussiert“ sein (Steps + Timer).
+  // Cook-View soll moeglichst koch-fokussiert sein (Steps + Timer).
   // Kochverlauf/Bewertung ist in der Detail-View.
 
  
@@ -38,7 +38,7 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
   // timers per root recipe
   const timersKey = "tinkeroneo_timers_v1";
 
-  // (keine Events hier – in Detailview)
+  // (keine Events hier - in Detailview)
 
   appEl.innerHTML = `
     <div class="container">
