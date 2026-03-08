@@ -583,6 +583,16 @@ textarea { min-height: 120px; resize: vertical; }
   pointer-events: auto;
 }
 
+#globalFeedbackBanner[data-kind="success"]{
+  border: 1px solid color-mix(in srgb, #39d98a 55%, var(--border));
+}
+#globalFeedbackBanner[data-kind="info"]{
+  border: 1px solid color-mix(in srgb, #67b7ff 50%, var(--border));
+}
+#globalFeedbackBanner[data-kind="error"]{
+  border: 1px solid color-mix(in srgb, #ff7a7a 55%, var(--border));
+}
+
 .toast__text{ min-width: 0; }
 .toast__title{ font-weight: 900; }
 .toast__msg{ font-size: var(--fs-4); opacity: .9; }

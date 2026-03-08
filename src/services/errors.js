@@ -1,4 +1,4 @@
-// src/services/errors.js
+﻿// src/services/errors.js
 // Global error capture + lightweight diagnostics.
 // Goals:
 // - keep UX calm (banner only for user-relevant errors)
@@ -9,11 +9,12 @@ import { logClientEvent } from "../supabase.js";
 import { getClientId } from "../domain/clientId.js";
 
 let installed = false;
+let __bannerTimer = null;
 
 const recentErrors = []; // newest first via accessor
 const MAX_RECENT = 20;
 
-// Persisted (device-local) error log – for diagnostics / bug reports.
+// Persisted (device-local) error log â€“ for diagnostics / bug reports.
 // Note: keep small, never store raw recipe data etc.
 const ERR_KEY = "tinkeroneo_errors_v1";
 const MAX_PERSISTED = 80;
@@ -117,31 +118,47 @@ function showBanner(type, err, meta = {}) {
   persistLocal(entry);
   if (type === "error") sendToBackend(entry);
 
-  const msg = entry.message;
+  const msg = normalizeErr(err);
   const title = type === "success" ? "Erfolg" : type === "info" ? "Hinweis" : "Fehler";
 
   let el = document.getElementById("globalFeedbackBanner");
   if (!el) {
     el = document.createElement("div");
     el.id = "globalFeedbackBanner";
-    el.innerHTML =             `<div class="geb-inner">
-        <div class="geb-title" id="globalFeedbackBannerTitle"></div>
-        <div class="geb-msg" id="globalFeedbackBannerMsg"></div>
-        <button class="btn btn-ghost geb-close" id="globalFeedbackBannerClose" aria-label="Close">×</button>
+    el.className = "toast";
+    el.innerHTML = `<div class="toast__text">
+        <div class="toast__title" id="globalFeedbackBannerTitle"></div>
+        <div class="toast__msg" id="globalFeedbackBannerMsg"></div>
+      </div>
+      <div class="toast__actions">
+        <button class="btn btn--ghost" id="globalFeedbackBannerClose" aria-label="Schließen">×</button>
       </div>`;
     document.body.appendChild(el);
 
     const closeBtn = el.querySelector("#globalFeedbackBannerClose");
     closeBtn?.addEventListener("click", () => {
-      el.remove();
+      el.classList.remove("toast--show");
     });
   }
 
   el.dataset.kind = type;
+  el.classList.add("toast--show");
+
   const titleEl = el.querySelector("#globalFeedbackBannerTitle");
   const msgEl = el.querySelector("#globalFeedbackBannerMsg");
   if (titleEl) titleEl.textContent = title;
   if (msgEl) msgEl.textContent = msg;
+
+  if (__bannerTimer) {
+    clearTimeout(__bannerTimer);
+    __bannerTimer = null;
+  }
+  if (type === "success") {
+    __bannerTimer = setTimeout(() => {
+      el.classList.remove("toast--show");
+    }, 2600);
+  }
+
   return el;
 }
 
@@ -222,3 +239,4 @@ async function sendToBackend(entry) {
     // ignore
   }
 }
+
