@@ -183,7 +183,7 @@ let ui = {
       renderResults();
     },
     onOpenRecipe: (id) => {
-      setView({ name: "detail", selectedId: id });
+      setView({ name: "detail", selectedId: id, q: getUi().q ?? (qEl?.value ?? "") });
     }
   });
 
