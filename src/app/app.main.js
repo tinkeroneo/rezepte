@@ -105,6 +105,7 @@ import { createOfflineQueueDrainer } from "./offlineSync.js";
 import { createLoadAll, createPartsStore } from "./dataLoader.js";
 import { renderAuxRoute } from "./renderAuxRoutes.js";
 import { renderEditorRoute } from "./renderEditorRoutes.js";
+import { ensureRenderPermissions } from "./renderPermissions.js";
 import {
 
 
@@ -292,53 +293,34 @@ async function render(view, setView) {
   // Permissions bootstrap: after refresh/auth, spaceId/mySpaces can be temporarily missing.
   // Avoid rendering read-only UI during this transient state.
   if (useBackend && isAuthenticated?.()) {
-    const ctx = (() => { try { return getAuthContext?.(); } catch { return null; } })();
-    const sid = String(ctx?.spaceId || "").trim();
-    const spacesMissing = !Array.isArray(appState.mySpaces) || appState.mySpaces.length === 0;
+    const permissionRenderHandled = await ensureRenderPermissions({
+      useBackend,
+      isAuthenticated,
+      getAuthContext,
+      getMySpaces: () => appState.mySpaces,
+      appEl,
+      reportError,
+      showError,
+      refreshSpaceSelect: () => refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }),
+      runExclusive,
+      render,
+      view,
+      setView,
+      getBootstrapState: () => ({
+        inFlight: __permBootstrapInFlight,
+        attempts: __permBootstrapAttempts,
+      }),
+      setBootstrapState: ({
+        inFlight = __permBootstrapInFlight,
+        attempts = __permBootstrapAttempts,
+      } = {}) => {
+        __permBootstrapInFlight = inFlight;
+        __permBootstrapAttempts = attempts;
+      },
+      debug: DEBUG,
+    });
+    if (permissionRenderHandled) return;
 
-    // If permissions/space context are still missing right after refresh, bootstrap them once or twice.
-    // IMPORTANT: never loop indefinitely — otherwise the app can appear to "hang".
-    if ((!sid || spacesMissing) && !__permBootstrapInFlight) {
-      if (__permBootstrapAttempts >= 2) {
-        // Give up and render normally (read-only may be temporary, but app must remain usable).
-        if (DEBUG) console.warn("perm bootstrap: giving up", { sid, spacesMissing, attempts: __permBootstrapAttempts });
-      } else {
-        __permBootstrapInFlight = true;
-        __permBootstrapAttempts++;
-
-        try {
-          appEl.innerHTML = `
-          <div class="container">
-            <div class="card" style="padding:1rem; text-align:center;">
-              <div style="font-weight:800;">Lade Space-Rechte…</div>
-              <div class="muted" style="margin-top:.35rem;">Einen Moment</div>
-            </div>
-          </div>`;
-        } catch (e) {
-          reportError(e, { scope: "app.js", action: String(e?.message) });
-          showError(String(e?.message));
-        }
-
-        try { await refreshSpaceSelect({ listMySpaces, getAuthContext, isAuthenticated }); } catch (e) {
-          reportError(e, { scope: "app.js", action: String(e?.message) });
-          showError(String(e?.message));
-        }
-        __permBootstrapInFlight = false;
-
-        // Recompute and only re-render if we actually got something new.
-        const ctx2 = (() => { try { return getAuthContext?.(); } catch { return null; } })();
-        const sid2 = String(ctx2?.spaceId || "").trim();
-        const spacesMissing2 = !Array.isArray(appState.mySpaces) || appState.mySpaces.length === 0;
-        if (sid2 && !spacesMissing2) {
-          // Await to keep render serialized and avoid recursive storms.
-          await runExclusive("render", () => render(view, setView));
-          return;
-        }
-
-        // Still missing → fall through and render normally (no infinite loop).
-        if (DEBUG) console.warn("perm bootstrap: still missing", { sid2, spacesMissing2 });
-      }
-    }
   }
 
 
