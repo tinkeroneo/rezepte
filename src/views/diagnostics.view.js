@@ -5,6 +5,12 @@ function formatLatency(info) {
   return Number.isFinite(info?.backendMs) ? `${escapeHtml(String(info.backendMs))} ms` : "-";
 }
 
+function statusPill(ok) {
+  return ok
+    ? `<span class="diag-status ok">OK</span>`
+    : `<span class="diag-status fail">FAIL</span>`;
+}
+
 function renderSelftestList(results) {
   const items = Array.isArray(results) ? results : [];
   if (!items.length) return `<li class="muted">Keine Ergebnisse.</li>`;
@@ -74,6 +80,29 @@ export function renderDiagnosticsView({ appEl, state, info, setView, selftestRes
         .diag-row:last-child { border-bottom: 0; }
         .diag-label { color: var(--muted); font-weight: 650; }
         .diag-value { color: var(--text); font-weight: 700; word-break: break-word; }
+        .diag-status {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          min-width: 3.8rem;
+          padding: .12rem .45rem;
+          border-radius: 999px;
+          font-size: .78rem;
+          font-weight: 800;
+          letter-spacing: .02em;
+          border: 1px solid var(--line);
+          background: color-mix(in srgb, var(--card) 84%, var(--bg));
+        }
+        .diag-status.ok {
+          color: #1f7a42;
+          border-color: color-mix(in srgb, #1f7a42 45%, var(--line));
+          background: color-mix(in srgb, #1f7a42 14%, var(--card));
+        }
+        .diag-status.fail {
+          color: #b13737;
+          border-color: color-mix(in srgb, #b13737 45%, var(--line));
+          background: color-mix(in srgb, #b13737 14%, var(--card));
+        }
         .selftest-wrap { padding: .35rem 0 .25rem; }
         .selftest-list { margin: .75rem 0 0 1.1rem; }
         .selftest-item { margin: .75rem 0; line-height: 1.35; }
@@ -132,9 +161,9 @@ export function renderDiagnosticsView({ appEl, state, info, setView, selftestRes
                 <div class="diag-kv">
                   <div class="diag-row"><span class="diag-label">Mode</span><span class="diag-value">${info?.useBackend ? "Backend (Supabase)" : "Local"}</span></div>
                   <div class="diag-row"><span class="diag-label">Backend Latenz</span><span class="diag-value">${formatLatency(info)}</span></div>
-                  <div class="diag-row"><span class="diag-label">Backend</span><span class="diag-value">${info?.backendOk ? "OK" : "FAIL"}</span></div>
-                  <div class="diag-row"><span class="diag-label">LocalStorage</span><span class="diag-value">${info?.storageOk ? "OK" : "FAIL"}</span></div>
-                  <div class="diag-row"><span class="diag-label">Import-Funktion</span><span class="diag-value">${info?.importOk ? "OK" : "FAIL"}</span></div>
+                  <div class="diag-row"><span class="diag-label">Backend</span><span class="diag-value">${statusPill(!!info?.backendOk)}</span></div>
+                  <div class="diag-row"><span class="diag-label">LocalStorage</span><span class="diag-value">${statusPill(!!info?.storageOk)}</span></div>
+                  <div class="diag-row"><span class="diag-label">Import-Funktion</span><span class="diag-value">${statusPill(!!info?.importOk)}</span></div>
                   <div class="diag-row"><span class="diag-label">Queue</span><span class="diag-value">${escapeHtml(String(info?.queueLen ?? 0))}</span></div>
                   <div class="diag-row"><span class="diag-label">Service Worker</span><span class="diag-value" id="swStatusText">Pruefe...</span></div>
                 </div>
