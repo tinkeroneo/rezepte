@@ -86,6 +86,7 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
 
   let parsedItems = [];
   let parseError = "";
+  let validationError = "";
 
   const parsePayload = (text) => {
     const raw = String(text ?? "");
@@ -115,8 +116,10 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
 
 
   const refreshHint = () => {
-    if (parseError) {
-      hintEl.textContent = `Ungueltiges JSON: ${parseError}`;
+    if (parseError || validationError) {
+      hintEl.textContent = parseError
+        ? `Ungueltiges JSON: ${parseError}`
+        : `Import ungueltig: ${validationError}`;
       hintEl.style.color = "var(--danger, #b13737)";
       hintEl.style.fontWeight = "700";
     } else {
@@ -124,7 +127,16 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
       hintEl.style.color = "";
       hintEl.style.fontWeight = "";
     }
-    doBtn.disabled = parsedItems.length === 0;
+    doBtn.disabled = parsedItems.length === 0 || !!parseError || !!validationError;
+  };
+
+  const validateItems = (items) => {
+    const arr = Array.isArray(items) ? items : [];
+    const missingTitleIdx = arr.findIndex((item) => !String(item?.title ?? "").trim());
+    if (missingTitleIdx >= 0) {
+      return `Eintrag ${missingTitleIdx + 1} hat keinen Titel.`;
+    }
+    return "";
   };
 
   fileBtn.addEventListener("click", () => fileInput.click());
@@ -135,6 +147,7 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
     const r = parsePayload(await f.text());
     parsedItems = r.items;
     parseError = r.error;
+    validationError = parseError ? "" : validateItems(parsedItems);
     refreshHint();
   });
 
@@ -142,17 +155,17 @@ export function openImportSheet({ onImportRecipes, spaces = [], activeSpaceId = 
     const r = parsePayload(pasteEl.value);
     parsedItems = r.items;
     parseError = r.error;
+    validationError = parseError ? "" : validateItems(parsedItems);
     refreshHint();
   });
 
   doBtn.addEventListener("click", async () => {
     try {
       if (parseError) {
-        showError("Import fehlgeschlagen: JSON ist ungueltig.");
         return;
       }
+      if (validationError) return;
       if (!parsedItems.length) {
-        showError("Import fehlgeschlagen: Keine Eintraege erkannt.");
         return;
       }
       doBtn.disabled = true;
