@@ -133,6 +133,12 @@ export async function importRecipesIntoApp({
 
   const incoming = incomingRaw.map((raw) => normalizeImportedRecipe(raw, toLocalShape));
 
+  // Hard validation before any write: title is mandatory for every imported item.
+  const firstMissingTitle = incoming.findIndex((recipe) => !String(recipe?.title ?? "").trim());
+  if (firstMissingTitle >= 0) {
+    throw new Error(`Import abgebrochen: Eintrag ${firstMissingTitle + 1} hat keinen Titel.`);
+  }
+
   const repoMode = repo && typeof repo.getAll === "function" && typeof repo.upsert === "function";
   if (repoMode) {
     const current = (await repo.getAll()).map((recipe) => normalizeImportedRecipe(recipe, toLocalShape));
