@@ -11,8 +11,12 @@ function fallbackStepTitle(line, index) {
   const raw = String(line ?? "").trim();
   if (!raw) return `Schritt ${index + 1}`;
 
-  const words = raw
+  const cleaned = raw
     .replace(/^[-*•]\s*/, "")
+    .replace(/^\d+[\].):-]?\s*/, "")
+    .trim();
+
+  const words = cleaned
     .split(/\s+/)
     .map((word) => word.trim())
     .filter(Boolean)
@@ -22,7 +26,21 @@ function fallbackStepTitle(line, index) {
 
   let title = words.join(" ");
   title = title.replace(/[.,;:!?]+$/g, "");
-  return title || `Schritt ${index + 1}`;
+  return title ? `${index + 1}. ${title}` : `Schritt ${index + 1}`;
+}
+
+function fallbackStepBody(line, fallbackTitle) {
+  const raw = String(line ?? "").trim();
+  const title = String(fallbackTitle ?? "").trim();
+  if (!raw) return "";
+  if (!title) return raw;
+
+  const titleWithoutNumber = title.replace(/^\d+\.\s*/, "").trim();
+  if (!titleWithoutNumber) return raw;
+
+  const escaped = titleWithoutNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const withoutPrefix = raw.replace(new RegExp(`^${escaped}[,;:!?.-]*\\s*`, "i"), "").trim();
+  return withoutPrefix || raw;
 }
 
 export function splitStepsToCards(lines) {
@@ -47,7 +65,7 @@ export function splitStepsToCards(lines) {
   if (cards.length === 1 && cards[0].title === "Schritt") {
     return (lines ?? []).filter(Boolean).map((line, index) => ({
       title: fallbackStepTitle(line, index),
-      body: [line.trim()]
+      body: [fallbackStepBody(line, fallbackStepTitle(line, index))]
     }));
   }
 
