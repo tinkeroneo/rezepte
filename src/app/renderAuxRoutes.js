@@ -48,7 +48,7 @@ export async function renderAuxRoute({
         results.push({ name: "Backend erreichbar (listRecipes)", ok: false, detail: String(e?.message || e) });
       }
     } else {
-      results.push({ name: "Backend erreichbar (übersprungen)", ok: true, detail: "useBackend=false" });
+      results.push({ name: "Backend erreichbar (uebersprungen)", ok: true, detail: "useBackend=false" });
     }
 
     results.push({ name: "Import-Funktion geladen", ok: typeof importRecipesIntoApp === "function" });

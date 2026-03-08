@@ -62,6 +62,18 @@ export function renderDiagnosticsView({ appEl, state, info, setView, selftestRes
   appEl.innerHTML = `
     <div class="page">
       <style>
+        .diag-kv { display: grid; gap: .42rem; margin-top: .45rem; }
+        .diag-row {
+          display: grid;
+          grid-template-columns: minmax(150px, 220px) 1fr;
+          gap: .85rem;
+          align-items: baseline;
+          padding: .15rem 0;
+          border-bottom: 1px solid color-mix(in srgb, var(--line) 62%, transparent);
+        }
+        .diag-row:last-child { border-bottom: 0; }
+        .diag-label { color: var(--muted); font-weight: 650; }
+        .diag-value { color: var(--text); font-weight: 700; word-break: break-word; }
         .selftest-wrap { padding: .35rem 0 .25rem; }
         .selftest-list { margin: .75rem 0 0 1.1rem; }
         .selftest-item { margin: .75rem 0; line-height: 1.35; }
@@ -117,13 +129,15 @@ export function renderDiagnosticsView({ appEl, state, info, setView, selftestRes
             : `
               <div class="panel">
                 <h3>Status</h3>
-                <div class="kv"><span>Mode</span><span>${info?.useBackend ? "Backend (Supabase)" : "Local"}</span></div>
-                <div class="kv"><span>Backend Latenz</span><span>${formatLatency(info)}</span></div>
-                <div class="kv"><span>Backend</span><span>${info?.backendOk ? "OK" : "FAIL"}</span></div>
-                <div class="kv"><span>LocalStorage</span><span>${info?.storageOk ? "OK" : "FAIL"}</span></div>
-                <div class="kv"><span>Import-Funktion</span><span>${info?.importOk ? "OK" : "FAIL"}</span></div>
-                <div class="kv"><span>Queue</span><span>${escapeHtml(String(info?.queueLen ?? 0))}</span></div>
-                <div class="kv"><span>Service Worker</span><span id="swStatusText">Pruefe...</span></div>
+                <div class="diag-kv">
+                  <div class="diag-row"><span class="diag-label">Mode</span><span class="diag-value">${info?.useBackend ? "Backend (Supabase)" : "Local"}</span></div>
+                  <div class="diag-row"><span class="diag-label">Backend Latenz</span><span class="diag-value">${formatLatency(info)}</span></div>
+                  <div class="diag-row"><span class="diag-label">Backend</span><span class="diag-value">${info?.backendOk ? "OK" : "FAIL"}</span></div>
+                  <div class="diag-row"><span class="diag-label">LocalStorage</span><span class="diag-value">${info?.storageOk ? "OK" : "FAIL"}</span></div>
+                  <div class="diag-row"><span class="diag-label">Import-Funktion</span><span class="diag-value">${info?.importOk ? "OK" : "FAIL"}</span></div>
+                  <div class="diag-row"><span class="diag-label">Queue</span><span class="diag-value">${escapeHtml(String(info?.queueLen ?? 0))}</span></div>
+                  <div class="diag-row"><span class="diag-label">Service Worker</span><span class="diag-value" id="swStatusText">Pruefe...</span></div>
+                </div>
                 <div id="swUpdateHint" class="muted" style="margin-top:.5rem; display:none;">Ein neuer Service Worker ist bereit. Reload im Header oder Seiten-Reload ausfuehren.</div>
                 <div class="row" style="margin-top:.75rem; gap:.5rem; flex-wrap:wrap;">
                   ${info?.onRetrySync ? `<button class="btn btn--ghost" type="button" id="syncRetryBtn">Sync erneut versuchen</button>` : ``}
