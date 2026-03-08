@@ -38,9 +38,13 @@ function fallbackStepBody(line, fallbackTitle) {
   const titleWithoutNumber = title.replace(/^\d+\.\s*/, "").trim();
   if (!titleWithoutNumber) return raw;
 
+  const comparableRaw = raw
+    .replace(/^[-*•]\s*/, "")
+    .replace(/^\d+[\].):-]?\s*/, "")
+    .trim();
   const escaped = titleWithoutNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const withoutPrefix = raw.replace(new RegExp(`^${escaped}[,;:!?.-]*\\s*`, "i"), "").trim();
-  return withoutPrefix || raw;
+  const withoutPrefix = comparableRaw.replace(new RegExp(`^${escaped}[,;:!?.-]*\\s*`, "i"), "").trim();
+  return withoutPrefix || comparableRaw || raw;
 }
 
 export function splitStepsToCards(lines) {

@@ -124,7 +124,7 @@ export function openExportSheet({ list, partsByParent, spaceName }) {
       allRecipes: safeList,
       partsByParent,
       includeImages: true,
-      spaceName
+      title: spaceName ? `Rezepte Export – ${spaceName}` : "Rezepte Export"
     });
     close();
   });
