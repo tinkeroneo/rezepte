@@ -53,7 +53,7 @@ async function readServiceWorkerInfo() {
   }
 }
 
-export function renderDiagnoseView({ appEl, state, info, setView, selftestResults = [] }) {
+export function renderDiagnosticsView({ appEl, state, info, setView, selftestResults = [] }) {
   const errors = info?.recentErrors ?? [];
   const magic = info?.magicLinkDiag || null;
   const q = state?.q || "";
