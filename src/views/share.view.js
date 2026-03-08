@@ -101,10 +101,10 @@ export async function renderShareView({
   }
 
   const { recipe: r, parts } = normalizeSharedPayload(data);
-  if (isAuthenticated?.() && (await canReadRecipeAuthed(r.id))) {
-  setView({ name: "detail", selectedId: r.id, q: state?.q || "" });
-  return;
-}
+  if (r?.id && isAuthenticated?.() && (await canReadRecipeAuthed(r.id))) {
+    setView({ name: "detail", selectedId: r.id, q: state?.q || "" });
+    return;
+  }
   if (!r?.id) {
     appEl.innerHTML = `
       <div class="container">
