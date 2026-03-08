@@ -255,8 +255,7 @@ export async function renderShareView({
   appEl.querySelector("#btnPrint")?.addEventListener("click", () => window.print());
 
   appEl.querySelector("#btnBack")?.addEventListener("click", () => {
-    if (window.history.length > 1) window.history.back();
-    else setView({ name: "list", selectedId: null, q: state?.q || "" });
+    setView({ name: "list", selectedId: null, q: state?.q || "" });
   });
 
   appEl.querySelector("#btnOpenFull")?.addEventListener("click", () => {
