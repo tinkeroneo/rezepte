@@ -128,18 +128,18 @@ export function renderCookView({ appEl, state, recipes, partsByParent, setView, 
 
     return `
                     <li data-stepwrap="${escapeHtml(key)}">
-                      <div style="font-weight:800; margin-bottom:.25rem;">${escapeHtml(c.title)}</div>
+                      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:.75rem; margin-bottom:.25rem;">
+                        <div style="font-weight:800; min-width:0; flex:1;">${escapeHtml(c.title)}</div>
+                        <label style="display:flex; align-items:center; justify-content:center; cursor:pointer; flex:0 0 auto; margin:0;">
+                          <input type="checkbox" data-stepkey="${escapeHtml(key)}" ${done[key] ? "checked" : ""} aria-label="Schritt erledigt" />
+                        </label>
+                      </div>
 
                       ${c.body.length ? `
                         <div class="${done[key] ? "step-done" : ""}" data-stepbody="${escapeHtml(key)}" style="margin-bottom:.35rem;">
                           ${escapeHtml(c.body.join(" "))}
                         </div>
                       ` : ""}
-
-                      <label style="display:flex; gap:.6rem; align-items:center; cursor:pointer;">
-                        <input type="checkbox" data-stepkey="${escapeHtml(key)}" ${done[key] ? "checked" : ""} />
-                        <span class="muted">Erledigt</span>
-                      </label>
 
                       ${dur ? `
                         <div class="timer-pill">
