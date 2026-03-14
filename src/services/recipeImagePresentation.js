@@ -1,6 +1,6 @@
 import { escapeHtml } from "../utils.js";
 
-const ALPHA_CACHE_KEY = "tinkeroneo_alpha_bounds_v1";
+const ALPHA_CACHE_KEY = "tinkeroneo_alpha_bounds_v2";
 const MAX_ALPHA_CACHE = 120;
 const memoryAlphaCache = new Map();
 
@@ -66,6 +66,11 @@ function writeStoredAlphaCache(map) {
 
 function alphaCacheKey(src) {
   return String(src || "").split("#")[0];
+}
+
+function isAlphaCandidateSource(src) {
+  const value = String(src || "").toLowerCase();
+  return /\.png(?:$|[?#])/.test(value) || /\.webp(?:$|[?#])/.test(value);
 }
 
 function readCachedAlphaBounds(src) {
@@ -149,11 +154,15 @@ function detectAlphaBoundsFromImage(img) {
   let minY = sampleHeight;
   let maxX = -1;
   let maxY = -1;
+  let transparentCount = 0;
 
   for (let y = 0; y < sampleHeight; y += 1) {
     for (let x = 0; x < sampleWidth; x += 1) {
       const alpha = data[(y * sampleWidth + x) * 4 + 3];
-      if (alpha <= threshold) continue;
+      if (alpha <= threshold) {
+        transparentCount += 1;
+        continue;
+      }
       if (x < minX) minX = x;
       if (y < minY) minY = y;
       if (x > maxX) maxX = x;
@@ -167,9 +176,19 @@ function detectAlphaBoundsFromImage(img) {
   const height = (maxY - minY + 1) / sampleHeight;
   const left = minX / sampleWidth;
   const top = minY / sampleHeight;
+  const transparentRatio = transparentCount / (sampleWidth * sampleHeight);
+  const bboxArea = width * height;
+  const emptyRatio = 1 - bboxArea;
+  const right = 1 - (left + width);
+  const bottom = 1 - (top + height);
+  const meaningfulMargins = [left, top, right, bottom].filter((margin) => margin >= 0.035).length;
+  const strongestMargin = Math.max(left, top, right, bottom);
 
   const nearFullFrame = width > 0.975 && height > 0.975 && left < 0.015 && top < 0.015;
   if (nearFullFrame) return null;
+  if (transparentRatio < 0.08) return null;
+  if (emptyRatio < 0.14) return null;
+  if (meaningfulMargins < 2 && strongestMargin < 0.09) return null;
 
   return normalizeBounds({ left, top, width, height });
 }
@@ -191,18 +210,20 @@ async function detectAndCacheAlphaBounds(src, loader) {
 
 export async function detectAlphaBoundsForUrl(url) {
   const src = alphaCacheKey(url);
-  if (!src || /\.svg(?:$|\?)/i.test(src)) return null;
+  if (!src || /\.svg(?:$|\?)/i.test(src) || !isAlphaCandidateSource(src)) return null;
   return await detectAndCacheAlphaBounds(src, () => createImageFromUrl(src));
 }
 
 export async function detectAlphaBoundsForFile(file) {
   const pseudoKey = `file:${file?.name || "image"}:${file?.size || 0}:${file?.lastModified || 0}`;
+  const type = String(file?.type || "").toLowerCase();
+  if (type && type !== "image/png" && type !== "image/webp") return null;
   return await detectAndCacheAlphaBounds(pseudoKey, () => createImageFromFile(file));
 }
 
 export async function detectAlphaBoundsForRenderedImage(img) {
   const src = alphaCacheKey(img?.currentSrc || img?.src || "");
-  if (!src || /\.svg(?:$|\?)/i.test(src)) return null;
+  if (!src || /\.svg(?:$|\?)/i.test(src) || !isAlphaCandidateSource(src)) return null;
 
   const cached = readCachedAlphaBounds(src);
   if (cached !== undefined) return cached;
