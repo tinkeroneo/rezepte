@@ -1,6 +1,6 @@
 import { escapeHtml } from "../utils.js";
 
-const ALPHA_CACHE_KEY = "tinkeroneo_alpha_bounds_v2";
+const ALPHA_CACHE_KEY = "tinkeroneo_alpha_bounds_v3";
 const MAX_ALPHA_CACHE = 120;
 const memoryAlphaCache = new Map();
 
@@ -84,11 +84,6 @@ function writeStoredAlphaCache(map) {
 
 function alphaCacheKey(src) {
   return String(src || "").split("#")[0];
-}
-
-function isAlphaCandidateSource(src) {
-  const value = String(src || "").toLowerCase();
-  return /\.png(?:$|[?#])/.test(value) || /\.webp(?:$|[?#])/.test(value);
 }
 
 function readCachedAlphaBounds(src) {
@@ -204,9 +199,9 @@ function detectAlphaBoundsFromImage(img) {
 
   const nearFullFrame = width > 0.975 && height > 0.975 && left < 0.015 && top < 0.015;
   if (nearFullFrame) return null;
-  if (transparentRatio < 0.08) return null;
-  if (emptyRatio < 0.14) return null;
-  if (meaningfulMargins < 2 && strongestMargin < 0.09) return null;
+  if (transparentRatio < 0.025) return null;
+  if (emptyRatio < 0.08) return null;
+  if (meaningfulMargins < 1 && strongestMargin < 0.05) return null;
 
   return normalizeBounds({ left, top, width, height });
 }
@@ -228,20 +223,18 @@ async function detectAndCacheAlphaBounds(src, loader) {
 
 export async function detectAlphaBoundsForUrl(url) {
   const src = alphaCacheKey(url);
-  if (!src || /\.svg(?:$|\?)/i.test(src) || !isAlphaCandidateSource(src)) return null;
+  if (!src || /\.svg(?:$|\?)/i.test(src)) return null;
   return await detectAndCacheAlphaBounds(src, () => createImageFromUrl(src));
 }
 
 export async function detectAlphaBoundsForFile(file) {
   const pseudoKey = `file:${file?.name || "image"}:${file?.size || 0}:${file?.lastModified || 0}`;
-  const type = String(file?.type || "").toLowerCase();
-  if (type && type !== "image/png" && type !== "image/webp") return null;
   return await detectAndCacheAlphaBounds(pseudoKey, () => createImageFromFile(file));
 }
 
 export async function detectAlphaBoundsForRenderedImage(img) {
   const src = alphaCacheKey(img?.currentSrc || img?.src || "");
-  if (!src || /\.svg(?:$|\?)/i.test(src) || !isAlphaCandidateSource(src)) return null;
+  if (!src || /\.svg(?:$|\?)/i.test(src)) return null;
 
   const cached = readCachedAlphaBounds(src);
   if (cached !== undefined) return cached;
