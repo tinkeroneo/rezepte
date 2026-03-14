@@ -1,5 +1,5 @@
 // src/views/detail/detail.templates.js
-import { escapeHtml, recipeImageOrDefault } from "../../utils.js";
+import { escapeHtml, parseSourceLink, recipeImageOrDefault } from "../../utils.js";
 import { splitStepsToCards } from "../../domain/steps.js";
 import { buildMenuIngredients, buildMenuStepSections } from "../../domain/menu.js";
 import { encodeImageFocusAttr } from "../../services/recipeImagePresentation.js";
@@ -18,6 +18,7 @@ export function buildChildrenFromIndex({ recipeId, recipes, partsByParent }) {
 
 export function renderDetailHeaderHtml({ r, canWrite }) {
   const isPending = !!r?._pending;
+  const sourceLink = parseSourceLink(r.source);
   return `
     <section class="card">
       <div class="card__hd">
@@ -42,7 +43,7 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
                               ${canWrite ? `<button class="btn btn--ghost" id="editBtn" type="button" title="Rezept bearbeiten">✎</button>` : ``}
                               </h2>
         ${r.time ? `<div class="muted">${escapeHtml(r.time)}</div>` : ""}
-        ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${escapeHtml(r.source)}</div>` : ""}
+        ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${sourceLink ? `<a href="${escapeHtml(sourceLink.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceLink.label)}</a>` : escapeHtml(r.source)}</div>` : ""}
         <div class="muted" style="margin-top:.35rem;">
           Sync-Status: ${isPending ? "&#9888; Ausstehend (lokal geaendert)" : "&#9989; Synchron"}
         </div>

@@ -120,6 +120,30 @@ export function escapeHtml(str) {
     .replaceAll("'", "&#039;");
 }
 
+export function parseSourceLink(source) {
+  const raw = String(source ?? "").trim();
+  if (!raw) return null;
+
+  const tryValues = raw.includes("://") ? [raw] : [`https://${raw}`, raw];
+  for (const candidate of tryValues) {
+    try {
+      const url = new URL(candidate, window.location.origin);
+      if (url.protocol !== "http:" && url.protocol !== "https:") continue;
+      if (!url.hostname || !url.hostname.includes(".")) continue;
+
+      const hostname = url.hostname.replace(/^www\./i, "");
+      return {
+        href: url.toString(),
+        label: hostname,
+      };
+    } catch {
+      // ignore and try next candidate
+    }
+  }
+
+  return null;
+}
+
 /**
  * Format seconds as mm:ss
  * Example: 125 -> "02:05"
