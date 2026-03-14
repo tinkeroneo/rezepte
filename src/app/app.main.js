@@ -86,7 +86,9 @@ import {
   readTimerSoundId,
   setTimerSoundId,
   readTimerSoundVolume,
-  setTimerSoundVolume
+  setTimerSoundVolume,
+  readImageModeDebug,
+  setImageModeDebug
 } from "./localSettings.js";
 import { withLoader } from "../ui/loader.js";
 import { applyThemeAndOverlay } from "./ui/theme.js";
@@ -213,6 +215,8 @@ installSettingsBridge({
   setTimerSoundId,
   readTimerSoundVolume,
   setTimerSoundVolume,
+  readImageModeDebug,
+  setImageModeDebug,
 });
 
 /* =========================

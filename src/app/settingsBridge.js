@@ -27,6 +27,8 @@ export function installSettingsBridge({
   setTimerSoundId,
   readTimerSoundVolume,
   setTimerSoundVolume,
+  readImageModeDebug,
+  setImageModeDebug,
 }) {
   window.__tinkeroneoSettings = {
     readUseBackend,
@@ -79,5 +81,8 @@ export function installSettingsBridge({
 
     readTimerSoundVolume,
     setTimerSoundVolume,
+
+    readImageModeDebug,
+    setImageModeDebug,
   };
 }

@@ -51,7 +51,7 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
   `;
 }
 
-export function renderDetailImageHtml({ r }) {
+export function renderDetailImageHtml({ r, showImageModeDebug = false }) {
 
   return `
     <div style="margin:.75rem 0;">
@@ -66,6 +66,7 @@ export function renderDetailImageHtml({ r }) {
           alt="${escapeHtml(r.title)}" 
         />
       </div>    
+      ${showImageModeDebug ? `<div id="imageModeDebug" class="hint" style="margin-top:.45rem;">Bildmodus: pruefe...</div>` : ``}
     </div>
   `;
 }

@@ -42,6 +42,24 @@ export function normalizeImageFocus(focus) {
   return { x, y, zoom, mode, alphaBounds };
 }
 
+export function getEffectiveImageMode(focus) {
+  const f = normalizeImageFocus(focus);
+  if (f.mode === "alpha-fit" && f.alphaBounds) return "alpha-fit";
+  if (f.mode === "cover") return "cover";
+  return "auto";
+}
+
+function emitImageModeResolved(img) {
+  try {
+    img.dispatchEvent(new window.CustomEvent("tinkeroneo:image-mode", {
+      bubbles: false,
+      detail: { mode: String(img.dataset.imageModeEffective || "auto") },
+    }));
+  } catch {
+    // ignore
+  }
+}
+
 export function encodeImageFocusAttr(focus) {
   return escapeHtml(JSON.stringify(normalizeImageFocus(focus)));
 }
@@ -318,18 +336,24 @@ export function applyImageFocusToElement(img, focus) {
   const pos = `${f.x}% ${f.y}%`;
 
   if (f.mode === "cover" || f.mode === "auto") {
+    img.dataset.imageModeEffective = f.mode === "cover" ? "cover" : "auto";
     resetImageStyle(img);
     img.style.objectFit = "cover";
     img.style.objectPosition = pos;
     img.style.transform = f.mode === "cover" ? `scale(${f.zoom})` : "none";
     img.style.transformOrigin = pos;
+    emitImageModeResolved(img);
     return;
   }
 
   resetImageStyle(img);
   if (f.mode === "alpha-fit" && f.alphaBounds) {
+    img.dataset.imageModeEffective = "alpha-fit";
     applyAlphaFit(img, f.alphaBounds);
+  } else {
+    img.dataset.imageModeEffective = getEffectiveImageMode(f);
   }
+  emitImageModeResolved(img);
 }
 
 function parseFocusAttr(img) {

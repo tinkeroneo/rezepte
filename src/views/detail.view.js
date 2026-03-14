@@ -55,6 +55,8 @@ export function renderDetailView({
   setDirtyIndicator,
   setViewCleanup,
 }) {
+  const settings = window.__tinkeroneoSettings || {};
+  const showImageModeDebug = !!settings.readImageModeDebug?.();
   const r = recipes.find(x => x.id === state.selectedId);
   if (!r) {
     setView({ name: "list", selectedId: null, q: state.q }, { push: false });
@@ -91,7 +93,7 @@ export function renderDetailView({
   appEl.innerHTML = `
     <div class="container">
       ${renderDetailHeaderHtml({ r, canWrite: writable })}
-      ${renderDetailImageHtml({ r })}
+      ${renderDetailImageHtml({ r, showImageModeDebug })}
       ${renderIngredientsSectionHtml({ r, recipes, partsByParent })}
       ${renderStepsSectionHtml({ r, recipes, partsByParent })}
       ${renderCooklogCardHtml({ recipeId: r.id, lastStr, avgLabel, avgCount, canWrite: writable })}
@@ -101,6 +103,27 @@ export function renderDetailView({
   `;
   window.requestAnimationFrame(() => resetScrollTop());
   const cleanupManagedImages = bindManagedRecipeImages({ root: appEl, observeMutations: false });
+  let cleanupImageModeDebug = null;
+
+  if (showImageModeDebug) {
+    const imgEl = appEl.querySelector("#detailImg");
+    const debugEl = appEl.querySelector("#imageModeDebug");
+    const updateImageModeDebug = () => {
+      if (!imgEl || !debugEl) return;
+      const mode = String(imgEl.dataset.imageModeEffective || r?.image_focus?.mode || "auto");
+      const alphaInfo =
+        mode === "alpha-fit" && r?.image_focus?.alphaBounds
+          ? " (transparente Raender erkannt)"
+          : "";
+      debugEl.textContent = `Bildmodus: ${mode}${alphaInfo}`;
+    };
+
+    imgEl?.addEventListener("tinkeroneo:image-mode", updateImageModeDebug);
+    window.setTimeout(updateImageModeDebug, 0);
+    cleanupImageModeDebug = () => {
+      imgEl?.removeEventListener("tinkeroneo:image-mode", updateImageModeDebug);
+    };
+  }
 
   // Optionaler Dirty-Tracker (aktuell wird hier nichts "halbfertig" editiert,
   // aber wir sind vorbereitet, falls du z.B. Fokusänderungen erst "Apply"en willst).
@@ -111,6 +134,7 @@ export function renderDetailView({
     setViewCleanup,
     beforeUnloadKey: "__tinkeroneo_beforeunload_detail",
     onCleanup: () => {
+      cleanupImageModeDebug?.();
       cleanupManagedImages?.();
     },
   });

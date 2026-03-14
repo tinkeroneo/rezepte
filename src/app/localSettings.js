@@ -144,3 +144,14 @@ export function setTimerSoundVolume(v) {
   lsSetStr(KEYS.TIMER_SOUND_VOLUME, String(clamped));
   window.dispatchEvent(new window.Event("tinkeroneo:timerSoundChanged"));
 }
+
+export function readImageModeDebug() {
+  const raw = lsGetStr(KEYS.IMAGE_MODE_DEBUG, "");
+  if (raw === "1") return true;
+  if (raw === "0") return false;
+  return false;
+}
+
+export function setImageModeDebug(on) {
+  lsSetStr(KEYS.IMAGE_MODE_DEBUG, on ? "1" : "0");
+}

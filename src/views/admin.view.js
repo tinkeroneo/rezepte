@@ -21,6 +21,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
 
   const ringIntervalMs = Number(s.readTimerRingIntervalMs?.() ?? 2800);
   const stepHighlight = !!s.readTimerStepHighlight?.();
+  const imageModeDebug = !!s.readImageModeDebug?.();
 
   const timerSoundEnabled = s.readTimerSoundEnabled ? !!s.readTimerSoundEnabled() : true;
   const timerSoundId = s.readTimerSoundId ? String(s.readTimerSoundId() || "bowl") : "gong";
@@ -107,6 +108,16 @@ export function renderAdminView({ appEl, recipes, setView }) {
                 <div class="hint" style="margin:0;">Consent: ${radioConsent ? "ja" : "nein"}</div>
               </div>
 
+            </div>
+
+            <div class="row row--spread">
+              <div>
+                <div class="label">Bildmodus-Debug</div>
+                <div class="hint">Zeigt in der Detailansicht an, ob cover, auto oder alpha-fit aktiv ist.</div>
+              </div>
+              <label class="toggle">
+                <input id="imageModeDebugToggle" type="checkbox" ${imageModeDebug ? "checked" : ""} />
+              </label>
             </div>
 
             
@@ -325,6 +336,15 @@ export function renderAdminView({ appEl, recipes, setView }) {
       }
     });
   }
+
+  q("#imageModeDebugToggle")?.addEventListener("change", () => {
+    try {
+      s.setImageModeDebug?.(!!q("#imageModeDebugToggle")?.checked);
+      setMsg("Gespeichert.", "ok");
+    } catch (e) {
+      setMsg(String(e?.message || e), "bad");
+    }
+  });
 
   // Radio consent
 
