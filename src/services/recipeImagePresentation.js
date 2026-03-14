@@ -296,11 +296,11 @@ export function applyImageFocusToElement(img, focus) {
   const f = normalizeImageFocus(focus);
   const pos = `${f.x}% ${f.y}%`;
 
-  if (f.mode === "cover") {
+  if (f.mode === "cover" || f.mode === "auto") {
     resetImageStyle(img);
     img.style.objectFit = "cover";
     img.style.objectPosition = pos;
-    img.style.transform = `scale(${f.zoom})`;
+    img.style.transform = f.mode === "cover" ? `scale(${f.zoom})` : "none";
     img.style.transformOrigin = pos;
     return;
   }
