@@ -1,5 +1,6 @@
 import { getCategoryColors, setCategoryColor, normalizeCategoryToken } from "../domain/categories.js";
 import { createBeep } from "../domain/timers.js";
+import { readServiceWorkerVersions } from "../services/swInfo.js";
 import { escapeHtml } from "../utils.js";
 // src/views/admin.view.js
 
@@ -190,6 +191,25 @@ export function renderAdminView({ appEl, recipes, setView }) {
             </div>
           </div>
           <div class="card__bd">
+            <div class="panel" style="margin-bottom:12px;">
+              <h3 style="margin:0 0 .75rem 0;">Service Worker</h3>
+              <div style="display:grid; gap:.55rem;">
+                <div class="row row--spread" style="gap:12px;">
+                  <div class="label">Aktiver SW</div>
+                  <div id="swActiveVersion" class="pill">Pruefe...</div>
+                </div>
+                <div class="row row--spread" style="gap:12px;">
+                  <div class="label">Neueste sw.js</div>
+                  <div id="swLatestVersion" class="pill">Pruefe...</div>
+                </div>
+                <div class="row row--spread" style="gap:12px;">
+                  <div class="label">Status</div>
+                  <div id="swVersionState" class="pill">Pruefe...</div>
+                </div>
+              </div>
+              <div id="swVersionHint" class="hint" style="margin-top:.75rem;"></div>
+            </div>
+
             <div class="row" style="flex-wrap:wrap;">
               <button class="btn" id="btnDiagnostics" type="button">Diagnostics</button>
               <button class="btn" id="btnSelftest" type="button">Selftest</button>
@@ -222,11 +242,49 @@ export function renderAdminView({ appEl, recipes, setView }) {
 
   const q = (sel) => appEl.querySelector(sel);
   const msgEl = q("#msg");
+  const swActiveEl = q("#swActiveVersion");
+  const swLatestEl = q("#swLatestVersion");
+  const swStateEl = q("#swVersionState");
+  const swHintEl = q("#swVersionHint");
 
   const setMsg = (text, kind = "") => {
     msgEl.textContent = text || "";
     msgEl.className = "msg " + (kind || "");
   };
+
+  async function refreshSwVersionInfo() {
+    if (!swActiveEl || !swLatestEl || !swStateEl || !swHintEl) return;
+
+    const info = await readServiceWorkerVersions();
+    const activeText = info.activeVersion || (info.registered ? "unbekannt" : "kein SW");
+    const latestText = info.latestVersion || (info.isDevHost ? "deaktiviert (localhost)" : "unbekannt");
+
+    let stateText = "Unbekannt";
+    let stateClass = "pill";
+
+    if (!info.supported) {
+      stateText = "Nicht verfuegbar";
+    } else if (info.isDevHost) {
+      stateText = "Lokal deaktiviert";
+    } else if (!info.registered) {
+      stateText = "Nicht registriert";
+    } else if (info.hasUpdate || info.mismatch) {
+      stateText = "Abweichung";
+      stateClass = "pill pill-warn";
+    } else if (info.activeVersion && info.latestVersion && info.activeVersion === info.latestVersion) {
+      stateText = "Aktuell";
+      stateClass = "pill";
+    } else {
+      stateText = "Registriert";
+    }
+
+    swActiveEl.textContent = activeText;
+    swLatestEl.textContent = latestText;
+    swStateEl.textContent = stateText;
+    swStateEl.className = stateClass;
+    swHintEl.textContent = info.warning || (stateText === "Aktuell" ? "Aktiver Service Worker entspricht der neuesten Datei." : "");
+    swHintEl.className = info.hasUpdate || info.mismatch ? "hint hint-bad" : "hint";
+  }
 
   q("#btnBack")?.addEventListener("click", () => {
     setView({ name: "list", selectedId: null, q: "" });
@@ -457,6 +515,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
   });
 
   // initial load
+  refreshSwVersionInfo();
   refreshSharing();
 
 }

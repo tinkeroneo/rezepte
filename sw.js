@@ -1,5 +1,6 @@
 // sw.js - minimal offline cache for app shell (no build step)
-const CACHE = "tinkeroneo-v4-20260104";
+const SW_VERSION = "2026-03-14-1";
+const CACHE = `tinkeroneo-${SW_VERSION}`;
 
 const ASSETS = [
   "./",
@@ -32,6 +33,9 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event?.data?.type === "SKIP_WAITING") self.skipWaiting();
+  if (event?.data?.type === "GET_META" && event.ports?.[0]) {
+    event.ports[0].postMessage({ version: SW_VERSION, cache: CACHE });
+  }
 });
 
 self.addEventListener("fetch", (event) => {
