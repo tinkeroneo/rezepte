@@ -119,7 +119,7 @@ function showBanner(type, err, meta = {}) {
   if (type === "error") sendToBackend(entry);
 
   const msg = normalizeErr(err);
-  const title = type === "success" ? "Erfolg" : type === "info" ? "Hinweis" : "Fehler";
+  const title = type === "success" ? "" : type === "info" ? "Hinweis" : "Fehler";
 
   let el = document.getElementById("globalFeedbackBanner");
   if (!el) {
@@ -146,7 +146,10 @@ function showBanner(type, err, meta = {}) {
 
   const titleEl = el.querySelector("#globalFeedbackBannerTitle");
   const msgEl = el.querySelector("#globalFeedbackBannerMsg");
-  if (titleEl) titleEl.textContent = title;
+  if (titleEl) {
+    titleEl.textContent = title;
+    titleEl.style.display = title ? "" : "none";
+  }
   if (msgEl) msgEl.textContent = msg;
 
   if (__bannerTimer) {
