@@ -1,28 +1,11 @@
+import { applyImageFocusToElement, normalizeImageFocus } from "../../services/recipeImagePresentation.js";
+
 export function normalizeFocus(focus) {
-  const f = (focus && typeof focus === "object") ? { ...focus } : {};
-  const x = Number.isFinite(Number(f.x)) ? Number(f.x) : 50;
-  const y = Number.isFinite(Number(f.y)) ? Number(f.y) : 50;
-  const zoom = Number.isFinite(Number(f.zoom)) ? Math.max(1, Math.min(3, Number(f.zoom))) : 1;
-  const mode = (f.mode === "cover" || f.mode === "manual" || f.mode === "crop") ? "cover" : "auto";
-  return { x, y, zoom, mode };
+  return normalizeImageFocus(focus);
 }
 
 export function applyFocusToImg(img, focus) {
-  if (!img) return;
-  const f = normalizeFocus(focus);
-  const pos = `${f.x}% ${f.y}%`;
-
-  img.style.objectPosition = pos;
-
-  if (f.mode === "cover") {
-    img.style.objectFit = "cover";
-    img.style.transform = `scale(${f.zoom})`;
-    img.style.transformOrigin = pos;
-  } else {
-    img.style.objectFit = "contain";
-    img.style.transform = "scale(1)";
-    img.style.transformOrigin = "50% 50%";
-  }
+  applyImageFocusToElement(img, focus);
 }
 
 export function bindImageFocusPanel({

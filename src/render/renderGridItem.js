@@ -1,4 +1,5 @@
 import { escapeHtml, recipeImageOrDefault, recipeImageForCard } from "../utils.js";
+import { encodeImageFocusAttr } from "../services/recipeImagePresentation.js";
 import { isFavorite } from "../domain/favorites.js";
 
 export function renderGridItem(r, ctx) {
@@ -6,12 +7,13 @@ export function renderGridItem(r, ctx) {
 
   const isPending = r._pending || (pendingIds && pendingIds.has(r.id));
   const isTodo = Array.isArray(r.tags) && r.tags.some((t) => String(t || "").trim().toLowerCase() === "todo");
+  const resizeMode = r?.image_focus?.mode === "alpha-fit" ? "contain" : "cover";
 
   return `
     <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
       <div class="grid-media">
         ${recipeImageOrDefault(r.image_url)
-          ? `<img class="grid-img" src="${escapeHtml(recipeImageForCard(r.image_url, "grid"))}" data-default-img="${r.image_url ? "" : "1"}" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
+          ? `<img class="grid-img" src="${escapeHtml(recipeImageForCard(r.image_url, "grid", { resize: resizeMode }))}" data-default-img="${r.image_url ? "" : "1"}" data-image-focus="${encodeImageFocusAttr(r.image_focus)}" data-auto-alpha="1" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
           : coverFallbackHtml(r, "grid-img")
         }
         ${isTodo ? `<span class="todo-ribbon" aria-hidden="true">ToDo</span>` : ``}

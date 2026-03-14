@@ -2,6 +2,7 @@
 import { escapeHtml, recipeImageOrDefault } from "../../utils.js";
 import { splitStepsToCards } from "../../domain/steps.js";
 import { buildMenuIngredients, buildMenuStepSections } from "../../domain/menu.js";
+import { encodeImageFocusAttr } from "../../services/recipeImagePresentation.js";
 import { renderIngredientsHtml } from "../shared.ingredients.js";
 
 function formatStepCardTitle(title, index) {
@@ -59,6 +60,8 @@ export function renderDetailImageHtml({ r }) {
           id="detailImg" 
           class="detail-img" 
           src="${escapeHtml(recipeImageOrDefault(r.image_url))}" 
+          data-image-focus="${encodeImageFocusAttr(r.image_focus)}"
+          data-auto-alpha="1"
           data-default-img="" 
           alt="${escapeHtml(r.title)}" 
         />

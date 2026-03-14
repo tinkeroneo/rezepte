@@ -25,16 +25,17 @@ function withImageTransform(url, { width, height, quality = 72, resize = "cover"
 
 // Returns a smaller image variant for list/grid cards when the source is a
 // Supabase Storage public-object URL. Other URLs are returned unchanged.
-export function recipeImageForCard(imageUrl, kind = "list") {
+export function recipeImageForCard(imageUrl, kind = "list", options = {}) {
   const raw = recipeImageOrDefault(imageUrl);
   if (!raw) return raw;
 
   try {
     const url = new URL(raw, window.location.origin);
+    const resize = options?.resize || "cover";
     if (kind === "grid") {
-      return withImageTransform(url, { width: 420, height: 420, quality: 74, resize: "cover", format: "webp" });
+      return withImageTransform(url, { width: 420, height: 420, quality: 74, resize, format: "webp" });
     }
-    return withImageTransform(url, { width: 128, height: 128, quality: 72, resize: "cover", format: "webp" });
+    return withImageTransform(url, { width: 128, height: 128, quality: 72, resize, format: "webp" });
   } catch {
     return raw;
   }

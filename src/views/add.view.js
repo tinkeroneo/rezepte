@@ -9,6 +9,7 @@ import { createImagePicker } from "../ui/imagePicker.js";
 
 import { withLoader } from "../ui/loader.js";
 import { showError, showSuccess } from "../services/errors.js";
+import { deriveAlphaFitFocus } from "../services/recipeImagePresentation.js";
 
 
 function normalizeRecipe(existing) {
@@ -282,6 +283,7 @@ export function renderAddView({
       .filter(Boolean);
 
     let image_url = img.getUrl();
+    let image_focus = r.image_focus ?? null;
 
     const pendingFile = img.getPendingFile();
     if (useBackend && pendingFile) {
@@ -307,6 +309,22 @@ export function renderAddView({
       }
     }
 
+    if (pendingFile && !image_focus) {
+      try {
+        image_focus = await deriveAlphaFitFocus({ file: pendingFile, currentFocus: r.image_focus });
+      } catch {
+        image_focus = r.image_focus ?? null;
+      }
+    } else if (!image_url) {
+      image_focus = null;
+    } else if (String(image_url) !== String(r.image_url || "")) {
+      try {
+        image_focus = await deriveAlphaFitFocus({ url: image_url, currentFocus: r.image_focus });
+      } catch {
+        image_focus = r.image_focus ?? null;
+      }
+    }
+
     const ingredients = String(ingredientsEl?.value || "")
       .split("\n")
       .map((s) => s.trim())
@@ -327,6 +345,7 @@ export function renderAddView({
       ingredients,
       steps,
       image_url: image_url || "",
+      image_focus,
     };
 
 

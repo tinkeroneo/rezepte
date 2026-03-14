@@ -25,6 +25,7 @@ import {
 // Optional: vorbereitet für Dirty-Guard (Caller kann diese Props später reinreichen)
 // -> bleibt komplett rückwärtskompatibel
 import { createDirtyTracker } from "../ui/dirtyTracker.js";
+import { bindManagedRecipeImages } from "../services/recipeImagePresentation.js";
 
 export function renderDetailView({
   appEl,
@@ -99,6 +100,7 @@ export function renderDetailView({
     </div>
   `;
   window.requestAnimationFrame(() => resetScrollTop());
+  const cleanupManagedImages = bindManagedRecipeImages({ root: appEl, observeMutations: false });
 
   // Optionaler Dirty-Tracker (aktuell wird hier nichts "halbfertig" editiert,
   // aber wir sind vorbereitet, falls du z.B. Fokusänderungen erst "Apply"en willst).
@@ -108,7 +110,9 @@ export function renderDetailView({
     setDirtyIndicator,
     setViewCleanup,
     beforeUnloadKey: "__tinkeroneo_beforeunload_detail",
-    onCleanup: () => { },
+    onCleanup: () => {
+      cleanupManagedImages?.();
+    },
   });
 
 

@@ -23,6 +23,7 @@ import { openImportSheet } from "../ui/importSheet.js";
 import { initFabMenu } from "../ui/fabMenu.js";
 
 import { watchCategoryAccents } from "../services/categoryAccentWatcher.js";
+import { bindManagedRecipeImages } from "../services/recipeImagePresentation.js";
 
 import { renderListShell } from "../render/listShell.js";
 
@@ -170,6 +171,7 @@ let ui = {
       renderGridItemHtml,
       renderListItemHtml
     });
+    bindManagedRecipeImages({ root: resultsEl, observeMutations: true });
         const chipsEl = qs(appEl, "#activeFilters");
     if (chipsEl) {
       chipsEl.innerHTML = renderActiveFilterChips({ ui: u });
