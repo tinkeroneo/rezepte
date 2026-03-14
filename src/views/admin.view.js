@@ -1,4 +1,10 @@
-import { getCategoryColors, setCategoryColor, normalizeCategoryToken } from "../domain/categories.js";
+import {
+  deriveCategoryColor,
+  getCategoryColors,
+  removeCategoryColor,
+  setCategoryColor,
+  normalizeCategoryToken
+} from "../domain/categories.js";
 import { createBeep } from "../domain/timers.js";
 import { readServiceWorkerVersions } from "../services/swInfo.js";
 import { escapeHtml } from "../utils.js";
@@ -24,7 +30,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
 
 
   // Category colors (local setting)
-  const catColorMap = getCategoryColors();
   const catTokens = Array.from(
     new Set(
       (Array.isArray(recipes) ? recipes : [])
@@ -33,22 +38,29 @@ export function renderAdminView({ appEl, recipes, setView }) {
     )
   ).sort((a,b)=>a.localeCompare(b));
 
-  const catRowsHtml = catTokens.length
-    ? catTokens.map(cat => {
-        const key = normalizeCategoryToken(cat);
-        const col = catColorMap[key] || "#d9e8df";
-        return `
-          <div class="row row--spread" style="align-items:center; gap:12px;">
-            <div style="min-width:160px;">
-              <div class="label">${cat}</div>
-            </div>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <input class="catColor" type="color" value="${col}" data-cat="${cat}" />
-              <span class="hint" style="min-width:110px;">${col}</span>
-            </div>
-          </div>`;
-      }).join("")
-    : `<div class="hint">Noch keine Kategorien gefunden. Sobald Rezepte Kategorien haben, erscheinen sie hier.</div>`;
+  const renderCatRowsHtml = () => {
+    const catColorMap = getCategoryColors();
+    return catTokens.length
+      ? catTokens.map((cat) => {
+          const key = normalizeCategoryToken(cat);
+          const hasOverride = Object.prototype.hasOwnProperty.call(catColorMap, key);
+          const col = hasOverride ? catColorMap[key] : deriveCategoryColor(cat);
+          return `
+            <div class="row row--spread" style="align-items:center; gap:12px;">
+              <div style="min-width:160px;">
+                <div class="label">${escapeHtml(cat)}</div>
+                <div class="hint" style="margin:0;">${hasOverride ? "Manuell" : "Automatisch aus Kategoriename"}</div>
+              </div>
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+                <input class="catColor" type="color" value="${escapeHtml(col)}" data-cat="${escapeHtml(cat)}" />
+                <span class="hint" style="min-width:84px;">${escapeHtml(col)}</span>
+                <span class="pill ${hasOverride ? "" : "pill-ghost"}">${hasOverride ? "Override" : "Auto"}</span>
+                <button class="btn btn--ghost btn--sm" type="button" data-cat-auto="${escapeHtml(cat)}" ${hasOverride ? "" : "disabled"}>Auto</button>
+              </div>
+            </div>`;
+        }).join("")
+      : `<div class="hint">Noch keine Kategorien gefunden. Sobald Rezepte Kategorien haben, erscheinen sie hier.</div>`;
+  };
 
 
   appEl.innerHTML = `
@@ -101,23 +113,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
 
           </div>
         </section>
-
-        <section class="card">
-          <div class="card__hd">
-            <div>
-              <h2 class="card__title">Kategorien</h2>
-              <div class="card__subtitle">Farben als Akzent in der Liste</div>
-            </div>
-          </div>
-          <div class="card__bd">
-            <div class="hint">Farben werden in der Listenansicht als Akzent genutzt.</div>
-            <div id="catColors" class="form" style="margin-top:8px; display:flex; flex-direction:column; gap:8px;">
-              ${catRowsHtml || `<div class="hint">Noch keine Kategorien vorhanden.</div>`}
-            </div>
-          </div>
-        </section>
-
-        
 
         <section class="card">
           <div class="card__hd">
@@ -234,6 +229,24 @@ export function renderAdminView({ appEl, recipes, setView }) {
           </div>
         </section>
 
+        <section class="card">
+          <div class="card__hd">
+            <div>
+              <h2 class="card__title">Kategorien</h2>
+              <div class="card__subtitle">Selten noetig: Auto-Farben mit optionalem Override</div>
+            </div>
+          </div>
+          <div class="card__bd">
+            <details class="details">
+              <summary>Kategorie-Farben verwalten (${escapeHtml(String(catTokens.length))})</summary>
+              <div class="hint" style="margin-top:10px;">Ohne manuelle Auswahl wird pro Kategoriename automatisch eine Default-Farbe abgeleitet.</div>
+              <div id="catColors" class="form" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                ${renderCatRowsHtml()}
+              </div>
+            </details>
+          </div>
+        </section>
+
       </div>
     </div>
   
@@ -242,6 +255,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
 
   const q = (sel) => appEl.querySelector(sel);
   const msgEl = q("#msg");
+  const catColorsEl = q("#catColors");
   const swActiveEl = q("#swActiveVersion");
   const swLatestEl = q("#swLatestVersion");
   const swStateEl = q("#swVersionState");
@@ -250,6 +264,11 @@ export function renderAdminView({ appEl, recipes, setView }) {
   const setMsg = (text, kind = "") => {
     msgEl.textContent = text || "";
     msgEl.className = "msg " + (kind || "");
+  };
+
+  const refreshCategoryRows = () => {
+    if (!catColorsEl) return;
+    catColorsEl.innerHTML = renderCatRowsHtml();
   };
 
   async function refreshSwVersionInfo() {
@@ -434,17 +453,26 @@ export function renderAdminView({ appEl, recipes, setView }) {
   q("#btnReload")?.addEventListener("click", () => location.reload());
 
   // category colors
-  const cc = q("#catColors");
-  if (cc) {
-    cc.addEventListener("input", (ev) => {
+  if (catColorsEl) {
+    catColorsEl.addEventListener("input", (ev) => {
       const el = ev.target;
       if (!(el instanceof window.HTMLInputElement)) return;
       if (el.type !== "color") return;
       const cat = el.getAttribute("data-cat") || "";
       const col = el.value;
       setCategoryColor(cat, col);
+      refreshCategoryRows();
 
       // update immediately (no reload)
+      try { window.dispatchEvent(new window.Event("category-colors-changed")); } catch { /* ignore */ }
+    });
+
+    catColorsEl.addEventListener("click", (ev) => {
+      const btn = ev.target?.closest?.("[data-cat-auto]");
+      if (!btn) return;
+      const cat = btn.getAttribute("data-cat-auto") || "";
+      removeCategoryColor(cat);
+      refreshCategoryRows();
       try { window.dispatchEvent(new window.Event("category-colors-changed")); } catch { /* ignore */ }
     });
   }
