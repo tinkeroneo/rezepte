@@ -54,6 +54,11 @@ export function readRadioConsent() {
   return false;
 }
 
+export function setRadioConsent(on) {
+  lsSetStr(KEYS.RADIO_CONSENT, on ? "1" : "0");
+  window.dispatchEvent(new window.Event("tinkeroneo:radioFeatureChanged"));
+}
+
 export function clearRadioConsent() {
   lsSetStr(KEYS.RADIO_CONSENT, "0");
   window.dispatchEvent(new window.Event("tinkeroneo:radioFeatureChanged"));

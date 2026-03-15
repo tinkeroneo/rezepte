@@ -14,6 +14,7 @@ export function installSettingsBridge({
   readRadioFeature,
   setRadioFeature,
   readRadioConsent,
+  setRadioConsent,
   clearRadioConsent,
   readTimerRingIntervalMs,
   setTimerRingIntervalMs,
@@ -62,6 +63,7 @@ export function installSettingsBridge({
     readRadioFeature,
     setRadioFeature: (enabled) => setRadioFeature(enabled),
     readRadioConsent,
+    setRadioConsent: (enabled) => setRadioConsent(enabled),
     clearRadioConsent,
 
     readTimerRingIntervalMs,

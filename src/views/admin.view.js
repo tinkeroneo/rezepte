@@ -10,6 +10,33 @@ import { readServiceWorkerVersions } from "../services/swInfo.js";
 import { escapeHtml } from "../utils.js";
 // src/views/admin.view.js
 
+function renderAdminHint(text, label = "Hinweis") {
+  const safeText = String(text || "").trim();
+  if (!safeText) return "";
+  const safeLabel = escapeHtml(label);
+  return `
+    <details class="admin-help">
+      <summary class="admin-help__btn" aria-label="${safeLabel}" title="${safeLabel}">?</summary>
+      <div class="admin-help__bubble">${escapeHtml(safeText)}</div>
+    </details>
+  `;
+}
+
+function renderAdminSetting({ title, hint = "", controlHtml = "", statusHtml = "" }) {
+  return `
+    <div class="admin-setting">
+      <div class="admin-setting__main">
+        <div class="admin-setting__lead">
+          <div class="label">${escapeHtml(title)}</div>
+          ${renderAdminHint(hint, `${title} Hinweis`)}
+        </div>
+        ${statusHtml ? `<div class="admin-setting__status">${statusHtml}</div>` : ""}
+      </div>
+      <div class="admin-setting__control">${controlHtml}</div>
+    </div>
+  `;
+}
+
 export function renderAdminView({ appEl, recipes, setView }) {
   const s = window.__tinkeroneoSettings || {};
 
@@ -47,12 +74,12 @@ export function renderAdminView({ appEl, recipes, setView }) {
           const hasOverride = Object.prototype.hasOwnProperty.call(catColorMap, key);
           const col = hasOverride ? catColorMap[key] : deriveCategoryColor(cat);
           return `
-            <div class="row row--spread" style="align-items:center; gap:12px;">
-              <div style="min-width:160px;">
+            <div class="admin-cat-row">
+              <div class="admin-cat-row__title">
                 <div class="label">${escapeHtml(cat)}</div>
                 <div class="hint" style="margin:0;">${hasOverride ? "Manuell" : "Automatisch aus Kategoriename"}</div>
               </div>
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+              <div class="admin-cat-row__controls">
                 <input class="catColor" type="color" value="${escapeHtml(col)}" data-cat="${escapeHtml(cat)}" />
                 <span class="hint" style="min-width:84px;">${escapeHtml(col)}</span>
                 <span class="pill ${hasOverride ? "" : "pill-ghost"}">${hasOverride ? "Override" : "Auto"}</span>
@@ -263,6 +290,99 @@ export function renderAdminView({ appEl, recipes, setView }) {
   
   `;
 
+  const cardBodies = Array.from(appEl.querySelectorAll(".container > .card .card__bd"));
+  const appSettingsBody = cardBodies[0] || null;
+  const timerSettingsBody = cardBodies[1] || null;
+
+  if (appSettingsBody) {
+    appSettingsBody.classList.add("admin-settings");
+    appSettingsBody.innerHTML = `
+      ${renderAdminSetting({
+        title: "Winter Mode",
+        controlHtml: `
+          <label class="toggle">
+            <input id="winterToggle" type="checkbox" ${winter ? "checked" : ""} />
+          </label>
+        `
+      })}
+
+      ${renderAdminSetting({
+        title: "Radio (Drittanbieter)",
+        hint: "Erteilter Consent erlaubt das Laden des externen Radio-Players. Ohne Consent wird kein Drittanbieter-Inhalt eingebunden.",
+        statusHtml: `<span class="pill ${radioConsent ? "" : "pill-ghost"}">${radioConsent ? "Consent aktiv" : "Kein Consent"}</span>`,
+        controlHtml: `
+          <label class="toggle">
+            <input id="radioConsentToggle" type="checkbox" ${radioConsent ? "checked" : ""} />
+          </label>
+        `
+      })}
+
+      ${renderAdminSetting({
+        title: "Bildmodus-Debug",
+        hint: "Zeigt in der Detailansicht an, ob cover, auto oder alpha-fit aktiv ist.",
+        controlHtml: `
+          <label class="toggle">
+            <input id="imageModeDebugToggle" type="checkbox" ${imageModeDebug ? "checked" : ""} />
+          </label>
+        `
+      })}
+    `;
+  }
+
+  if (timerSettingsBody) {
+    timerSettingsBody.classList.add("admin-settings");
+    timerSettingsBody.innerHTML = `
+      ${renderAdminSetting({
+        title: "Ring-Intervall (ms)",
+        hint: "Abstand zwischen zwei Klingel-Signalen. Erlaubter Bereich: 125 bis 5000 ms.",
+        controlHtml: `<input id="ringInterval" class="admin-input admin-input--short" type="number" min="125" max="5000" step="25" value="${escapeHtml(ringIntervalMs)}" />`
+      })}
+
+      ${renderAdminSetting({
+        title: "Step Highlight",
+        hint: "Hebt den aktuellen Schritt sichtbar hervor, wenn ein Timer abläuft.",
+        controlHtml: `
+          <label class="toggle">
+            <input id="stepHighlightToggle" type="checkbox" ${stepHighlight ? "checked" : ""} />
+          </label>
+        `
+      })}
+
+      ${renderAdminSetting({
+        title: "Timer-Ton",
+        hint: "Läuft bei Ablauf dauerhaft, bis Bestätigen, Verlängern oder Stoppen.",
+        controlHtml: `
+          <label class="toggle">
+            <input id="timerSoundEnabled" type="checkbox" ${timerSoundEnabled ? "checked" : ""} />
+          </label>
+        `
+      })}
+
+      <div class="admin-subgrid">
+        <label class="admin-input-group">
+          <div class="label">Sound</div>
+          <select id="timerSoundId">
+            <option value="gong" ${timerSoundId === "gong" ? "selected" : ""}>A · Küchen-Gong</option>
+            <option value="wood" ${timerSoundId === "wood" ? "selected" : ""}>B · Holz-Block</option>
+            <option value="pulse" ${timerSoundId === "pulse" ? "selected" : ""}>C · Elektronisch</option>
+            <option value="bowl" ${timerSoundId === "bowl" ? "selected" : ""}>D · Klangschale</option>
+          </select>
+        </label>
+
+        <label class="admin-input-group">
+          <div class="label">Lautstärke</div>
+          <div class="admin-range-row">
+            <input id="timerSoundVolume" type="range" min="0" max="100" step="1" value="${escapeHtml(String(Math.round(timerSoundVolume * 100)))}" />
+            <span class="pill" id="timerSoundVolumeLabel">${escapeHtml(String(Math.round(timerSoundVolume * 100)))}%</span>
+          </div>
+        </label>
+
+        <div class="admin-input-group admin-input-group--button">
+          <button class="btn" id="timerSoundPreview" type="button" title="Sound abspielen">▶ Test</button>
+        </div>
+      </div>
+    `;
+  }
 
   const q = (sel) => appEl.querySelector(sel);
   const msgEl = q("#msg");
@@ -271,6 +391,8 @@ export function renderAdminView({ appEl, recipes, setView }) {
   const swLatestEl = q("#swLatestVersion");
   const swStateEl = q("#swVersionState");
   const swHintEl = q("#swVersionHint");
+
+  q("#btnDiagnostics")?.parentElement?.classList.add("admin-actions");
 
   const setMsg = (text, kind = "") => {
     msgEl.textContent = text || "";
@@ -353,6 +475,17 @@ export function renderAdminView({ appEl, recipes, setView }) {
       s.clearRadioConsent?.();
       setMsg("Consent zurückgesetzt ✅", "ok");
       location.reload();
+    } catch (e) {
+      setMsg(String(e?.message || e), "bad");
+    }
+  });
+
+  q("#radioConsentToggle")?.addEventListener("change", () => {
+    try {
+      const enabled = !!q("#radioConsentToggle")?.checked;
+      if (s.setRadioConsent) s.setRadioConsent(enabled);
+      else if (!enabled) s.clearRadioConsent?.();
+      setMsg(enabled ? "Consent gespeichert." : "Consent entfernt.", "ok");
     } catch (e) {
       setMsg(String(e?.message || e), "bad");
     }
