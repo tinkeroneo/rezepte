@@ -390,7 +390,7 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function applyCoverPosition(img, { x = 0.5, y = 0.5 } = {}) {
+function applyCoverPosition(img, { x = 0.5, y = 0.5, scaleFactor = 1 } = {}) {
   const parent = img.parentElement;
   if (!parent) return false;
 
@@ -400,7 +400,7 @@ function applyCoverPosition(img, { x = 0.5, y = 0.5 } = {}) {
   const naturalHeight = Number(img.naturalHeight || 0);
   if (!containerWidth || !containerHeight || !naturalWidth || !naturalHeight) return false;
 
-  const scale = Math.max(containerWidth / naturalWidth, containerHeight / naturalHeight);
+  const scale = Math.max(containerWidth / naturalWidth, containerHeight / naturalHeight) * Math.max(1, Number(scaleFactor) || 1);
   const finalWidth = naturalWidth * scale;
   const finalHeight = naturalHeight * scale;
   const centerX = clamp(x, 0, 1) * finalWidth;
@@ -446,7 +446,9 @@ export function applyImageFocusToElement(img, focus) {
     img.dataset.imageModeEffective = "alpha-fit";
     if (context === "grid" || context === "list") {
       const centerY = f.alphaBounds.top + f.alphaBounds.height / 2;
-      applyCoverPosition(img, { x: f.x / 100, y: centerY });
+      const widthRatio = Number(f.alphaBounds.width || 1);
+      const zoomOut = widthRatio > 0.8 ? Math.min(1.18, 1 / Math.max(0.82, widthRatio)) : 1;
+      applyCoverPosition(img, { x: f.x / 100, y: centerY, scaleFactor: zoomOut });
     } else {
       applyAlphaFit(img, f.alphaBounds);
     }
