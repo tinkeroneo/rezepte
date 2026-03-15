@@ -7,6 +7,7 @@ import {
 } from "../domain/categories.js";
 import { createBeep } from "../domain/timers.js";
 import { readServiceWorkerVersions } from "../services/swInfo.js";
+import { applyThemeAndOverlay } from "../app/ui/theme.js";
 import { escapeHtml } from "../utils.js";
 // src/views/admin.view.js
 
@@ -531,7 +532,8 @@ export function renderAdminView({ appEl, recipes, setView }) {
     winterToggle.addEventListener("change", () => {
       try {
         s.setWinter?.(!!winterToggle.checked);
-        location.reload();
+        applyThemeAndOverlay();
+        setMsg("Gespeichert.", "ok");
       } catch (e) {
         setMsg(String(e?.message || e), "bad");
       }
