@@ -447,7 +447,10 @@ export function applyImageFocusToElement(img, focus) {
     if (context === "grid" || context === "list") {
       const centerY = f.alphaBounds.top + f.alphaBounds.height / 2;
       const widthRatio = Number(f.alphaBounds.width || 1);
-      const zoomOut = widthRatio > 0.8 ? Math.min(1.18, 1 / Math.max(0.82, widthRatio)) : 1;
+      const zoomOut =
+        context === "list" && widthRatio > 0.8
+          ? Math.min(1.18, 1 / Math.max(0.82, widthRatio))
+          : 1;
       applyCoverPosition(img, { x: f.x / 100, y: centerY, scaleFactor: zoomOut });
     } else {
       applyAlphaFit(img, f.alphaBounds);
