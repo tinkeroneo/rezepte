@@ -392,6 +392,19 @@ export function wireAccountControls(ctx) {
       }
     };
 
+    const enhanceMembersWithDisplayNames = (rows) => {
+      if (!membersEl || !Array.isArray(rows) || rows.length === 0) return;
+      const nodes = Array.from(membersEl.children || []);
+      rows.forEach((row, index) => {
+        const displayName = String(row?.display_name || "").trim();
+        if (!displayName) return;
+        const role = esc(row?.role || "-");
+        const node = nodes[index];
+        if (!node) return;
+        node.innerHTML = `<b>${esc(displayName)}</b> · <b>${role}</b>`;
+      });
+    };
+
     const refreshLists = async () => {
       const spaceId = getActiveSpaceId();
       if (!spaceId) return;
@@ -403,6 +416,7 @@ export function wireAccountControls(ctx) {
           typeof listPendingInvites === "function" ? listPendingInvites({ spaceId }) : [],
         ]);
         renderMembers(members);
+        enhanceMembersWithDisplayNames(members);
         renderInvites(invites);
       } catch (e) {
         if (membersEl) membersEl.textContent = "Fehler beim Laden.";

@@ -1,15 +1,14 @@
 import {
   deriveCategoryColor,
   getCategoryColors,
+  normalizeCategoryToken,
   removeCategoryColor,
   setCategoryColor,
-  normalizeCategoryToken
 } from "../domain/categories.js";
 import { createBeep } from "../domain/timers.js";
-import { readServiceWorkerVersions } from "../services/swInfo.js";
 import { applyThemeAndOverlay } from "../app/ui/theme.js";
+import { readServiceWorkerVersions } from "../services/swInfo.js";
 import { escapeHtml } from "../utils.js";
-// src/views/admin.view.js
 
 function renderAdminHint(text, label = "Hinweis") {
   const safeText = String(text || "").trim();
@@ -41,56 +40,49 @@ function renderAdminSetting({ title, hint = "", controlHtml = "", statusHtml = "
 export function renderAdminView({ appEl, recipes, setView }) {
   const s = window.__tinkeroneoSettings || {};
 
-  const cloudEnabled = !!s.readUseBackend?.();
-  const auth = s.getAuthContext?.() || null;
-  const activeSpaceId = String(auth?.spaceId || "");
   const winter = !!s.readWinter?.();
   const radioConsent = !!s.readRadioConsent?.();
-
+  const imageModeDebug = !!s.readImageModeDebug?.();
   const ringIntervalMs = Number(s.readTimerRingIntervalMs?.() ?? 2800);
   const stepHighlight = !!s.readTimerStepHighlight?.();
-  const imageModeDebug = !!s.readImageModeDebug?.();
-
   const timerSoundEnabled = s.readTimerSoundEnabled ? !!s.readTimerSoundEnabled() : true;
   const timerSoundId = s.readTimerSoundId ? String(s.readTimerSoundId() || "bowl") : "gong";
-  const timerSoundVolume = s.readTimerSoundVolume ? Number(s.readTimerSoundVolume(  0.65) ?? 0.65) : 0.65;
-
+  const timerSoundVolume = s.readTimerSoundVolume ? Number(s.readTimerSoundVolume(0.65) ?? 0.65) : 0.65;
   const recipeCount = Array.isArray(recipes) ? recipes.length : 0;
 
-
-  // Category colors (local setting)
   const catTokens = Array.from(
     new Set(
       (Array.isArray(recipes) ? recipes : [])
-        .map(r => String(r?.category || "").split("/")[0].trim())
-        .filter(Boolean)
-    )
-  ).sort((a,b)=>a.localeCompare(b));
+        .map((recipe) => String(recipe?.category || "").split("/")[0].trim())
+        .filter(Boolean),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
 
   const renderCatRowsHtml = () => {
     const catColorMap = getCategoryColors();
     return catTokens.length
-      ? catTokens.map((cat) => {
-          const key = normalizeCategoryToken(cat);
-          const hasOverride = Object.prototype.hasOwnProperty.call(catColorMap, key);
-          const col = hasOverride ? catColorMap[key] : deriveCategoryColor(cat);
-          return `
-            <div class="admin-cat-row">
-              <div class="admin-cat-row__title">
-                <div class="label">${escapeHtml(cat)}</div>
+      ? catTokens
+          .map((cat) => {
+            const key = normalizeCategoryToken(cat);
+            const hasOverride = Object.prototype.hasOwnProperty.call(catColorMap, key);
+            const col = hasOverride ? catColorMap[key] : deriveCategoryColor(cat);
+            return `
+              <div class="admin-cat-row">
+                <div class="admin-cat-row__title">
+                  <div class="label">${escapeHtml(cat)}</div>
+                </div>
+                <div class="admin-cat-row__controls">
+                  <input class="catColor" type="color" value="${escapeHtml(col)}" data-cat="${escapeHtml(cat)}" />
+                  ${hasOverride ? `<button class="btn btn--ghost btn--sm" type="button" data-cat-auto="${escapeHtml(cat)}" title="Automatische Farbe wiederherstellen">↺</button>` : ""}
+                </div>
               </div>
-              <div class="admin-cat-row__controls">
-                <input class="catColor" type="color" value="${escapeHtml(col)}" data-cat="${escapeHtml(cat)}" />
-                ${hasOverride ? `<button class="btn btn--ghost btn--sm" type="button" data-cat-auto="${escapeHtml(cat)}" title="Automatische Farbe wiederherstellen">↺</button>` : ""}
-              </div>
-            </div>`;
-        }).join("")
+            `;
+          })
+          .join("")
       : `<div class="hint">Noch keine Kategorien gefunden. Sobald Rezepte Kategorien haben, erscheinen sie hier.</div>`;
   };
 
-
   appEl.innerHTML = `
-
     <div class="page">
       <header class="topbar">
         <div class="title">Admin</div>
@@ -99,7 +91,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
       </header>
 
       <div class="container">
-
         <section class="card">
           <div class="card__hd">
             <div>
@@ -107,47 +98,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
               <div class="card__subtitle">Basis-Einstellungen</div>
             </div>
           </div>
-          <div class="card__bd">
-      
-
-
-            <div class="row row--spread">
-              <div>
-                <div class="label" hint="Winter Mode">Winter Mode</div>
-                
-              </div>
-              <label class="toggle">
-                <input id="winterToggle" type="checkbox" ${winter ? "checked" : ""} />
-              </label>
-            </div>
-
-            <div class="row row--spread">
-              <div>
-                <div class="label">Radio (Drittanbieter)</div>
-              </div>
-              <div></div>
-              <div class="row row--right">
-                <button class="btn" id="btnRadioResetConsent" type="button" ${radioConsent ? "" : "disabled"}>
-                  Consent zurücksetzen
-                </button>
-                <div class="hint" style="margin:0;">Consent: ${radioConsent ? "ja" : "nein"}</div>
-              </div>
-
-            </div>
-
-            <div class="row row--spread">
-              <div>
-                <div class="label">Bildmodus-Debug</div>
-                <div class="hint">Zeigt in der Detailansicht an, ob cover, auto oder alpha-fit aktiv ist.</div>
-              </div>
-              <label class="toggle">
-                <input id="imageModeDebugToggle" type="checkbox" ${imageModeDebug ? "checked" : ""} />
-              </label>
-            </div>
-
-            
-
-          </div>
+          <div class="card__bd"></div>
         </section>
 
         <section class="card">
@@ -157,61 +108,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
               <div class="card__subtitle">Klingelt bis Bestätigen/Verlängern</div>
             </div>
           </div>
-          <div class="card__bd">
-
-            <label class="field">
-            <div class="row row--spread">
-              <div class="label">Ring Interval (ms)</div>
-              <input id="ringInterval" type="number" min="125" max="5000" step="25" value="${escapeHtml(ringIntervalMs)}" />
-              <div class="hint">125…5000 ms</div></div>
-            </label>
-            <label class="field">
-              <div class="row row--spread">
-              <div>
-                <div class="label">Step Highlight</div>
-                <div class="hint">Schritt wird hervorgehoben wenn Timer abläuft</div>
-              </div>
-              <label class="toggle">
-                <input id="stepHighlightToggle" type="checkbox" ${stepHighlight ? "checked" : ""} />
-                <span>Highlight</span>
-              </label>
-            </div>
-            </label>
-            <label class="field">
-            <div class="row row--spread" style="align-items:flex-start; gap: 14px;">
-              <div>
-                <div class="label">Timer‑Ton</div>
-                <div class="hint">Läuft bei Ablauf dauerhaft, bis Bestätigen/Verlängern/Stop.</div>
-              </div>
-              <label class="toggle">
-                <input id="timerSoundEnabled" type="checkbox" ${timerSoundEnabled ? "checked" : ""} />
-                <span>Ton</span>
-              </label>
-            </div>
-            </label>
-            <div class="row" style="flex-wrap:wrap; gap: 12px; align-items:flex-end;">
-              <label class="field" style="min-width:240px;">
-                <div class="label">Sound</div>
-                <select id="timerSoundId">
-                  <option value="gong" ${timerSoundId === "gong" ? "selected" : ""}>A · Küchen‑Gong</option>
-                  <option value="wood" ${timerSoundId === "wood" ? "selected" : ""}>B · Holz‑Block</option>
-                  <option value="pulse" ${timerSoundId === "pulse" ? "selected" : ""}>C · Elektronisch</option>
-                  <option value="bowl" ${timerSoundId === "bowl" ? "selected" : ""}>D · Klangschale</option>
-                </select>
-              </label>
-
-              <label class="field" style="min-width:240px;">
-                <div class="label">Lautstärke</div>
-                <div class="row" style="gap:10px; align-items:center;">
-                  <input id="timerSoundVolume" type="range" min="0" max="100" step="1" value="${escapeHtml(String(Math.round(timerSoundVolume * 100)))}" style="flex:1;" />
-                  <span class="hint" id="timerSoundVolumeLabel" style="min-width:44px; text-align:right;">${escapeHtml(String(Math.round(timerSoundVolume * 100)))}%</span>
-                </div>
-              </label>
-
-              <button class="btn" id="timerSoundPreview" type="button" title="Sound abspielen">▶︎ Test</button>
-            </div>
-
-          </div>  
+          <div class="card__bd"></div>
         </section>
 
         <section class="card">
@@ -221,55 +118,14 @@ export function renderAdminView({ appEl, recipes, setView }) {
               <div class="card__subtitle">Diagnose & Wartung</div>
             </div>
           </div>
-          <div class="card__bd">
-            <div class="panel" style="margin-bottom:12px;">
-              <h3 style="margin:0 0 .75rem 0;">Service Worker</h3>
-              <div style="display:grid; gap:.55rem;">
-                <div class="row row--spread" style="gap:12px;">
-                  <div class="label">Aktiver SW</div>
-                  <div id="swActiveVersion" class="pill">Pruefe...</div>
-                </div>
-                <div class="row row--spread" style="gap:12px;">
-                  <div class="label">Neueste sw.js</div>
-                  <div id="swLatestVersion" class="pill">Pruefe...</div>
-                </div>
-                <div class="row row--spread" style="gap:12px;">
-                  <div class="label">Status</div>
-                  <div id="swVersionState" class="pill">Pruefe...</div>
-                </div>
-              </div>
-              <div id="swVersionHint" class="hint" style="margin-top:.75rem;"></div>
-            </div>
-
-            <div class="row" style="flex-wrap:wrap;">
-              <button class="btn" id="btnDiagnostics" type="button">Diagnostics</button>
-              <button class="btn" id="btnSelftest" type="button">Selftest</button>
-              <button class="btn" id="btnSwReload" type="button">SW Reload</button>
-              <button class="btn" id="btnReload" type="button">Reload</button>
-            </div>
-
-            <div class="msg" id="msg"></div>
-
-            <details class="details">
-              <summary>Info</summary>
-              <pre class="pre">${escapeHtml(
-                [
-                  `recipes=${recipeCount}`,
-                  `winter=${winter}`,
-                  `ringIntervalMs=${ringIntervalMs}`,
-                  `stepHighlight=${stepHighlight}`,
-                  `href=${location.href}`,
-                ].join("\n")
-              )}</pre>
-            </details>
-          </div>
+          <div class="card__bd"></div>
         </section>
 
         <section class="card">
           <div class="card__hd">
             <div>
               <h2 class="card__title">Kategorien</h2>
-              <div class="card__subtitle">Selten noetig: Auto-Farben mit optionalem Override</div>
+              <div class="card__subtitle">Selten nötig: Farben bei Bedarf überschreiben</div>
             </div>
           </div>
           <div class="card__bd">
@@ -281,10 +137,8 @@ export function renderAdminView({ appEl, recipes, setView }) {
             </details>
           </div>
         </section>
-
       </div>
     </div>
-  
   `;
 
   const cardBodies = Array.from(appEl.querySelectorAll(".container > .card .card__bd"));
@@ -301,7 +155,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <label class="toggle">
             <input id="winterToggle" type="checkbox" ${winter ? "checked" : ""} />
           </label>
-        `
+        `,
       })}
 
       ${renderAdminSetting({
@@ -312,7 +166,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <label class="toggle">
             <input id="radioConsentToggle" type="checkbox" ${radioConsent ? "checked" : ""} />
           </label>
-        `
+        `,
       })}
 
       ${renderAdminSetting({
@@ -322,7 +176,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <label class="toggle">
             <input id="imageModeDebugToggle" type="checkbox" ${imageModeDebug ? "checked" : ""} />
           </label>
-        `
+        `,
       })}
     `;
   }
@@ -333,7 +187,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
       ${renderAdminSetting({
         title: "Ring-Intervall (ms)",
         hint: "Abstand zwischen zwei Klingel-Signalen. Erlaubter Bereich: 125 bis 5000 ms.",
-        controlHtml: `<input id="ringInterval" class="admin-input admin-input--short" type="number" min="125" max="5000" step="25" value="${escapeHtml(ringIntervalMs)}" />`
+        controlHtml: `<input id="ringInterval" class="admin-input admin-input--short" type="number" min="125" max="5000" step="25" value="${escapeHtml(ringIntervalMs)}" />`,
       })}
 
       ${renderAdminSetting({
@@ -343,7 +197,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <label class="toggle">
             <input id="stepHighlightToggle" type="checkbox" ${stepHighlight ? "checked" : ""} />
           </label>
-        `
+        `,
       })}
 
       ${renderAdminSetting({
@@ -353,7 +207,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <label class="toggle">
             <input id="timerSoundEnabled" type="checkbox" ${timerSoundEnabled ? "checked" : ""} />
           </label>
-        `
+        `,
       })}
 
       <div class="admin-timer-panel">
@@ -397,7 +251,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
             </div>
             <div id="swVersionHint" class="hint" hidden></div>
           </div>
-          <div id="swVersionState" class="pill">Pruefe...</div>
+          <div id="swVersionState" class="pill">Prüfe...</div>
         </div>
 
         <details class="details admin-sw-details">
@@ -405,11 +259,11 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <div class="admin-sw-versions">
             <div class="admin-sw-kv">
               <div class="label">Aktiver SW</div>
-              <div id="swActiveVersion" class="pill">Pruefe...</div>
+              <div id="swActiveVersion" class="pill">Prüfe...</div>
             </div>
             <div class="admin-sw-kv">
               <div class="label">Neueste sw.js</div>
-              <div id="swLatestVersion" class="pill">Pruefe...</div>
+              <div id="swLatestVersion" class="pill">Prüfe...</div>
             </div>
           </div>
         </details>
@@ -433,7 +287,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
             `ringIntervalMs=${ringIntervalMs}`,
             `stepHighlight=${stepHighlight}`,
             `href=${location.href}`,
-          ].join("\n")
+          ].join("\n"),
         )}</pre>
       </details>
     `;
@@ -452,8 +306,9 @@ export function renderAdminView({ appEl, recipes, setView }) {
   q("#btnDiagnostics")?.parentElement?.classList.add("admin-actions");
 
   const setMsg = (text, kind = "") => {
+    if (!msgEl) return;
     msgEl.textContent = text || "";
-    msgEl.className = "msg " + (kind || "");
+    msgEl.className = `msg ${kind || ""}`.trim();
   };
 
   const refreshCategoryRows = () => {
@@ -507,7 +362,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
       hintText = info.warning || "Aktiver Service Worker weicht von der neuesten sw.js ab.";
     } else if (info.activeVersion && info.latestVersion && info.activeVersion === info.latestVersion) {
       stateText = "✅ Aktuell";
-      stateClass = "pill";
     } else {
       stateText = "ℹ Registriert";
     }
@@ -525,11 +379,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
     setView({ name: "list", selectedId: null, q: "" });
   });
 
-  // --- Backend toggle (NO reload, awaits setUseBackend) ---
-
-  // Theme
-
-  // Winter
   const winterToggle = q("#winterToggle");
   if (winterToggle) {
     winterToggle.addEventListener("change", () => {
@@ -537,8 +386,8 @@ export function renderAdminView({ appEl, recipes, setView }) {
         s.setWinter?.(!!winterToggle.checked);
         applyThemeAndOverlay();
         setMsg("Gespeichert.", "ok");
-      } catch (e) {
-        setMsg(String(e?.message || e), "bad");
+      } catch (error) {
+        setMsg(String(error?.message || error), "bad");
       }
     });
   }
@@ -547,83 +396,69 @@ export function renderAdminView({ appEl, recipes, setView }) {
     try {
       s.setImageModeDebug?.(!!q("#imageModeDebugToggle")?.checked);
       setMsg("Gespeichert.", "ok");
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
-    }
-  });
-
-  // Radio consent
-
-  q("#btnRadioResetConsent")?.addEventListener("click", () => {
-    try {
-      s.clearRadioConsent?.();
-      setMsg("Consent zurückgesetzt ✅", "ok");
-      location.reload();
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
+    } catch (error) {
+      setMsg(String(error?.message || error), "bad");
     }
   });
 
   radioConsentToggleEl?.addEventListener("change", () => {
     try {
-      const enabled = !!radioConsentToggleEl?.checked;
+      const enabled = !!radioConsentToggleEl.checked;
       if (s.setRadioConsent) s.setRadioConsent(enabled);
       else if (!enabled) s.clearRadioConsent?.();
       syncRadioConsentUi();
       setMsg(enabled ? "Consent gespeichert." : "Consent entfernt.", "ok");
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
+    } catch (error) {
+      setMsg(String(error?.message || error), "bad");
     }
   });
 
-  // Timer settings
   q("#ringInterval")?.addEventListener("change", () => {
     try {
-      s.setTimerRingIntervalMs?.(Number(q("#ringInterval").value));
-      setMsg("Gespeichert ✅", "ok");
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
+      s.setTimerRingIntervalMs?.(Number(q("#ringInterval")?.value));
+      setMsg("Gespeichert.", "ok");
+    } catch (error) {
+      setMsg(String(error?.message || error), "bad");
     }
   });
-
-  // maxRingSeconds is intentionally ignored (timer rings until acknowledged).
 
   q("#stepHighlightToggle")?.addEventListener("change", () => {
     try {
-      s.setTimerStepHighlight?.(!!q("#stepHighlightToggle").checked);
-      setMsg("Gespeichert ✅", "ok");
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
+      s.setTimerStepHighlight?.(!!q("#stepHighlightToggle")?.checked);
+      setMsg("Gespeichert.", "ok");
+    } catch (error) {
+      setMsg(String(error?.message || error), "bad");
     }
   });
 
-  // Timer sound
   q("#timerSoundEnabled")?.addEventListener("change", () => {
     try {
-      s.setTimerSoundEnabled?.(!!q("#timerSoundEnabled").checked);
-      setMsg("Gespeichert ✅", "ok");
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
+      s.setTimerSoundEnabled?.(!!q("#timerSoundEnabled")?.checked);
+      setMsg("Gespeichert.", "ok");
+    } catch (error) {
+      setMsg(String(error?.message || error), "bad");
     }
   });
 
   q("#timerSoundId")?.addEventListener("change", () => {
     try {
-      s.setTimerSoundId?.(String(q("#timerSoundId").value || "gong"));
-      setMsg("Gespeichert ✅", "ok");
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
+      s.setTimerSoundId?.(String(q("#timerSoundId")?.value || "gong"));
+      setMsg("Gespeichert.", "ok");
+    } catch (error) {
+      setMsg(String(error?.message || error), "bad");
     }
   });
 
   q("#timerSoundVolume")?.addEventListener("input", () => {
     try {
-      const pct = Number(q("#timerSoundVolume").value) || 0;
+      const pct = Number(q("#timerSoundVolume")?.value) || 0;
       const vol = Math.max(0, Math.min(1, pct / 100));
       s.setTimerSoundVolume?.(vol);
       const label = q("#timerSoundVolumeLabel");
       if (label) label.textContent = `${Math.round(vol * 100)}%`;
-    } catch { /* ignore */ }
+    } catch {
+      // ignore
+    }
   });
 
   q("#timerSoundPreview")?.addEventListener("click", async () => {
@@ -636,10 +471,11 @@ export function renderAdminView({ appEl, recipes, setView }) {
       const audio = createBeep({ soundId: sid, volume: vol });
       await audio.prime?.();
       await audio.playOnce?.();
-    } catch { /* ignore */ }
+    } catch {
+      // ignore
+    }
   });
 
-  // Tools
   q("#btnDiagnostics")?.addEventListener("click", () => setView({ name: "diagnostics" }));
   q("#btnSelftest")?.addEventListener("click", () => setView({ name: "selftest" }));
   q("#btnSwReload")?.addEventListener("click", async () => {
@@ -678,150 +514,44 @@ export function renderAdminView({ appEl, recipes, setView }) {
           if (reg.waiting) reg.waiting.postMessage({ type: "SKIP_WAITING" });
         });
       } else {
-        // No new worker waiting; do a normal reload to pick latest network assets.
         doReload();
         return;
       }
 
       window.setTimeout(doReload, 1800);
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
+    } catch (error) {
+      setMsg(String(error?.message || error), "bad");
     }
   });
   q("#btnReload")?.addEventListener("click", () => location.reload());
 
-  // category colors
   if (catColorsEl) {
-    catColorsEl.addEventListener("input", (ev) => {
-      const el = ev.target;
-      if (!(el instanceof window.HTMLInputElement)) return;
-      if (el.type !== "color") return;
+    catColorsEl.addEventListener("input", (event) => {
+      const el = event.target;
+      if (!(el instanceof window.HTMLInputElement) || el.type !== "color") return;
       const cat = el.getAttribute("data-cat") || "";
-      const col = el.value;
-      setCategoryColor(cat, col);
+      setCategoryColor(cat, el.value);
       refreshCategoryRows();
-
-      // update immediately (no reload)
-      try { window.dispatchEvent(new window.Event("category-colors-changed")); } catch { /* ignore */ }
+      try {
+        window.dispatchEvent(new window.Event("category-colors-changed"));
+      } catch {
+        // ignore
+      }
     });
 
-    catColorsEl.addEventListener("click", (ev) => {
-      const btn = ev.target?.closest?.("[data-cat-auto]");
+    catColorsEl.addEventListener("click", (event) => {
+      const btn = event.target?.closest?.("[data-cat-auto]");
       if (!btn) return;
       const cat = btn.getAttribute("data-cat-auto") || "";
       removeCategoryColor(cat);
       refreshCategoryRows();
-      try { window.dispatchEvent(new window.Event("category-colors-changed")); } catch { /* ignore */ }
+      try {
+        window.dispatchEvent(new window.Event("category-colors-changed"));
+      } catch {
+        // ignore
+      }
     });
   }
 
-  // Sharing (space invites)
-  async function refreshSharing() {
-    const membersEl = q("#membersList");
-    const invitesEl = q("#invitesList");
-    if (!membersEl || !invitesEl) return;
-
-    if (!cloudEnabled) {
-      membersEl.textContent = "CLOUD deaktiviert";
-      invitesEl.textContent = "CLOUD deaktiviert";
-      return;
-    }
-
-    if (!s.listSpaceMembers || !s.listPendingInvites) {
-      membersEl.textContent = "Sharing-API fehlt";
-      invitesEl.textContent = "Sharing-API fehlt";
-      return;
-    }
-
-    membersEl.textContent = "Lade…";
-    invitesEl.textContent = "Lade…";
-
-    try {
-      const members = await s.listSpaceMembers({ spaceId: activeSpaceId });
-      const invites = await s.listPendingInvites({ spaceId: activeSpaceId });
-
-      membersEl.innerHTML = renderMembersHtml(members);
-      invitesEl.innerHTML = renderInvitesHtml(invites);
-
-      // wire revoke buttons
-      invitesEl.querySelectorAll("[data-revoke]").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const id = btn.getAttribute("data-revoke");
-          if (!id) return;
-          try {
-            await s.revokeInvite?.(id);
-            setMsg("Invite entfernt ✅", "ok");
-            await refreshSharing();
-          } catch (e) {
-            setMsg(String(e?.message || e), "bad");
-          }
-        });
-      });
-    } catch (e) {
-      membersEl.textContent = "Fehler beim Laden";
-      invitesEl.textContent = String(e?.message || e);
-    }
-  }
-
-  q("#btnRefreshSharing")?.addEventListener("click", () => { refreshSharing(); });
-
-  q("#btnInvite")?.addEventListener("click", async () => {
-    const email = (q("#shareEmail")?.value || "").trim();
-    const role = (q("#shareRole")?.value || "viewer").trim();
-    try {
-      if (!s.inviteToSpace) throw new Error("inviteToSpace fehlt");
-      await s.inviteToSpace({ email, role, spaceId: activeSpaceId });
-      setMsg("Invite gesendet ✅", "ok");
-      const inp = q("#shareEmail");
-      if (inp) inp.value = "";
-      await refreshSharing();
-    } catch (e) {
-      setMsg(String(e?.message || e), "bad");
-    }
-  });
-
-  // initial load
   refreshSwVersionInfo();
-  refreshSharing();
-
 }
-
-function renderMembersHtml(members) {
-  if (!Array.isArray(members) || members.length === 0) {
-    return `<div class="hint">Keine Mitglieder gefunden.</div>`;
-  }
-  const rows = members
-    .map(m => {
-      const uid = escapeHtml(m?.user_id || "");
-      const role = escapeHtml(m?.role || "viewer");
-      return `<div class="row row--spread" style="align-items:center; gap:10px;">
-        <div class="hint" style="margin:0; overflow:hidden; text-overflow:ellipsis;">${uid}</div>
-        <div class="pill">${role}</div>
-      </div>`;
-    })
-    .join("");
-  return `<div style="display:flex; flex-direction:column; gap:6px;">${rows}</div>`;
-}
-
-function renderInvitesHtml(invites) {
-  if (!Array.isArray(invites) || invites.length === 0) {
-    return `<div class="hint">Keine offenen Einladungen.</div>`;
-  }
-  const rows = invites
-    .map(inv => {
-      const id = escapeHtml(inv?.id || "");
-      const mail = escapeHtml(inv?.email || "");
-      const role = escapeHtml(inv?.role || "viewer");
-      return `<div class="row row--spread" style="align-items:center; gap:10px;">
-        <div style="min-width:0; flex:1 1 auto;">
-          <div class="hint" style="margin:0; overflow:hidden; text-overflow:ellipsis;">${mail}</div>
-        </div>
-        <div class="pill">${role}</div>
-        <button class="btn" type="button" data-revoke="${id}" title="Einladung entfernen">✖</button>
-      </div>`;
-    })
-    .join("");
-  return `<div style="display:flex; flex-direction:column; gap:6px;">${rows}</div>`;
-}
-
-/* ---------- helpers ---------- */

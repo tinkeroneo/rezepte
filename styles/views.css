@@ -836,6 +836,88 @@ html.dark .todo-ribbon{
   opacity: .92;
 }
 
+.account-share {
+  display: grid;
+  gap: .9rem;
+}
+
+.account-share__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.account-share__state {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex-wrap: wrap;
+}
+
+.account-share__info {
+  padding: .75rem .9rem;
+  border-radius: var(--r-1);
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  background: color-mix(in srgb, var(--panel) 60%, var(--card));
+  color: var(--muted);
+}
+
+.account-share__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+}
+
+.account-share__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: flex-end;
+}
+
+.account-share__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: .85rem;
+}
+
+.account-share__panel {
+  display: grid;
+  gap: .55rem;
+  padding: .8rem .9rem;
+  border-radius: var(--r-1);
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  background: color-mix(in srgb, var(--panel) 72%, var(--card));
+}
+
+.account-share__list {
+  min-height: 1.2rem;
+}
+
+.account-share-row {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  justify-content: space-between;
+  padding: .35rem 0;
+  border-top: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+}
+
+.account-share-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.account-share-row__main {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+
 .admin-tools {
   display: grid;
   gap: .9rem;

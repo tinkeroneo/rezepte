@@ -1,85 +1,101 @@
-// src/views/account.view.js
-// Wichtig: benutze deine bestehenden Handler/Imports (auth, theme, admin, space etc.)
-// -> hier nur UI + IDs, damit du bestehende Logik weiterverwenden kannst.
-
 import { escapeHtml } from "../utils.js";
-// src/views/account.view.js
+
+function renderAccountHint(text, label = "Hinweis") {
+  const safeText = String(text || "").trim();
+  if (!safeText) return "";
+  const safeLabel = escapeHtml(label);
+  return `
+    <details class="admin-help">
+      <summary class="admin-help__btn" aria-label="${safeLabel}" title="${safeLabel}">?</summary>
+      <div class="admin-help__bubble">${escapeHtml(safeText)}</div>
+    </details>
+  `;
+}
+
 export function renderAccountView({ appEl }) {
- const s = window.__tinkeroneoSettings || {};
+  const s = window.__tinkeroneoSettings || {};
   const auth = s.getAuthContext?.() || null;
   const authedEmail = String(auth?.user?.email || "");
   const cloudEnabled = !!s.readUseBackend?.();
   const activeSpaceId = String(auth?.spaceId || "");
   const mySpaces = Array.isArray(s.getMySpaces?.()) ? s.getMySpaces() : [];
-  const activeSpaceName = String((mySpaces.find(x => String(x?.space_id || "") === activeSpaceId)?.name) || "");
+  const activeSpaceName = String((mySpaces.find((space) => String(space?.space_id || "") === activeSpaceId)?.name) || "");
   const isAuthed = !!auth?.user?.id || !!authedEmail;
+
+  const shareState = !isAuthed
+    ? { text: "Login nötig", ghost: true, info: "Bitte zuerst einloggen, um Sharing zu nutzen." }
+    : !cloudEnabled
+      ? { text: "CLOUD aus", ghost: true, info: "Aktiviere CLOUD, um Sharing zu nutzen." }
+      : { text: "Bereit", ghost: false, info: "" };
+
   appEl.innerHTML = `
-  <div class="container">
-    <section class="card">
-      <h1 class="view-title">Account & Einstellungen</h1>
+    <div class="container">
+      <section class="card">
+        <h1 class="view-title">Account & Einstellungen</h1>
 
-      <div class="card">
-        <div class="card-title">Konto</div>
-        <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-          <button id="authBadge" class="badge badge-btn" type="button">🔐 Login/Logout</button>
-          <button id="adminBadge" class="badge badge-btn" type="button" hidden>🛠️ Admin</button>
-        </div>
-      </div>
-    ${isAuthed ? `
-      <div class="card">
-        <div class="card-title">Space</div>
-
-
-        <div class="muted" style="font-weight:900; margin-bottom:.35rem;"></div>
-        <div class="select-wrapper" style="margin-bottom:.35rem;">
-          <span class="icon">⭐ Standard:</span>
-          <select id="defaultSpaceSelect" class="badge badge-select" title="Default-Space (beim Login)"></select>
-        </div>        
-
-        <div class="muted" style="font-weight:900; margin-bottom:.35rem;"></div>
-        <div class="select-wrapper" style="margin-bottom:.35rem;">
-          <span class="icon">✎ (Um)benennen</span>
-          <input id="spaceNameInput" class="badge badge-select" type="text" placeholder="Space-Name" />
-          <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">💾</button>
-        </div>  
-
-        <div style="margin-top:.5rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.75rem;">
-          <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Profil</div>
-          <div class="select-wrapper" style="margin-bottom:.35rem;">
-            <span class="icon">🏷️</span>
-            <input id="profileDisplayName" class="badge badge-select" type="text" placeholder="Username (Displayname)" />
-            <button id="saveProfileBtn" class="badge badge-btn" type="button">💾</button>
-
-
+        <div class="card">
+          <div class="card-title">Konto</div>
+          <div class="row" style="gap:.5rem; flex-wrap:wrap;">
+            <button id="authBadge" class="badge badge-btn" type="button">🔐 Login/Logout</button>
+            <button id="adminBadge" class="badge badge-btn" type="button" hidden>🛠️ Admin</button>
           </div>
         </div>
 
+        ${isAuthed
+          ? `
+            <div class="card">
+              <div class="card-title">Space</div>
 
+              <div class="select-wrapper" style="margin-bottom:.35rem;">
+                <span class="icon">⭐ Standard:</span>
+                <select id="defaultSpaceSelect" class="badge badge-select" title="Default-Space (beim Login)"></select>
+              </div>
 
-        <div style="margin-top:.75rem;">
-          <span id="syncBadge" class="badge" title="Sync-Status" hidden>⟳ Sync-Status</span>
-        </div>
-      </div>
+              <div class="select-wrapper" style="margin-bottom:.35rem;">
+                <span class="icon">✎ (Um)benennen</span>
+                <input id="spaceNameInput" class="badge badge-select" type="text" placeholder="Space-Name" />
+                <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">💾</button>
+              </div>
 
-      <div class="card">
+              <div style="margin-top:.5rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.75rem;">
+                <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Profil</div>
+                <div class="select-wrapper" style="margin-bottom:.35rem;">
+                  <span class="icon">🏷️</span>
+                  <input id="profileDisplayName" class="badge badge-select" type="text" placeholder="Username (Displayname)" />
+                  <button id="saveProfileBtn" class="badge badge-btn" type="button">💾</button>
+                </div>
+              </div>
+            </div>
+          `
+          : ""}
+
+        <div class="card">
           <div class="card__hd">
             <div>
               <h2 class="card__title">Space teilen</h2>
               <div class="card__subtitle">Einladen per Mail (CLOUD)</div>
             </div>
           </div>
-          <div class="card__bd">
-            <div class="hint">Einladen per Mail: Die eingeladene Person loggt sich ein und wird automatisch Mitglied. (RLS schützt eure Daten.)</div>
+          <div class="card__bd account-share">
+            <div class="account-share__top">
+              <div class="account-share__state">
+                <span class="pill ${shareState.ghost ? "pill-ghost" : ""}">${escapeHtml(shareState.text)}</span>
+                ${renderAccountHint("Die eingeladene Person loggt sich ein und wird automatisch Mitglied im aktuellen Space.")}
+              </div>
+              ${isAuthed && cloudEnabled
+                ? `<button class="btn btn--ghost" id="btnRefreshSharing" type="button">Aktualisieren</button>`
+                : ``}
+            </div>
 
-            ${cloudEnabled
-      ? `
-                <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:center;">
-                  <div class="hint" style="margin:0;">Angemeldet als: <b>${escapeHtml(authedEmail || "-")}</b></div>
-                  <div class="hint" style="margin:0;">Aktiver Space: <b>${escapeHtml(activeSpaceName || activeSpaceId || "-")}</b></div>
-                  <button class="btn" id="btnRefreshSharing" type="button">Refresh</button>
+            ${shareState.info
+              ? `<div class="account-share__info">${escapeHtml(shareState.info)}</div>`
+              : `
+                <div class="account-share__meta">
+                  <div class="pill pill-ghost">Account: ${escapeHtml(authedEmail || "-")}</div>
+                  <div class="pill pill-ghost">Space: ${escapeHtml(activeSpaceName || activeSpaceId || "-")}</div>
                 </div>
 
-                <div class="row" style="flex-wrap:wrap; gap:.5rem; align-items:flex-end;">
+                <div class="account-share__form">
                   <label class="field" style="min-width:120px; flex: 1 1 220px;">
                     <div class="label">E-Mail</div>
                     <input id="shareEmail" type="email" placeholder="freundin@example.com" />
@@ -97,45 +113,37 @@ export function renderAccountView({ appEl }) {
                   <button class="btn btn--ghost" id="btnInvite" type="button">Einladen</button>
                 </div>
 
-                <div class="row" style="flex-wrap:wrap; gap:1rem; align-items:flex-start;">
-                  <div style="min-width:260px; flex: 1 1 260px;">
-                    <div class="label">Mitglieder (user_spaces)</div>
-                    <div id="membersList" class="hint">Lade…</div>
+                <div class="account-share__columns">
+                  <div class="account-share__panel">
+                    <div class="label">Mitglieder</div>
+                    <div id="membersList" class="account-share__list hint">Lade…</div>
                   </div>
-                  <div style="min-width:260px; flex: 1 1 260px;">
+                  <div class="account-share__panel">
                     <div class="label">Offene Einladungen</div>
-                    <div id="invitesList" class="hint">Lade…</div>
+                    <div id="invitesList" class="account-share__list hint">Lade…</div>
                   </div>
                 </div>
-              `
-      : `<div class="hint">Aktiviere CLOUD, um Sharing zu nutzen.</div>`
-    }
+              `}
           </div>
-        <div id="accShareMsg" class="hint" style="min-height:18px;"></div>
-      </div>
-     ` : ``}
-      <div class="card">
-        <div class="card-title">Darstellung</div>
-        <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-          <button id="themeBadge" class="badge badge-btn" type="button">🌓 THEME</button>
+          <div id="accShareMsg" class="hint" style="min-height:18px;"></div>
         </div>
-        <div class="muted" style="margin-top:.35rem;">System · Hell · Dunkel</div>
-      </div>
 
-
-      <div class="card">
-        <div class="card-title">Tools</div>
-        <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-          <button id="diagnosticsBtn" class="badge badge-btn" type="button">🩺 Diagnostics</button>
+        <div class="card">
+          <div class="card-title">Darstellung</div>
+          <div class="row" style="gap:.5rem; flex-wrap:wrap;">
+            <button id="themeBadge" class="badge badge-btn" type="button">🌓 THEME</button>
+          </div>
+          <div class="muted" style="margin-top:.35rem;">System · Hell · Dunkel</div>
         </div>
-        <div class="muted" style="margin-top:.35rem;">Import/Export als Sheet · Fehlerliste & Backend-Status</div>
-      </div>        
-      </div>
 
-
-
-
-    </section>
-  </div>  
+        <div class="card">
+          <div class="card-title">Tools</div>
+          <div class="row" style="gap:.5rem; flex-wrap:wrap;">
+            <button id="diagnosticsBtn" class="badge badge-btn" type="button">🩺 Diagnostics</button>
+          </div>
+          <div class="muted" style="margin-top:.35rem;">Import/Export als Sheet · Fehlerliste & Backend-Status</div>
+        </div>
+      </section>
+    </div>
   `;
 }

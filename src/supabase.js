@@ -802,7 +802,46 @@ export async function listSpaceMembers({ spaceId } = {}) {
     }
   );
   if (!res.ok) throw new Error(`List members failed: ${res.status} ${await sbJson(res)}`);
-  return res.json();
+  const members = await res.json();
+  if (!Array.isArray(members) || members.length === 0) return [];
+
+  const userIds = Array.from(
+    new Set(
+      members
+        .map((member) => String(member?.user_id || "").trim())
+        .filter(Boolean)
+    )
+  );
+  if (!userIds.length) return members;
+
+  try {
+    const profileRes = await sbFetch(
+      `${SUPABASE_URL}/rest/v1/profiles?select=user_id,display_name&user_id=in.(${userIds.join(",")})`,
+      {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${_session.access_token}`,
+        },
+        timeoutMs: 12000,
+      }
+    );
+    if (!profileRes.ok) return members;
+
+    const profileRows = await profileRes.json();
+    const profileByUserId = new Map(
+      (Array.isArray(profileRows) ? profileRows : []).map((row) => [
+        String(row?.user_id || "").trim(),
+        String(row?.display_name || "").trim(),
+      ])
+    );
+
+    return members.map((member) => ({
+      ...member,
+      display_name: profileByUserId.get(String(member?.user_id || "").trim()) || "",
+    }));
+  } catch {
+    return members;
+  }
 }
 
 // Lightweight auth state check for UI (header badges etc.)
