@@ -13,7 +13,7 @@ export function renderGridItem(r, ctx) {
     <div class="grid-card" data-id="${escapeHtml(r.id)}" style="--cat-accent:${catAccent(r.category)}">
       <div class="grid-media">
         ${recipeImageOrDefault(r.image_url)
-          ? `<img class="grid-img" src="${escapeHtml(recipeImageForCard(r.image_url, "grid", { resize: resizeMode }))}" data-default-img="${r.image_url ? "" : "1"}" data-image-focus="${encodeImageFocusAttr(r.image_focus)}" data-auto-alpha="1" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
+          ? `<img class="grid-img" src="${escapeHtml(recipeImageForCard(r.image_url, "grid", { resize: resizeMode }))}" data-default-img="${r.image_url ? "" : "1"}" data-image-focus="${encodeImageFocusAttr(r.image_focus)}" data-image-context="grid" data-auto-alpha="1" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
           : coverFallbackHtml(r, "grid-img")
         }
         ${isTodo ? `<span class="todo-ribbon" aria-hidden="true">ToDo</span>` : ``}

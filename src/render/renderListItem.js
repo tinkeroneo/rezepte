@@ -17,7 +17,7 @@ export function renderListItem(r, ctx) {
       <div class="li-left">
         <div class="li-media">
           ${recipeImageOrDefault(r.image_url)
-            ? `<img class="li-thumb" src="${escapeHtml(recipeImageForCard(r.image_url, "list", { resize: resizeMode }))}" data-default-img="${r.image_url ? "" : "1"}" data-image-focus="${encodeImageFocusAttr(r.image_focus)}" data-auto-alpha="1" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
+            ? `<img class="li-thumb" src="${escapeHtml(recipeImageForCard(r.image_url, "list", { resize: resizeMode }))}" data-default-img="${r.image_url ? "" : "1"}" data-image-focus="${encodeImageFocusAttr(r.image_focus)}" data-image-context="list" data-auto-alpha="1" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
             : coverFallbackHtml(r, "li-thumb li-thumb--empty")
           }
           ${isTodo ? `<span class="todo-ribbon" aria-hidden="true">ToDo</span>` : ``}

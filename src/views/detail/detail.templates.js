@@ -62,6 +62,7 @@ export function renderDetailImageHtml({ r, showImageModeDebug = false }) {
           class="detail-img" 
           src="${escapeHtml(recipeImageOrDefault(r.image_url))}" 
           data-image-focus="${encodeImageFocusAttr(r.image_focus)}"
+          data-image-context="detail"
           data-auto-alpha="1"
           data-default-img="" 
           alt="${escapeHtml(r.title)}" 

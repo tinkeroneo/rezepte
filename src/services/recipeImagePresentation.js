@@ -386,10 +386,49 @@ function applyAlphaFit(img, bounds) {
   return true;
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function applyCoverPosition(img, { x = 0.5, y = 0.5 } = {}) {
+  const parent = img.parentElement;
+  if (!parent) return false;
+
+  const containerWidth = parent.clientWidth;
+  const containerHeight = parent.clientHeight;
+  const naturalWidth = Number(img.naturalWidth || 0);
+  const naturalHeight = Number(img.naturalHeight || 0);
+  if (!containerWidth || !containerHeight || !naturalWidth || !naturalHeight) return false;
+
+  const scale = Math.max(containerWidth / naturalWidth, containerHeight / naturalHeight);
+  const finalWidth = naturalWidth * scale;
+  const finalHeight = naturalHeight * scale;
+  const centerX = clamp(x, 0, 1) * finalWidth;
+  const centerY = clamp(y, 0, 1) * finalHeight;
+  const minLeft = containerWidth - finalWidth;
+  const minTop = containerHeight - finalHeight;
+  const left = clamp(containerWidth / 2 - centerX, minLeft, 0);
+  const top = clamp(containerHeight / 2 - centerY, minTop, 0);
+
+  img.style.position = "absolute";
+  img.style.left = `${left}px`;
+  img.style.top = `${top}px`;
+  img.style.width = `${finalWidth}px`;
+  img.style.height = `${finalHeight}px`;
+  img.style.maxWidth = "none";
+  img.style.maxHeight = "none";
+  img.style.objectFit = "fill";
+  img.style.objectPosition = "0 0";
+  img.style.transform = "none";
+  img.style.transformOrigin = "50% 50%";
+  return true;
+}
+
 export function applyImageFocusToElement(img, focus) {
   if (!img) return;
   const f = normalizeImageFocus(focus);
   const pos = `${f.x}% ${f.y}%`;
+  const context = String(img.dataset.imageContext || "");
 
   if (f.mode === "cover" || f.mode === "auto") {
     img.dataset.imageModeEffective = f.mode === "cover" ? "cover" : "auto";
@@ -405,7 +444,12 @@ export function applyImageFocusToElement(img, focus) {
   resetImageStyle(img);
   if (f.mode === "alpha-fit" && f.alphaBounds) {
     img.dataset.imageModeEffective = "alpha-fit";
-    applyAlphaFit(img, f.alphaBounds);
+    if (context === "grid" || context === "list") {
+      const centerY = f.alphaBounds.top + f.alphaBounds.height / 2;
+      applyCoverPosition(img, { x: f.x / 100, y: centerY });
+    } else {
+      applyAlphaFit(img, f.alphaBounds);
+    }
   } else {
     img.dataset.imageModeEffective = getEffectiveImageMode(f);
   }
