@@ -136,10 +136,10 @@ async function createImageFromFile(file) {
   }
 }
 
-function detectAlphaBoundsFromImage(img) {
+function analyzeAlphaImage(img) {
   const naturalWidth = Number(img?.naturalWidth || img?.videoWidth || 0);
   const naturalHeight = Number(img?.naturalHeight || img?.videoHeight || 0);
-  if (!naturalWidth || !naturalHeight) return null;
+  if (!naturalWidth || !naturalHeight) return { ok: false, reason: "missing-size" };
 
   const maxSide = 256;
   const scale = Math.min(1, maxSide / Math.max(naturalWidth, naturalHeight));
@@ -150,7 +150,7 @@ function detectAlphaBoundsFromImage(img) {
   canvas.width = sampleWidth;
   canvas.height = sampleHeight;
   const ctx = canvas.getContext("2d", { willReadFrequently: true, alpha: true });
-  if (!ctx) return null;
+  if (!ctx) return { ok: false, reason: "no-canvas-context" };
 
   ctx.clearRect(0, 0, sampleWidth, sampleHeight);
   ctx.drawImage(img, 0, 0, sampleWidth, sampleHeight);
@@ -159,7 +159,7 @@ function detectAlphaBoundsFromImage(img) {
   try {
     data = ctx.getImageData(0, 0, sampleWidth, sampleHeight).data;
   } catch {
-    return null;
+    return { ok: false, reason: "pixel-read-failed" };
   }
 
   const threshold = 8;
@@ -183,7 +183,21 @@ function detectAlphaBoundsFromImage(img) {
     }
   }
 
-  if (maxX < 0 || maxY < 0) return null;
+  if (maxX < 0 || maxY < 0) {
+    return {
+      ok: true,
+      candidate: false,
+      reason: "fully-transparent-or-empty",
+      bounds: null,
+      transparentRatio: 1,
+      emptyRatio: 1,
+      meaningfulMargins: 4,
+      strongestMargin: 1,
+      margins: { left: 1, top: 1, right: 1, bottom: 1 },
+      sampleWidth,
+      sampleHeight,
+    };
+  }
 
   const width = (maxX - minX + 1) / sampleWidth;
   const height = (maxY - minY + 1) / sampleHeight;
@@ -196,14 +210,38 @@ function detectAlphaBoundsFromImage(img) {
   const bottom = 1 - (top + height);
   const meaningfulMargins = [left, top, right, bottom].filter((margin) => margin >= 0.035).length;
   const strongestMargin = Math.max(left, top, right, bottom);
-
+  const bounds = normalizeBounds({ left, top, width, height });
   const nearFullFrame = width > 0.975 && height > 0.975 && left < 0.015 && top < 0.015;
-  if (nearFullFrame) return null;
-  if (transparentRatio < 0.025) return null;
-  if (emptyRatio < 0.08) return null;
-  if (meaningfulMargins < 1 && strongestMargin < 0.05) return null;
 
-  return normalizeBounds({ left, top, width, height });
+  let candidate = true;
+  let reason = "alpha-fit";
+  if (nearFullFrame) {
+    candidate = false;
+    reason = "near-full-frame";
+  } else if (transparentRatio < 0.025) {
+    candidate = false;
+    reason = "low-transparency";
+  } else if (emptyRatio < 0.08) {
+    candidate = false;
+    reason = "low-empty-area";
+  } else if (meaningfulMargins < 1 && strongestMargin < 0.05) {
+    candidate = false;
+    reason = "low-margin";
+  }
+
+  return {
+    ok: true,
+    candidate,
+    reason,
+    bounds: candidate ? bounds : null,
+    transparentRatio,
+    emptyRatio,
+    meaningfulMargins,
+    strongestMargin,
+    margins: { left, top, right, bottom },
+    sampleWidth,
+    sampleHeight,
+  };
 }
 
 async function detectAndCacheAlphaBounds(src, loader) {
@@ -212,9 +250,9 @@ async function detectAndCacheAlphaBounds(src, loader) {
 
   try {
     const img = await loader();
-    const bounds = detectAlphaBoundsFromImage(img);
-    writeCachedAlphaBounds(src, bounds);
-    return bounds;
+    const analysis = analyzeAlphaImage(img);
+    writeCachedAlphaBounds(src, analysis?.bounds || null);
+    return analysis?.bounds || null;
   } catch {
     writeCachedAlphaBounds(src, null);
     return null;
@@ -240,9 +278,19 @@ export async function detectAlphaBoundsForRenderedImage(img) {
   if (cached !== undefined) return cached;
 
   if (!img.complete || !img.naturalWidth || !img.naturalHeight) return null;
-  const bounds = detectAlphaBoundsFromImage(img);
+  const bounds = analyzeAlphaImage(img)?.bounds || null;
   writeCachedAlphaBounds(src, bounds);
   return bounds;
+}
+
+export async function analyzeRenderedImageTransparency(img) {
+  if (!(img instanceof window.HTMLImageElement)) {
+    return { ok: false, reason: "not-an-image" };
+  }
+  if (!img.complete || !img.naturalWidth || !img.naturalHeight) {
+    return { ok: false, reason: "image-not-ready" };
+  }
+  return analyzeAlphaImage(img);
 }
 
 export async function deriveAlphaFitFocus({ file = null, url = "", currentFocus = null } = {}) {

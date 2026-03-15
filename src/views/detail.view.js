@@ -25,7 +25,7 @@ import {
 // Optional: vorbereitet für Dirty-Guard (Caller kann diese Props später reinreichen)
 // -> bleibt komplett rückwärtskompatibel
 import { createDirtyTracker } from "../ui/dirtyTracker.js";
-import { bindManagedRecipeImages } from "../services/recipeImagePresentation.js";
+import { analyzeRenderedImageTransparency, bindManagedRecipeImages } from "../services/recipeImagePresentation.js";
 
 export function renderDetailView({
   appEl,
@@ -108,14 +108,21 @@ export function renderDetailView({
   if (showImageModeDebug) {
     const imgEl = appEl.querySelector("#detailImg");
     const debugEl = appEl.querySelector("#imageModeDebug");
-    const updateImageModeDebug = () => {
+    const updateImageModeDebug = async () => {
       if (!imgEl || !debugEl) return;
       const mode = String(imgEl.dataset.imageModeEffective || r?.image_focus?.mode || "auto");
-      const alphaInfo =
-        mode === "alpha-fit" && r?.image_focus?.alphaBounds
-          ? " (transparente Raender erkannt)"
-          : "";
-      debugEl.textContent = `Bildmodus: ${mode}${alphaInfo}`;
+      const analysis = await analyzeRenderedImageTransparency(imgEl);
+      if (!analysis?.ok) {
+        debugEl.textContent = `Bildmodus: ${mode} | Alpha-Check: ${String(analysis?.reason || "unbekannt")}`;
+        return;
+      }
+
+      const percent = (value) => `${Math.round(Number(value || 0) * 100)}%`;
+      const bounds = analysis.bounds
+        ? `${percent(analysis.bounds.width)} x ${percent(analysis.bounds.height)}`
+        : "-";
+      debugEl.textContent =
+        `Bildmodus: ${mode} | Alpha-Check: ${analysis.candidate ? "ja" : "nein"} (${analysis.reason}) | transparent=${percent(analysis.transparentRatio)} | leer=${percent(analysis.emptyRatio)} | bounds=${bounds}`;
     };
 
     imgEl?.addEventListener("tinkeroneo:image-mode", updateImageModeDebug);
