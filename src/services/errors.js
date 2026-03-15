@@ -14,7 +14,7 @@ let __bannerTimer = null;
 const recentErrors = []; // newest first via accessor
 const MAX_RECENT = 20;
 
-// Persisted (device-local) error log â€“ for diagnostics / bug reports.
+// Persisted (device-local) error log - for diagnostics / bug reports.
 // Note: keep small, never store raw recipe data etc.
 const ERR_KEY = "tinkeroneo_errors_v1";
 const MAX_PERSISTED = 80;

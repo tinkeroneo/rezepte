@@ -52,22 +52,22 @@ export function renderAccountView({ appEl }) {
               <div class="card-title">Space</div>
 
               <div class="select-wrapper" style="margin-bottom:.35rem;">
-                <span class="icon">â­ Standard:</span>
+                <span class="icon">⭐ Standard:</span>
                 <select id="defaultSpaceSelect" class="badge badge-select" title="Default-Space (beim Login)"></select>
               </div>
 
               <div class="select-wrapper" style="margin-bottom:.35rem;">
-                <span class="icon">âœŽ (Um)benennen</span>
+                <span class="icon">✎ (Um)benennen</span>
                 <input id="spaceNameInput" class="badge badge-select" type="text" placeholder="Space-Name" />
-                <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">ðŸ’¾</button>
+                <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">💾</button>
               </div>
 
               <div style="margin-top:.5rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.75rem;">
                 <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Profil</div>
                 <div class="select-wrapper" style="margin-bottom:.35rem;">
-                  <span class="icon">ðŸ·ï¸</span>
+                  <span class="icon">🏷️</span>
                   <input id="profileDisplayName" class="badge badge-select" type="text" placeholder="Username (Displayname)" />
-                  <button id="saveProfileBtn" class="badge badge-btn" type="button">ðŸ’¾</button>
+                  <button id="saveProfileBtn" class="badge badge-btn" type="button">💾</button>
                 </div>
               </div>
             </div>
@@ -125,11 +125,11 @@ export function renderAccountView({ appEl }) {
                 <div class="account-share__columns">
                   <div class="account-share__panel">
                     <div class="label">Mitglieder</div>
-                    <div id="membersList" class="account-share__list hint">Ladeâ€¦</div>
+                    <div id="membersList" class="account-share__list hint">Lade…</div>
                   </div>
                   <div class="account-share__panel">
                     <div class="label">Offene Einladungen</div>
-                    <div id="invitesList" class="account-share__list hint">Ladeâ€¦</div>
+                    <div id="invitesList" class="account-share__list hint">Lade…</div>
                   </div>
                 </div>
               `}
@@ -140,17 +140,17 @@ export function renderAccountView({ appEl }) {
         <div class="card">
           <div class="card-title">Darstellung</div>
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-            <button id="themeBadge" class="badge badge-btn" type="button">ðŸŒ“ THEME</button>
+            <button id="themeBadge" class="badge badge-btn" type="button">🌓 THEME</button>
           </div>
-          <div class="muted" style="margin-top:.35rem;">System Â· Hell Â· Dunkel</div>
+          <div class="muted" style="margin-top:.35rem;">System · Hell · Dunkel</div>
         </div>
 
         <div class="card">
           <div class="card-title">Tools</div>
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-            <button id="diagnosticsBtn" class="badge badge-btn" type="button">ðŸ©º Diagnostics</button>
+            <button id="diagnosticsBtn" class="badge badge-btn" type="button">🩺 Diagnostics</button>
           </div>
-          <div class="muted" style="margin-top:.35rem;">Import/Export als Sheet Â· Fehlerliste & Backend-Status</div>
+          <div class="muted" style="margin-top:.35rem;">Import/Export als Sheet · Fehlerliste & Backend-Status</div>
         </div>
       </section>
     </div>
