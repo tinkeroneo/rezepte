@@ -23,10 +23,10 @@ export function renderAccountView({ appEl }) {
   const isAuthed = !!auth?.user?.id || !!authedEmail;
 
   const shareState = !isAuthed
-    ? { text: "Login nötig", ghost: true, info: "Bitte zuerst einloggen, um Sharing zu nutzen." }
+    ? { text: "Login nötig", ghost: true, info: "Bitte logge dich zuerst ein, um deinen Space zu teilen." }
     : !cloudEnabled
-      ? { text: "CLOUD aus", ghost: true, info: "Aktiviere CLOUD, um Sharing zu nutzen." }
-      : { text: "Bereit", ghost: false, info: "" };
+      ? { text: "CLOUD aus", ghost: true, info: "Aktiviere CLOUD, damit Einladungen und Sharing verfügbar sind." }
+      : { text: "Freigabe bereit", ghost: false, info: "" };
 
   appEl.innerHTML = `
     <div class="container">
@@ -73,14 +73,14 @@ export function renderAccountView({ appEl }) {
           <div class="card__hd">
             <div>
               <h2 class="card__title">Space teilen</h2>
-              <div class="card__subtitle">Einladen per Mail (CLOUD)</div>
+              <div class="card__subtitle">Einladungen per E-Mail</div>
             </div>
           </div>
           <div class="card__bd account-share">
             <div class="account-share__top">
               <div class="account-share__state">
                 <span class="pill ${shareState.ghost ? "pill-ghost" : ""}">${escapeHtml(shareState.text)}</span>
-                ${renderAccountHint("Die eingeladene Person loggt sich ein und wird automatisch Mitglied im aktuellen Space.")}
+                ${renderAccountHint("Die eingeladene Person meldet sich an und wird dann automatisch Mitglied im aktuellen Space.")}
               </div>
               ${isAuthed && cloudEnabled
                 ? `<button class="btn btn--ghost" id="btnRefreshSharing" type="button">Aktualisieren</button>`
@@ -102,11 +102,11 @@ export function renderAccountView({ appEl }) {
                   </label>
 
                   <label class="field" style="min-width:160px;">
-                    <div class="label">Rolle</div>
+                    <div class="label">Zugriff</div>
                     <select id="shareRole">
-                      <option value="viewer">viewer (lesen)</option>
-                      <option value="editor">editor (bearbeiten)</option>
-                      <option value="owner">owner (verwalten)</option>
+                      <option value="viewer">Lesen</option>
+                      <option value="editor">Bearbeiten</option>
+                      <option value="owner">Verwalten</option>
                     </select>
                   </label>
 
