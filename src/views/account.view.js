@@ -71,8 +71,16 @@ export function renderAccountView({ appEl }) {
 
         <div class="card">
           <div class="card__hd">
+            <div class="row" style="align-items:center; gap:.45rem;">
+              <h2 class="card__title" style="margin:0;">Space teilen</h2>
+              ${renderAccountHint("Die eingeladene Person meldet sich an und wird dann automatisch Mitglied im aktuellen Space.")}
+            </div>
+            ${isAuthed && cloudEnabled
+              ? `<button class="btn btn--ghost" id="btnRefreshSharing" type="button">Aktualisieren</button>`
+              : ``}
+          </div>
+          <div class="card__hd" style="padding-top:0;">
             <div>
-              <h2 class="card__title">Space teilen</h2>
               <div class="card__subtitle">Einladungen per E-Mail</div>
             </div>
           </div>
@@ -80,11 +88,7 @@ export function renderAccountView({ appEl }) {
             <div class="account-share__top">
               <div class="account-share__state">
                 <span class="pill ${shareState.ghost ? "pill-ghost" : ""}">${escapeHtml(shareState.text)}</span>
-                ${renderAccountHint("Die eingeladene Person meldet sich an und wird dann automatisch Mitglied im aktuellen Space.")}
               </div>
-              ${isAuthed && cloudEnabled
-                ? `<button class="btn btn--ghost" id="btnRefreshSharing" type="button">Aktualisieren</button>`
-                : ``}
             </div>
 
             ${shareState.info
