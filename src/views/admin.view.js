@@ -289,6 +289,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
   const cardBodies = Array.from(appEl.querySelectorAll(".container > .card .card__bd"));
   const appSettingsBody = cardBodies[0] || null;
   const timerSettingsBody = cardBodies[1] || null;
+  const toolsBody = cardBodies[2] || null;
 
   if (appSettingsBody) {
     appSettingsBody.classList.add("admin-settings");
@@ -380,6 +381,60 @@ export function renderAdminView({ appEl, recipes, setView }) {
     `;
   }
 
+  if (toolsBody) {
+    toolsBody.classList.add("admin-tools");
+    toolsBody.innerHTML = `
+      <div class="admin-sw-card">
+        <div class="admin-sw-summary">
+          <div class="admin-sw-summary__main">
+            <div class="admin-setting__lead">
+              <div class="label">Service Worker</div>
+              ${renderAdminHint("Zeigt, ob der aktuell laufende Service Worker zur neuesten sw.js passt.")}
+            </div>
+            <div id="swVersionHint" class="hint" hidden></div>
+          </div>
+          <div id="swVersionState" class="pill">Pruefe...</div>
+        </div>
+
+        <details class="details admin-sw-details">
+          <summary>Versionen</summary>
+          <div class="admin-sw-versions">
+            <div class="admin-sw-kv">
+              <div class="label">Aktiver SW</div>
+              <div id="swActiveVersion" class="pill">Pruefe...</div>
+            </div>
+            <div class="admin-sw-kv">
+              <div class="label">Neueste sw.js</div>
+              <div id="swLatestVersion" class="pill">Pruefe...</div>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <div class="admin-actions admin-actions--subtle">
+        <button class="btn" id="btnSelftest" type="button">Selftest</button>
+        <button class="btn btn--ghost" id="btnDiagnostics" type="button">Diagnose</button>
+        <button class="btn btn--ghost" id="btnSwReload" type="button">SW neu laden</button>
+        <button class="btn btn--ghost" id="btnReload" type="button">Neu laden</button>
+      </div>
+
+      <div class="msg" id="msg"></div>
+
+      <details class="details">
+        <summary>Info</summary>
+        <pre class="pre">${escapeHtml(
+          [
+            `recipes=${recipeCount}`,
+            `winter=${winter}`,
+            `ringIntervalMs=${ringIntervalMs}`,
+            `stepHighlight=${stepHighlight}`,
+            `href=${location.href}`,
+          ].join("\n")
+        )}</pre>
+      </details>
+    `;
+  }
+
   const q = (sel) => appEl.querySelector(sel);
   const msgEl = q("#msg");
   const catColorsEl = q("#catColors");
@@ -407,30 +462,35 @@ export function renderAdminView({ appEl, recipes, setView }) {
     const activeText = info.activeVersion || (info.registered ? "unbekannt" : "kein SW");
     const latestText = info.latestVersion || (info.isDevHost ? "deaktiviert (localhost)" : "unbekannt");
 
-    let stateText = "Unbekannt";
+    let stateText = "ℹ Unbekannt";
     let stateClass = "pill";
+    let hintText = "";
 
     if (!info.supported) {
-      stateText = "Nicht verfuegbar";
+      stateText = "🚫 Nicht verfügbar";
+      hintText = "Service Worker wird in diesem Browser nicht unterstützt.";
     } else if (info.isDevHost) {
-      stateText = "Lokal deaktiviert";
+      stateText = "🧪 Lokal deaktiviert";
     } else if (!info.registered) {
-      stateText = "Nicht registriert";
+      stateText = "🚫 Nicht registriert";
+      hintText = "Aktuell ist kein Service Worker registriert.";
     } else if (info.hasUpdate || info.mismatch) {
-      stateText = "Abweichung";
+      stateText = "⚠ Update verfügbar";
       stateClass = "pill pill-warn";
+      hintText = info.warning || "Aktiver Service Worker weicht von der neuesten sw.js ab.";
     } else if (info.activeVersion && info.latestVersion && info.activeVersion === info.latestVersion) {
-      stateText = "Aktuell";
+      stateText = "✅ Aktuell";
       stateClass = "pill";
     } else {
-      stateText = "Registriert";
+      stateText = "ℹ Registriert";
     }
 
     swActiveEl.textContent = activeText;
     swLatestEl.textContent = latestText;
     swStateEl.textContent = stateText;
     swStateEl.className = stateClass;
-    swHintEl.textContent = info.warning || (stateText === "Aktuell" ? "Aktiver Service Worker entspricht der neuesten Datei." : "");
+    swHintEl.textContent = hintText;
+    swHintEl.hidden = !hintText;
     swHintEl.className = info.hasUpdate || info.mismatch ? "hint hint-bad" : "hint";
   }
 
