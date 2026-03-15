@@ -306,7 +306,7 @@ export function renderAdminView({ appEl, recipes, setView }) {
       ${renderAdminSetting({
         title: "Radio (Drittanbieter)",
         hint: "Erteilter Consent erlaubt das Laden des externen Radio-Players. Ohne Consent wird kein Drittanbieter-Inhalt eingebunden.",
-        statusHtml: `<span class="pill ${radioConsent ? "" : "pill-ghost"}">${radioConsent ? "Consent aktiv" : "Kein Consent"}</span>`,
+        statusHtml: `<span id="radioConsentState" class="pill ${radioConsent ? "" : "pill-ghost"}">${radioConsent ? "Consent aktiv" : "Kein Consent"}</span>`,
         controlHtml: `
           <label class="toggle">
             <input id="radioConsentToggle" type="checkbox" ${radioConsent ? "checked" : ""} />
@@ -442,6 +442,8 @@ export function renderAdminView({ appEl, recipes, setView }) {
   const swLatestEl = q("#swLatestVersion");
   const swStateEl = q("#swVersionState");
   const swHintEl = q("#swVersionHint");
+  const radioConsentToggleEl = q("#radioConsentToggle");
+  const radioConsentStateEl = q("#radioConsentState");
 
   q("#btnDiagnostics")?.parentElement?.classList.add("admin-actions");
 
@@ -454,6 +456,27 @@ export function renderAdminView({ appEl, recipes, setView }) {
     if (!catColorsEl) return;
     catColorsEl.innerHTML = renderCatRowsHtml();
   };
+
+  const syncRadioConsentUi = () => {
+    const consent = !!s.readRadioConsent?.();
+    if (radioConsentToggleEl) radioConsentToggleEl.checked = consent;
+    if (radioConsentStateEl) {
+      radioConsentStateEl.textContent = consent ? "Consent aktiv" : "Kein Consent";
+      radioConsentStateEl.className = `pill${consent ? "" : " pill-ghost"}`;
+    }
+  };
+
+  try {
+    appEl.__adminRadioConsentListenerCleanup?.();
+  } catch {
+    // ignore stale cleanup issues
+  }
+  const onRadioConsentChanged = () => syncRadioConsentUi();
+  window.addEventListener("tinkeroneo:radioFeatureChanged", onRadioConsentChanged);
+  appEl.__adminRadioConsentListenerCleanup = () => {
+    window.removeEventListener("tinkeroneo:radioFeatureChanged", onRadioConsentChanged);
+  };
+  syncRadioConsentUi();
 
   async function refreshSwVersionInfo() {
     if (!swActiveEl || !swLatestEl || !swStateEl || !swHintEl) return;
@@ -536,11 +559,12 @@ export function renderAdminView({ appEl, recipes, setView }) {
     }
   });
 
-  q("#radioConsentToggle")?.addEventListener("change", () => {
+  radioConsentToggleEl?.addEventListener("change", () => {
     try {
-      const enabled = !!q("#radioConsentToggle")?.checked;
+      const enabled = !!radioConsentToggleEl?.checked;
       if (s.setRadioConsent) s.setRadioConsent(enabled);
       else if (!enabled) s.clearRadioConsent?.();
+      syncRadioConsentUi();
       setMsg(enabled ? "Consent gespeichert." : "Consent entfernt.", "ok");
     } catch (e) {
       setMsg(String(e?.message || e), "bad");

@@ -17,6 +17,7 @@ function hasConsent() {
 
 function setConsent(v) {
   setSetting("radio_consent", !!v);
+  window.dispatchEvent(new window.Event(EVT_FEATURE_CHANGED));
 }
 
 export function clearRadioConsent() {
@@ -25,6 +26,12 @@ export function clearRadioConsent() {
 }
 
 function renderDisabled(root) {
+  try {
+    root.__radioDockCleanup?.();
+  } catch {
+    // ignore cleanup issues
+  }
+  delete root.__radioDockCleanup;
   root.innerHTML = "";
   root.style.display = "none";
   delete root.dataset.mounted;
@@ -140,31 +147,46 @@ export function initRadioDock() {
       if (expanded) renderBody();
     };
 
-    // Toggle comes from the header
-    if (headerBtn && !headerBtn.__wired) {
+    const onHeaderClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      expanded = !expanded;
+      updateUI();
+    };
+    if (headerBtn?.__radioDockClickHandler) {
+      headerBtn.removeEventListener("click", headerBtn.__radioDockClickHandler);
+    }
+    if (headerBtn) {
+      headerBtn.__radioDockClickHandler = onHeaderClick;
+      headerBtn.addEventListener("click", onHeaderClick);
       headerBtn.__wired = true;
-      headerBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        // Prevent the global "outside click" handler from immediately closing the panel.
-        e.stopPropagation();
-        expanded = !expanded;
-        updateUI();
-      });
     }
 
-    closeBtn.addEventListener("click", (e) => {
+    const onCloseClick = (e) => {
       e.preventDefault();
       expanded = false;
       updateUI();
-    });
+    };
+    closeBtn.addEventListener("click", onCloseClick);
 
-    document.addEventListener("click", (e) => {
+    const onDocumentClick = (e) => {
       if (!expanded) return;
       const t = e.target;
       if (wrap.contains(t)) return;
       expanded = false;
       updateUI();
-    });
+    };
+    document.addEventListener("click", onDocumentClick);
+
+    root.__radioDockCleanup = () => {
+      closeBtn.removeEventListener("click", onCloseClick);
+      document.removeEventListener("click", onDocumentClick);
+      if (headerBtn?.__radioDockClickHandler === onHeaderClick) {
+        headerBtn.removeEventListener("click", onHeaderClick);
+        delete headerBtn.__radioDockClickHandler;
+      }
+      if (headerBtn) headerBtn.setAttribute("aria-pressed", "false");
+    };
 
     updateUI();
   };
@@ -182,6 +204,12 @@ export function initRadioDock() {
 
     // Feature enabled again
     // Remount cleanly to ensure no stale iframe is kept when consent was revoked.
+    try {
+      root.__radioDockCleanup?.();
+    } catch {
+      // ignore cleanup issues
+    }
+    delete root.__radioDockCleanup;
     root.innerHTML = "";
     delete root.dataset.mounted;
     mountIfNeeded();
