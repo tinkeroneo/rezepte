@@ -278,9 +278,14 @@ export async function detectAlphaBoundsForRenderedImage(img) {
   if (cached) return cached;
 
   if (!img.complete || !img.naturalWidth || !img.naturalHeight) return null;
-  const bounds = analyzeAlphaImage(img)?.bounds || null;
-  writeCachedAlphaBounds(src, bounds);
-  return bounds;
+  try {
+    const analysisImg = await createImageFromUrl(src);
+    const bounds = analyzeAlphaImage(analysisImg)?.bounds || null;
+    writeCachedAlphaBounds(src, bounds);
+    return bounds;
+  } catch {
+    return null;
+  }
 }
 
 export async function analyzeRenderedImageTransparency(img) {
