@@ -356,27 +356,30 @@ export function renderAdminView({ appEl, recipes, setView }) {
         `
       })}
 
-      <div class="admin-subgrid">
-        <label class="admin-input-group">
-          <div class="label">Sound</div>
-          <select id="timerSoundId">
-            <option value="gong" ${timerSoundId === "gong" ? "selected" : ""}>A · Küchen-Gong</option>
-            <option value="wood" ${timerSoundId === "wood" ? "selected" : ""}>B · Holz-Block</option>
-            <option value="pulse" ${timerSoundId === "pulse" ? "selected" : ""}>C · Elektronisch</option>
-            <option value="bowl" ${timerSoundId === "bowl" ? "selected" : ""}>D · Klangschale</option>
-          </select>
-        </label>
+      <div class="admin-timer-panel">
+        <div class="admin-timer-panel__row">
+          <label class="admin-input-group">
+            <div class="label">Sound</div>
+            <div class="admin-inline-controls">
+              <select id="timerSoundId">
+                <option value="gong" ${timerSoundId === "gong" ? "selected" : ""}>A · Küchen-Gong</option>
+                <option value="wood" ${timerSoundId === "wood" ? "selected" : ""}>B · Holz-Block</option>
+                <option value="pulse" ${timerSoundId === "pulse" ? "selected" : ""}>C · Elektronisch</option>
+                <option value="bowl" ${timerSoundId === "bowl" ? "selected" : ""}>D · Klangschale</option>
+              </select>
+              <button class="btn btn--ghost" id="timerSoundPreview" type="button" title="Sound abspielen">▶</button>
+            </div>
+          </label>
+        </div>
 
-        <label class="admin-input-group">
-          <div class="label">Lautstärke</div>
-          <div class="admin-range-row">
-            <input id="timerSoundVolume" type="range" min="0" max="100" step="1" value="${escapeHtml(String(Math.round(timerSoundVolume * 100)))}" />
-            <span class="pill" id="timerSoundVolumeLabel">${escapeHtml(String(Math.round(timerSoundVolume * 100)))}%</span>
-          </div>
-        </label>
-
-        <div class="admin-input-group admin-input-group--button">
-          <button class="btn" id="timerSoundPreview" type="button" title="Sound abspielen">▶ Test</button>
+        <div class="admin-timer-panel__row">
+          <label class="admin-input-group">
+            <div class="label">Lautstärke</div>
+            <div class="admin-range-row">
+              <input id="timerSoundVolume" type="range" min="0" max="100" step="1" value="${escapeHtml(String(Math.round(timerSoundVolume * 100)))}" />
+              <span class="pill" id="timerSoundVolumeLabel">${escapeHtml(String(Math.round(timerSoundVolume * 100)))}%</span>
+            </div>
+          </label>
         </div>
       </div>
     `;

@@ -736,6 +736,19 @@ html.dark .todo-ribbon{
   gap: .85rem;
 }
 
+.admin-timer-panel {
+  display: grid;
+  gap: .85rem;
+  padding: .85rem .95rem;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: var(--r-1);
+  background: color-mix(in srgb, var(--panel) 72%, var(--card));
+}
+
+.admin-timer-panel__row {
+  min-width: 0;
+}
+
 .admin-input-group {
   display: grid;
   gap: .45rem;
@@ -753,6 +766,17 @@ html.dark .todo-ribbon{
 }
 
 .admin-range-row input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-inline-controls {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+}
+
+.admin-inline-controls select {
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -890,5 +914,9 @@ html.dark .todo-ribbon{
 
   .admin-help__bubble {
     width: min(18rem, calc(100vw - 3rem));
+  }
+
+  .admin-inline-controls {
+    align-items: stretch;
   }
 }
