@@ -19,14 +19,19 @@ export function renderAccountView({ appEl }) {
   const cloudEnabled = !!s.readUseBackend?.();
   const activeSpaceId = String(auth?.spaceId || "");
   const mySpaces = Array.isArray(s.getMySpaces?.()) ? s.getMySpaces() : [];
-  const activeSpaceName = String((mySpaces.find((space) => String(space?.space_id || "") === activeSpaceId)?.name) || "");
+  const activeSpace = mySpaces.find((space) => String(space?.space_id || "") === activeSpaceId) || null;
+  const activeSpaceName = String(activeSpace?.name || "");
+  const activeSpaceRole = String(activeSpace?.role || "").toLowerCase();
+  const isOwnerInActiveSpace = activeSpaceRole === "owner" || activeSpaceRole === "admin";
   const isAuthed = !!auth?.user?.id || !!authedEmail;
 
   const shareState = !isAuthed
     ? { text: "Login nötig", ghost: true, info: "Bitte logge dich zuerst ein, um deinen Space zu teilen." }
     : !cloudEnabled
       ? { text: "CLOUD aus", ghost: true, info: "Aktiviere CLOUD, damit Einladungen und Sharing verfügbar sind." }
-      : { text: "Freigabe bereit", ghost: false, info: "" };
+      : !isOwnerInActiveSpace
+        ? { text: "Nur für Owner", ghost: true, info: "Einladungen, Mitgliederliste und offene Freigaben sind nur für Owner sichtbar." }
+        : { text: "Freigabe bereit", ghost: false, info: "" };
 
   appEl.innerHTML = `
     <div class="container">
@@ -36,8 +41,8 @@ export function renderAccountView({ appEl }) {
         <div class="card">
           <div class="card-title">Konto</div>
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-            <button id="authBadge" class="badge badge-btn" type="button">🔐 Login/Logout</button>
-            <button id="adminBadge" class="badge badge-btn" type="button" hidden>🛠️ Admin</button>
+            <button id="authBadge" class="badge badge-btn" type="button">Login/Logout</button>
+            <button id="adminBadge" class="badge badge-btn" type="button" hidden>Admin</button>
           </div>
         </div>
 
@@ -47,22 +52,22 @@ export function renderAccountView({ appEl }) {
               <div class="card-title">Space</div>
 
               <div class="select-wrapper" style="margin-bottom:.35rem;">
-                <span class="icon">⭐ Standard:</span>
+                <span class="icon">â­ Standard:</span>
                 <select id="defaultSpaceSelect" class="badge badge-select" title="Default-Space (beim Login)"></select>
               </div>
 
               <div class="select-wrapper" style="margin-bottom:.35rem;">
-                <span class="icon">✎ (Um)benennen</span>
+                <span class="icon">âœŽ (Um)benennen</span>
                 <input id="spaceNameInput" class="badge badge-select" type="text" placeholder="Space-Name" />
-                <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">💾</button>
+                <button id="saveSpaceNameBtn" class="badge badge-btn" type="button">ðŸ’¾</button>
               </div>
 
               <div style="margin-top:.5rem; border-top:1px solid rgba(255,255,255,.08); padding-top:.75rem;">
                 <div class="muted" style="font-weight:900; margin-bottom:.35rem;">Profil</div>
                 <div class="select-wrapper" style="margin-bottom:.35rem;">
-                  <span class="icon">🏷️</span>
+                  <span class="icon">ðŸ·ï¸</span>
                   <input id="profileDisplayName" class="badge badge-select" type="text" placeholder="Username (Displayname)" />
-                  <button id="saveProfileBtn" class="badge badge-btn" type="button">💾</button>
+                  <button id="saveProfileBtn" class="badge badge-btn" type="button">ðŸ’¾</button>
                 </div>
               </div>
             </div>
@@ -75,7 +80,7 @@ export function renderAccountView({ appEl }) {
               <h2 class="card__title" style="margin:0;">Space teilen</h2>
               ${renderAccountHint("Die eingeladene Person meldet sich an und wird dann automatisch Mitglied im aktuellen Space.")}
             </div>
-            ${isAuthed && cloudEnabled
+            ${isAuthed && cloudEnabled && isOwnerInActiveSpace
               ? `<button class="btn btn--ghost" id="btnRefreshSharing" type="button">Aktualisieren</button>`
               : ``}
           </div>
@@ -114,17 +119,17 @@ export function renderAccountView({ appEl }) {
                     </select>
                   </label>
 
-                  <button class="btn btn--ghost" id="btnInvite" type="button">Einladen</button>
+                  <button class="btn btn--ghost account-share__invite-btn" id="btnInvite" type="button">Einladen</button>
                 </div>
 
                 <div class="account-share__columns">
                   <div class="account-share__panel">
                     <div class="label">Mitglieder</div>
-                    <div id="membersList" class="account-share__list hint">Lade…</div>
+                    <div id="membersList" class="account-share__list hint">Ladeâ€¦</div>
                   </div>
                   <div class="account-share__panel">
                     <div class="label">Offene Einladungen</div>
-                    <div id="invitesList" class="account-share__list hint">Lade…</div>
+                    <div id="invitesList" class="account-share__list hint">Ladeâ€¦</div>
                   </div>
                 </div>
               `}
@@ -135,17 +140,17 @@ export function renderAccountView({ appEl }) {
         <div class="card">
           <div class="card-title">Darstellung</div>
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-            <button id="themeBadge" class="badge badge-btn" type="button">🌓 THEME</button>
+            <button id="themeBadge" class="badge badge-btn" type="button">ðŸŒ“ THEME</button>
           </div>
-          <div class="muted" style="margin-top:.35rem;">System · Hell · Dunkel</div>
+          <div class="muted" style="margin-top:.35rem;">System Â· Hell Â· Dunkel</div>
         </div>
 
         <div class="card">
           <div class="card-title">Tools</div>
           <div class="row" style="gap:.5rem; flex-wrap:wrap;">
-            <button id="diagnosticsBtn" class="badge badge-btn" type="button">🩺 Diagnostics</button>
+            <button id="diagnosticsBtn" class="badge badge-btn" type="button">ðŸ©º Diagnostics</button>
           </div>
-          <div class="muted" style="margin-top:.35rem;">Import/Export als Sheet · Fehlerliste & Backend-Status</div>
+          <div class="muted" style="margin-top:.35rem;">Import/Export als Sheet Â· Fehlerliste & Backend-Status</div>
         </div>
       </section>
     </div>

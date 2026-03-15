@@ -1,4 +1,4 @@
-// src/app/ui/accountControls.js
+﻿// src/app/ui/accountControls.js
 import { allowedInviteRoles, getMyRoleInSpace } from "../../domain/spacePerms.js";
 import { revokeInvite, listSpaceMembers, listPendingInvites } from "../../supabase.js";
 // Bind account-related controls after the view is rendered.
@@ -51,7 +51,7 @@ export function wireAccountControls(ctx) {
     const applyThemeBtn = () => {
       const t = readTheme();
       themeBtn.title = `Theme wechseln (aktuell: ${t})`;
-      themeBtn.textContent = t === "dark" ? "🌙 THEME" : (t === "light" ? "☀️THEME" : "🌓 THEME");
+      themeBtn.textContent = t === "dark" ? "ðŸŒ™ THEME" : (t === "light" ? "â˜€ï¸THEME" : "ðŸŒ“ THEME");
     };
 
     applyThemeBtn();
@@ -252,7 +252,7 @@ export function wireAccountControls(ctx) {
       roleSel.innerHTML = roles.map(r => `<option value="${r}">${r}</option>`).join("");
       roleSel.value = roles[0] || "viewer";
       roleSel.disabled = roles.length === 1;
-      roleSel.title = roles.length === 1 ? "Du kannst nur Viewer einladen" : "Rolle wählen";
+      roleSel.title = roles.length === 1 ? "Du kannst nur Viewer einladen" : "Rolle wÃ¤hlen";
     };
 
     refreshInviteRoleOptions();
@@ -270,7 +270,7 @@ export function wireAccountControls(ctx) {
       if (!(getUseBackend() && isAuthenticated?.())) return;
       const email = String(emailInp?.value || "").trim();
       if (!email || !email.includes("@")) {
-        setMsg("Bitte eine gültige E-Mail eingeben.", "bad");
+        setMsg("Bitte eine gÃ¼ltige E-Mail eingeben.", "bad");
         return;
       }
 
@@ -289,11 +289,11 @@ export function wireAccountControls(ctx) {
 
       try {
         inviteBtn.disabled = true;
-        setMsg("Sende Invite…", "");
+        setMsg("Sende Inviteâ€¦", "");
         await inviteToSpace?.({ email, role, spaceId });
         if (emailInp) emailInp.value = "";
         refreshInviteRoleOptions();
-        setMsg("Invite gesendet ✅", "ok");
+        setMsg("Invite gesendet âœ…", "ok");
       } catch (e) {
         reportError?.(e, { scope: "accountControls", action: "inviteToSpace" });
         setMsg(String(e?.message || e), "bad");
@@ -337,7 +337,13 @@ export function wireAccountControls(ctx) {
       roleSel.innerHTML = roles.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
       roleSel.value = roles[0] || "viewer";
       roleSel.disabled = roles.length === 1;
-      roleSel.title = roles.length === 1 ? "Du kannst nur Viewer einladen" : "Rolle wählen";
+      roleSel.title = roles.length === 1 ? "Du kannst nur Viewer einladen" : "Rolle wÃ¤hlen";
+    };
+
+    const shortId = (value) => {
+      const raw = String(value || "").trim();
+      if (!raw) return "";
+      return raw.length > 12 ? `${raw.slice(0, 4)}...${raw.slice(-4)}` : raw;
     };
 
     const renderMembers = (rows) => {
@@ -346,11 +352,16 @@ export function wireAccountControls(ctx) {
         membersEl.textContent = "Keine Mitglieder gefunden.";
         return;
       }
-      // rows: { email?, user_id?, role?, created_at? }
       membersEl.innerHTML = rows.map(r => {
-        const email = esc(r?.email || r?.user_email || r?.user || r?.user_id || "-");
+        const displayName = String(r?.display_name || "").trim();
+        const fallback = esc(r?.email || r?.user_email || r?.user || shortId(r?.user_id) || "Mitglied");
         const role = esc(r?.role || "-");
-        return `<div class="hint" style="margin:.15rem 0;">${email} · <b>${role}</b></div>`;
+        const label = displayName ? `<b>${esc(displayName)}</b>` : fallback;
+        return `
+          <div class="account-share-row">
+            <div class="account-share-row__main">${label} &middot; <b>${role}</b></div>
+          </div>
+        `;
       }).join("");
     };
 
@@ -368,7 +379,7 @@ export function wireAccountControls(ctx) {
           ? `<button class="btn btn--ghost" data-revoke="${id}" type="button" style="margin-left:.5rem;">Entfernen</button>`
           : "";
         return `<div class="row" style="gap:.5rem; align-items:center; margin:.15rem 0;">
-          <div class="hint" style="margin:0;">${email} · <b>${role}</b></div>${btn}
+          <div class="hint" style="margin:0;">${email} Â· <b>${role}</b></div>${btn}
         </div>`;
       }).join("");
 
@@ -392,31 +403,18 @@ export function wireAccountControls(ctx) {
       }
     };
 
-    const enhanceMembersWithDisplayNames = (rows) => {
-      if (!membersEl || !Array.isArray(rows) || rows.length === 0) return;
-      const nodes = Array.from(membersEl.children || []);
-      rows.forEach((row, index) => {
-        const displayName = String(row?.display_name || "").trim();
-        if (!displayName) return;
-        const role = esc(row?.role || "-");
-        const node = nodes[index];
-        if (!node) return;
-        node.innerHTML = `<b>${esc(displayName)}</b> · <b>${role}</b>`;
-      });
-    };
 
     const refreshLists = async () => {
       const spaceId = getActiveSpaceId();
       if (!spaceId) return;
-      if (membersEl) membersEl.textContent = "Lade…";
-      if (invitesEl) invitesEl.textContent = "Lade…";
+      if (membersEl) membersEl.textContent = "Ladeâ€¦";
+      if (invitesEl) invitesEl.textContent = "Ladeâ€¦";
       try {
         const [members, invites] = await Promise.all([
           typeof listSpaceMembers === "function" ? listSpaceMembers({ spaceId }) : [],
           typeof listPendingInvites === "function" ? listPendingInvites({ spaceId }) : [],
         ]);
         renderMembers(members);
-        enhanceMembersWithDisplayNames(members);
         renderInvites(invites);
       } catch (e) {
         if (membersEl) membersEl.textContent = "Fehler beim Laden.";

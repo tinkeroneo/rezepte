@@ -871,10 +871,16 @@ html.dark .todo-ribbon{
 }
 
 .account-share__form {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(160px, 220px) auto;
   gap: .75rem;
-  align-items: flex-end;
+  align-items: end;
+}
+
+.account-share__invite-btn {
+  min-height: 44px;
+  align-self: end;
+  white-space: nowrap;
 }
 
 .account-share__columns {
@@ -916,6 +922,12 @@ html.dark .todo-ribbon{
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .account-share__form {
+    grid-template-columns: 1fr;
+  }
 }
 
 .admin-tools {
