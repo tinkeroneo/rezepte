@@ -246,7 +246,7 @@ function analyzeAlphaImage(img) {
 
 async function detectAndCacheAlphaBounds(src, loader) {
   const cached = readCachedAlphaBounds(src);
-  if (cached !== undefined) return cached;
+  if (cached) return cached;
 
   try {
     const img = await loader();
@@ -275,7 +275,7 @@ export async function detectAlphaBoundsForRenderedImage(img) {
   if (!src || /\.svg(?:$|\?)/i.test(src)) return null;
 
   const cached = readCachedAlphaBounds(src);
-  if (cached !== undefined) return cached;
+  if (cached) return cached;
 
   if (!img.complete || !img.naturalWidth || !img.naturalHeight) return null;
   const bounds = analyzeAlphaImage(img)?.bounds || null;
