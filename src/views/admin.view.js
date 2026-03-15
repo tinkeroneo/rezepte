@@ -77,13 +77,10 @@ export function renderAdminView({ appEl, recipes, setView }) {
             <div class="admin-cat-row">
               <div class="admin-cat-row__title">
                 <div class="label">${escapeHtml(cat)}</div>
-                <div class="hint" style="margin:0;">${hasOverride ? "Manuell" : "Automatisch aus Kategoriename"}</div>
               </div>
               <div class="admin-cat-row__controls">
                 <input class="catColor" type="color" value="${escapeHtml(col)}" data-cat="${escapeHtml(cat)}" />
-                <span class="hint" style="min-width:84px;">${escapeHtml(col)}</span>
-                <span class="pill ${hasOverride ? "" : "pill-ghost"}">${hasOverride ? "Override" : "Auto"}</span>
-                <button class="btn btn--ghost btn--sm" type="button" data-cat-auto="${escapeHtml(cat)}" ${hasOverride ? "" : "disabled"}>Auto</button>
+                ${hasOverride ? `<button class="btn btn--ghost btn--sm" type="button" data-cat-auto="${escapeHtml(cat)}" title="Automatische Farbe wiederherstellen">↺</button>` : ""}
               </div>
             </div>`;
         }).join("")
@@ -277,7 +274,6 @@ export function renderAdminView({ appEl, recipes, setView }) {
           <div class="card__bd">
             <details class="details">
               <summary>Kategorie-Farben verwalten (${escapeHtml(String(catTokens.length))})</summary>
-              <div class="hint" style="margin-top:10px;">Ohne manuelle Auswahl wird pro Kategoriename automatisch eine Default-Farbe abgeleitet.</div>
               <div id="catColors" class="form" style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
                 ${renderCatRowsHtml()}
               </div>
