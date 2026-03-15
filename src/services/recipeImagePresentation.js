@@ -287,10 +287,20 @@ export async function analyzeRenderedImageTransparency(img) {
   if (!(img instanceof window.HTMLImageElement)) {
     return { ok: false, reason: "not-an-image" };
   }
+  const src = alphaCacheKey(img.currentSrc || img.src || "");
   if (!img.complete || !img.naturalWidth || !img.naturalHeight) {
     return { ok: false, reason: "image-not-ready" };
   }
-  return analyzeAlphaImage(img);
+  if (!src || /\.svg(?:$|\?)/i.test(src)) {
+    return { ok: false, reason: "unsupported-source" };
+  }
+
+  try {
+    const analysisImg = await createImageFromUrl(src);
+    return analyzeAlphaImage(analysisImg);
+  } catch {
+    return { ok: false, reason: "analysis-image-load-failed" };
+  }
 }
 
 export async function deriveAlphaFitFocus({ file = null, url = "", currentFocus = null } = {}) {
