@@ -38,9 +38,6 @@ export function wireAccountControls(ctx) {
     updateSpaceName,
 
     installAdminCorner,
-
-
-
   } = ctx;
 
   // THEME
@@ -51,14 +48,14 @@ export function wireAccountControls(ctx) {
     const applyThemeBtn = () => {
       const t = readTheme();
       themeBtn.title = `Theme wechseln (aktuell: ${t})`;
-      themeBtn.textContent = t === "dark" ? "🌙 THEME" : (t === "light" ? "☀️ THEME" : "🌓 THEME");
+      themeBtn.textContent = t === "dark" ? "🌙 THEME" : t === "light" ? "☀️ THEME" : "🌓 THEME";
     };
 
     applyThemeBtn();
 
     themeBtn.addEventListener("click", () => {
       const t = readTheme();
-      const next = t === "system" ? "dark" : (t === "dark" ? "light" : "system");
+      const next = t === "system" ? "dark" : t === "dark" ? "light" : "system";
       setTheme(next);
       applyThemeAndOverlay();
       applyThemeBtn();
@@ -80,7 +77,9 @@ export function wireAccountControls(ctx) {
       const authed = isAuthenticated?.();
 
       if (authed) {
-        try { sbLogout(); } catch (e) {
+        try {
+          sbLogout();
+        } catch (e) {
           reportError?.(e, { scope: "accountControls", action: String(e?.message || e) });
           showError?.(String(e?.message || e));
         }
@@ -112,8 +111,17 @@ export function wireAccountControls(ctx) {
 
       try {
         setActiveSpaceId(sid);
-        const ctxAuth = (() => { try { return getAuthContext?.(); } catch { return null; } })();
-        setOfflineQueueScope?.({ userId: ctxAuth?.user?.id || null, spaceId: ctxAuth?.spaceId || null });
+        const ctxAuth = (() => {
+          try {
+            return getAuthContext?.();
+          } catch {
+            return null;
+          }
+        })();
+        setOfflineQueueScope?.({
+          userId: ctxAuth?.user?.id || null,
+          spaceId: ctxAuth?.spaceId || null,
+        });
 
         updateHeaderBadges?.({ syncing: true });
         await runExclusive?.("loadAll", () => loadAll());
@@ -155,20 +163,43 @@ export function wireAccountControls(ctx) {
   if (saveProfileBtn && !saveProfileBtn.__installed) {
     saveProfileBtn.__installed = true;
     saveProfileBtn.addEventListener("click", async () => {
+      const profileMsgEl = document.getElementById("profileMsg");
+      const setProfileMsg = (txt = "", kind = "") => {
+        if (!profileMsgEl) return;
+        profileMsgEl.textContent = txt;
+        profileMsgEl.classList.toggle("hint-bad", kind === "bad");
+      };
+
       if (!(getUseBackend() && isAuthenticated?.())) {
+        setProfileMsg("Nicht eingeloggt oder CLOUD ist aus.", "bad");
         showError?.("Nicht eingeloggt oder Backend aus (useBackend=false).");
         return;
       }
       const dn = document.getElementById("profileDisplayName");
       const display_name = String(dn?.value || "").trim();
+
+      if (display_name.length < 2) {
+        setProfileMsg("Bitte mindestens 2 Zeichen für den Anzeigenamen verwenden.", "bad");
+        return;
+      }
+
+      saveProfileBtn.disabled = true;
+      const oldLabel = saveProfileBtn.textContent;
+      saveProfileBtn.textContent = "…";
+      setProfileMsg("Speichere…");
       try {
         const p = await upsertProfile({ display_name });
         setProfileCache?.(p);
         await refreshProfileUi?.();
         updateHeaderBadges?.();
+        setProfileMsg("Profil gespeichert.");
       } catch (e) {
+        setProfileMsg(String(e?.message || e), "bad");
         reportError?.(e, { scope: "accountControls", action: "saveProfile" });
         showError?.(String(e?.message || e));
+      } finally {
+        saveProfileBtn.disabled = false;
+        saveProfileBtn.textContent = oldLabel || "💾";
       }
     });
   }
@@ -182,7 +213,13 @@ export function wireAccountControls(ctx) {
         showError?.("Nicht eingeloggt oder Backend aus (useBackend=false).");
         return;
       }
-      const ctxAuth = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+      const ctxAuth = (() => {
+        try {
+          return getAuthContext?.();
+        } catch {
+          return null;
+        }
+      })();
       const sid = String(ctxAuth?.spaceId || "").trim();
       if (!sid) return;
       const inp = document.getElementById("spaceNameInput");
@@ -209,7 +246,6 @@ export function wireAccountControls(ctx) {
     });
   }
 
-
   // TOOLS: Import / Export / Diagnostics
   const diagBtn = document.getElementById("diagnosticsBtn");
   if (diagBtn && !diagBtn.__installed) {
@@ -218,8 +254,6 @@ export function wireAccountControls(ctx) {
       router?.setView?.({ name: "diagnostics" });
     });
   }
-
-  
 
   // ensures text/icons are current + wires profile buttons (safe)
   updateHeaderBadges?.();
@@ -243,13 +277,19 @@ export function wireAccountControls(ctx) {
 
     const refreshInviteRoleOptions = () => {
       if (!roleSel) return;
-      const ctxAuth = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+      const ctxAuth = (() => {
+        try {
+          return getAuthContext?.();
+        } catch {
+          return null;
+        }
+      })();
       const spaceId = String(ctxAuth?.spaceId || "");
       const mySpaces = typeof getMySpaces === "function" ? getMySpaces() : [];
       const myRole = getMyRoleInSpace({ spaceId, mySpaces });
       const roles = allowedInviteRoles(myRole);
 
-      roleSel.innerHTML = roles.map(r => `<option value="${r}">${r}</option>`).join("");
+      roleSel.innerHTML = roles.map((r) => `<option value="${r}">${r}</option>`).join("");
       roleSel.value = roles[0] || "viewer";
       roleSel.disabled = roles.length === 1;
       roleSel.title = roles.length === 1 ? "Du kannst nur Viewer einladen" : "Rolle wählen";
@@ -274,7 +314,13 @@ export function wireAccountControls(ctx) {
         return;
       }
 
-      const ctxAuth = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+      const ctxAuth = (() => {
+        try {
+          return getAuthContext?.();
+        } catch {
+          return null;
+        }
+      })();
       const spaceId = String(ctxAuth?.spaceId || "").trim();
       if (!spaceId) {
         setMsg("Kein aktiver Space.", "bad");
@@ -284,7 +330,9 @@ export function wireAccountControls(ctx) {
       const mySpaces = typeof getMySpaces === "function" ? getMySpaces() : [];
       const myRole = getMyRoleInSpace({ spaceId, mySpaces });
       const allowed = allowedInviteRoles(myRole);
-      let role = String(roleSel?.value || "viewer").trim().toLowerCase();
+      let role = String(roleSel?.value || "viewer")
+        .trim()
+        .toLowerCase();
       if (!allowed.includes(role)) role = "viewer";
 
       try {
@@ -303,7 +351,6 @@ export function wireAccountControls(ctx) {
     });
   }
 
-
   // SHARING (CLOUD block in account.view.js)
   const cloudInviteBtn = document.getElementById("btnInvite");
   if (cloudInviteBtn && !cloudInviteBtn.__installed) {
@@ -315,15 +362,27 @@ export function wireAccountControls(ctx) {
     const invitesEl = document.getElementById("invitesList");
     const refreshBtn = document.getElementById("btnRefreshSharing");
 
-    const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => (
-      c === "&" ? "&amp;" :
-      c === "<" ? "&lt;" :
-      c === ">" ? "&gt;" :
-      c === '"' ? "&quot;" : "&#39;"
-    ));
+    const esc = (s) =>
+      String(s ?? "").replace(/[&<>"']/g, (c) =>
+        c === "&"
+          ? "&amp;"
+          : c === "<"
+            ? "&lt;"
+            : c === ">"
+              ? "&gt;"
+              : c === '"'
+                ? "&quot;"
+                : "&#39;",
+      );
 
     const getActiveSpaceId = () => {
-      const ctxAuth = (() => { try { return getAuthContext?.(); } catch { return null; } })();
+      const ctxAuth = (() => {
+        try {
+          return getAuthContext?.();
+        } catch {
+          return null;
+        }
+      })();
       return String(ctxAuth?.spaceId || "").trim();
     };
 
@@ -334,7 +393,7 @@ export function wireAccountControls(ctx) {
       const myRole = getMyRoleInSpace({ spaceId, mySpaces });
       const roles = allowedInviteRoles(myRole);
 
-      roleSel.innerHTML = roles.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
+      roleSel.innerHTML = roles.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
       roleSel.value = roles[0] || "viewer";
       roleSel.disabled = roles.length === 1;
       roleSel.title = roles.length === 1 ? "Du kannst nur Viewer einladen" : "Rolle wählen";
@@ -352,17 +411,21 @@ export function wireAccountControls(ctx) {
         membersEl.textContent = "Keine Mitglieder gefunden.";
         return;
       }
-      membersEl.innerHTML = rows.map(r => {
-        const displayName = String(r?.display_name || "").trim();
-        const fallback = esc(r?.email || r?.user_email || r?.user || shortId(r?.user_id) || "Mitglied");
-        const role = esc(r?.role || "-");
-        const label = displayName ? `<b>${esc(displayName)}</b>` : fallback;
-        return `
+      membersEl.innerHTML = rows
+        .map((r) => {
+          const displayName = String(r?.display_name || "").trim();
+          const fallback = esc(
+            r?.email || r?.user_email || r?.user || shortId(r?.user_id) || "Mitglied",
+          );
+          const role = esc(r?.role || "-");
+          const label = displayName ? `<b>${esc(displayName)}</b>` : fallback;
+          return `
           <div class="account-share-row">
             <div class="account-share-row__main">${label} &middot; <b>${role}</b></div>
           </div>
         `;
-      }).join("");
+        })
+        .join("");
     };
 
     const renderInvites = (rows) => {
@@ -371,17 +434,20 @@ export function wireAccountControls(ctx) {
         invitesEl.textContent = "Keine offenen Einladungen.";
         return;
       }
-      invitesEl.innerHTML = rows.map(r => {
-        const id = esc(r?.id || r?.invite_id || "");
-        const email = esc(r?.email || r?.invited_email || "-");
-        const role = esc(r?.role || "-");
-        const btn = (typeof revokeInvite === "function" && id)
-          ? `<button class="btn btn--ghost" data-revoke="${id}" type="button" style="margin-left:.5rem;">Entfernen</button>`
-          : "";
-        return `<div class="row" style="gap:.5rem; align-items:center; margin:.15rem 0;">
+      invitesEl.innerHTML = rows
+        .map((r) => {
+          const id = esc(r?.id || r?.invite_id || "");
+          const email = esc(r?.email || r?.invited_email || "-");
+          const role = esc(r?.role || "-");
+          const btn =
+            typeof revokeInvite === "function" && id
+              ? `<button class="btn btn--ghost" data-revoke="${id}" type="button" style="margin-left:.5rem;">Entfernen</button>`
+              : "";
+          return `<div class="row" style="gap:.5rem; align-items:center; margin:.15rem 0;">
           <div class="hint" style="margin:0;">${email} · <b>${role}</b></div>${btn}
         </div>`;
-      }).join("");
+        })
+        .join("");
 
       // wire revoke
       if (typeof revokeInvite === "function") {
@@ -402,7 +468,6 @@ export function wireAccountControls(ctx) {
         });
       }
     };
-
 
     const refreshLists = async () => {
       const spaceId = getActiveSpaceId();
@@ -451,7 +516,9 @@ export function wireAccountControls(ctx) {
       const myRole = getMyRoleInSpace({ spaceId, mySpaces });
       const allowed = allowedInviteRoles(myRole);
 
-      let role = String(roleSel?.value || "viewer").trim().toLowerCase();
+      let role = String(roleSel?.value || "viewer")
+        .trim()
+        .toLowerCase();
       if (!allowed.includes(role)) role = "viewer";
 
       try {
@@ -468,6 +535,4 @@ export function wireAccountControls(ctx) {
       }
     });
   }
-
-
 }
