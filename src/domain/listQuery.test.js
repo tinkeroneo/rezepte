@@ -19,7 +19,7 @@ function run() {
   // applyListQuery basic filter
   const recipes = [
     { id: "1", title: "Bohnen Chili", category: "Abend", tags: ["scharf"], createdAt: 2 },
-    { id: "2", title: "Pancakes", category: "Frühstück", tags: ["süß"], createdAt: 1 }
+    { id: "2", title: "Pancakes", category: "Frühstück", tags: ["süß"], createdAt: 1 },
   ];
 
   const r1 = applyListQuery({ recipes, query: "bohnen", sort: "new", sortDir: "desc" });
@@ -29,6 +29,25 @@ function run() {
   const r2 = applyListQuery({ recipes, cat: "Frühstück", sort: "az", sortDir: "asc" });
   assert.equal(r2.length, 1);
   assert.equal(r2[0].id, "2");
+
+  const r3 = applyListQuery({
+    recipes: [
+      {
+        id: "3",
+        title: "Kartoffelauflauf",
+        category: "Abend",
+        tags: [],
+        ingredients: "Kartoffeln\nSahne",
+        steps: "Backen\nServieren",
+        createdAt: 3,
+      },
+    ],
+    query: "sahne",
+    sort: "new",
+    sortDir: "desc",
+  });
+  assert.equal(r3.length, 1);
+  assert.equal(r3[0].id, "3");
 
   console.log("✅ listQuery tests passed");
 }

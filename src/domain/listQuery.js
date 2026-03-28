@@ -43,7 +43,10 @@ export function sortTitle(v) {
       .toLowerCase();
   } catch {
     // Fallback for older JS engines
-    return s.replace(/[\u{1F300}-\u{1FAFF}]/gu, "").trim().toLowerCase();
+    return s
+      .replace(/[\u{1F300}-\u{1FAFF}]/gu, "")
+      .trim()
+      .toLowerCase();
   }
 }
 
@@ -62,6 +65,17 @@ export function sortTitle(v) {
  *
  * @returns {Array} filtered & sorted recipes
  */
+function normalizeRecipeTextLines(value) {
+  if (Array.isArray(value)) return value.map((entry) => String(entry ?? ""));
+  if (typeof value === "string") {
+    return value
+      .split(/\r?\n/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 export function applyListQuery({
   recipes,
   query = "",
@@ -72,16 +86,12 @@ export function applyListQuery({
   sort = "new",
   sortDir = "desc",
   pendingOnly = false,
-  pendingIds = new Set()
+  pendingIds = new Set(),
 }) {
   const listIn = Array.isArray(recipes) ? recipes : [];
   const qq = norm(query);
-  const catList = Array.isArray(cats) && cats.length
-    ? cats
-    : (cat ? [cat] : []);
-  const tagList = Array.isArray(tags) && tags.length
-    ? tags
-    : (tag ? [tag] : []);
+  const catList = Array.isArray(cats) && cats.length ? cats : cat ? [cat] : [];
+  const tagList = Array.isArray(tags) && tags.length ? tags : tag ? [tag] : [];
 
   // 1) filter
   let list = listIn.filter((r) => {
@@ -106,8 +116,8 @@ export function applyListQuery({
       r.time,
       r.source,
       ...(Array.isArray(r.tags) ? r.tags : []),
-      ...(r.ingredients ?? []),
-      ...(r.steps ?? [])
+      ...normalizeRecipeTextLines(r.ingredients),
+      ...normalizeRecipeTextLines(r.steps),
     ]
       .map(norm)
       .join(" ");
