@@ -641,6 +641,69 @@ html.dark .ingredients-list.is-interactive .ingredient-item:hover{
   padding: 0 .4rem;
   font-size: .85rem;
 }
+.editor-preview{
+  padding: .75rem .9rem;
+  background: color-mix(in srgb, var(--panel) 74%, var(--card));
+}
+.editor-preview__label{
+  margin-bottom: .45rem;
+  font-weight: 700;
+}
+.editor-preview__body{
+  min-height: 2.5rem;
+}
+.editor-preview__body ul{
+  margin: 0;
+}
+.editor-preview__toolbar{
+  align-items: center;
+}
+.editor-preview-list,
+.editor-preview__step-body{
+  display: grid;
+  gap: .35rem;
+}
+.editor-preview-list{
+  list-style: none;
+  padding: 0;
+}
+.editor-preview__stack{
+  display: grid;
+  gap: .55rem;
+}
+.editor-line{
+  width: 100%;
+  border: 1px dashed transparent;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: .35rem .45rem;
+  border-radius: var(--r-1);
+  cursor: pointer;
+}
+.editor-line:hover{
+  border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+  background: color-mix(in srgb, var(--panel) 78%, var(--card));
+}
+.editor-line--header,
+.editor-line--step-title{
+  font-weight: 800;
+}
+.editor-line--step-body{
+  color: var(--muted);
+}
+.editor-line--step-bullet{
+  padding-left: 1.1rem;
+  position: relative;
+}
+.editor-line--step-bullet::before{
+  content: "•";
+  position: absolute;
+  left: .45rem;
+}
+.editor-source-toggle{
+  margin-top: .5rem;
+}
 .timerroot-dock .timer-pill-left{
   display: flex;
   align-items: center;

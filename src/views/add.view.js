@@ -2,6 +2,10 @@ import { escapeHtml, qs, recipeImageOrDefault } from "../utils.js";
 import { compressImageFile } from "../domain/images.js";
 import { normalizeIngredientLines } from "../domain/ingredientUnits.js";
 import { generateId } from "../domain/id.js";
+import { normalizeEditorLines, normalizeRecipeTitleInput } from "../domain/recipes.js";
+import { applyStepLineFormatAtCursor, formatStepLine } from "../domain/stepFormatEditor.js";
+import { isStepTitleLine, splitStepsToCards } from "../domain/steps.js";
+import { isIngredientHeader } from "../domain/shopping.js";
 import { deleteRecipe as sbDelete } from "../supabase.js";
 
 import { createDirtyTracker } from "../ui/dirtyTracker.js";
@@ -10,7 +14,6 @@ import { createImagePicker } from "../ui/imagePicker.js";
 import { withLoader } from "../ui/loader.js";
 import { showError, showSuccess } from "../services/errors.js";
 import { deriveAlphaFitFocus } from "../services/recipeImagePresentation.js";
-
 
 function normalizeRecipe(existing) {
   if (existing) {
@@ -24,6 +27,7 @@ function normalizeRecipe(existing) {
       steps: existing.steps ?? [],
       createdAt: existing.createdAt ?? Date.now(),
       source: existing.source ?? "",
+      description: existing.description ?? "",
       tags: existing.tags ?? [],
       space_id: existing.space_id,
       image_focus: existing.image_focus ?? null,
@@ -39,6 +43,7 @@ function normalizeRecipe(existing) {
     steps: [],
     createdAt: Date.now(),
     source: "",
+    description: "",
     tags: [],
     image_focus: null,
   };
@@ -78,6 +83,7 @@ export function renderAddView({
 
   const ingredientsText = (r.ingredients ?? []).join("\n");
   const stepsText = (r.steps ?? []).join("\n");
+  const notesText = String(r.description ?? "");
 
   const writeBlocked = canWrite === false;
 
@@ -86,14 +92,19 @@ export function renderAddView({
       <div class="card">
         <h2>${isEdit ? "Rezept bearbeiten" : "Neues Rezept"}</h2>
 
-        ${writeBlocked ? `
+        ${
+          writeBlocked
+            ? `
           <div class="muted" style="margin:.25rem 0 .75rem 0;">
             ✋ Schreibschutz aktiv – du kannst hier nur ansehen (solo lectura).
           </div>
-        ` : ""}
+        `
+            : ""
+        }
 
         <label class="muted">Titel</label>
         <input id="title" type="text" placeholder="z.B. Bohnen-Rührei Deluxe" value="${escapeHtml(r.title)}" />
+        <div class="muted" style="margin-top:.25rem;">Tipp: kurze, konkrete Titel funktionieren in Suche und Liste am besten.</div>
 
         <div class="row" style="flex-wrap:wrap; gap:.75rem;">
           <div style="flex:1; min-width:220px;">
@@ -101,7 +112,9 @@ export function renderAddView({
             <input id="category" type="text" placeholder="z.B. Frühstück" value="${escapeHtml(r.category)}" />
           </div>
 
-          ${useBackend && isEdit ? `
+          ${
+            useBackend && isEdit
+              ? `
           <div style="flex:1; min-width:220px;">
             <label class="muted">Space</label>
             <select id="spaceMoveSelect"></select>
@@ -109,7 +122,9 @@ export function renderAddView({
               <input id="moveIncludeParts" type="checkbox" checked /> inkl. Parts
             </label>
           </div>
-          ` : ``}
+          `
+              : ``
+          }
 
           <div style="flex:2; min-width:260px;">
             <label class="muted">Tags (kommagetrennt)</label>
@@ -144,10 +159,52 @@ export function renderAddView({
           <label class="muted" style="margin:0;">Zutaten (eine pro Zeile)</label>
           <button class="btn btn--ghost btn--sm" id="normalizeIngredientsBtn" type="button" title="Einheiten vereinheitlichen">Einheiten</button>
         </div>
-        <textarea id="ingredients" placeholder="z.B. Weiße Bohnen\nTK-Spinat\nKala Namak">${escapeHtml(ingredientsText)}</textarea>
+        <div class="row" style="gap:.5rem; margin-top:.35rem; align-items:center; flex-wrap:wrap;">
+          <label class="muted" style="display:flex; gap:.4rem; align-items:center; margin:0;">
+            <input id="ingredientsFormatToggle" type="checkbox" />
+            Zutaten-Format
+          </label>
+        </div>
+        <div id="ingredientsPreviewWrap" class="card editor-preview" style="margin-top:.5rem; display:none;">
+          <div class="muted editor-preview__label">Finale Ansicht Zutaten</div>
+          <div class="row editor-preview__toolbar" style="gap:.35rem; margin-bottom:.5rem; flex-wrap:wrap;">
+            <button class="btn btn--ghost btn--sm" type="button" data-preview-ingredients-format="ingredientHeader">Zwischentitel (:)</button>
+            <button class="btn btn--ghost btn--sm" type="button" data-preview-ingredients-format="ingredientItem">Zutat (-)</button>
+            <button class="btn btn--ghost btn--sm" type="button" data-preview-ingredients-format="plain">Text</button>
+          </div>
+          <div id="ingredientsPreview" class="editor-preview__body"></div>
+        </div>
+        <button class="btn btn--ghost btn--sm editor-source-toggle" id="ingredientsSourceToggle" type="button" style="display:none;">Rohtext bearbeiten</button>
+        <div id="ingredientsSourceWrap" class="editor-source-wrap">
+          <textarea id="ingredients" placeholder="z.B. Weiße Bohnen\nTK-Spinat\nKala Namak">${escapeHtml(ingredientsText)}</textarea>
+        </div>
 
         <label class="muted">Zubereitung (eine pro Zeile)</label>
-        <textarea id="steps" placeholder="z.B. Bohnen zerdrücken\nZwiebel anbraten\n...">${escapeHtml(stepsText)}</textarea>
+        <div class="row" style="gap:.5rem; margin-top:.35rem; align-items:center; flex-wrap:wrap;">
+          <label class="muted" style="display:flex; gap:.4rem; align-items:center; margin:0;">
+            <input id="stepsFormatToggle" type="checkbox" />
+            Format-Editor
+          </label>
+        </div>
+        <div id="stepsPreviewWrap" class="card editor-preview" style="margin-top:.5rem; display:none;">
+          <div class="muted editor-preview__label">Finale Ansicht Zubereitung</div>
+          <div class="row editor-preview__toolbar" style="gap:.35rem; margin-bottom:.5rem; flex-wrap:wrap;">
+            <button class="btn btn--ghost btn--sm" type="button" data-preview-step-format="title">Titel (##)</button>
+            <button class="btn btn--ghost btn--sm" type="button" data-preview-step-format="bullet">Unterpunkt (-)</button>
+            <button class="btn btn--ghost btn--sm" type="button" data-preview-step-format="plain">Text</button>
+          </div>
+          <div id="stepsPreview" class="editor-preview__body"></div>
+        </div>
+        <button class="btn btn--ghost btn--sm editor-source-toggle" id="stepsSourceToggle" type="button" style="display:none;">Rohtext bearbeiten</button>
+        <div id="stepsSourceWrap" class="editor-source-wrap">
+          <textarea id="steps" placeholder="z.B. Bohnen zerdrücken\nZwiebel anbraten\n...">${escapeHtml(stepsText)}</textarea>
+        </div>
+        <div class="muted" style="margin-top:.25rem;">
+          Modus wahlen, dann in der finalen Ansicht die passende Zeile antippen. Rohtext nur bei Bedarf.
+        </div>
+
+        <label class="muted" style="margin-top:.75rem;">Zusätzliche Hinweise (optional)</label>
+        <textarea id="notes" placeholder="z.B. Kann am Vortag vorbereitet werden.">${escapeHtml(notesText)}</textarea>
 
         <div class="row" style="justify-content:flex-end; margin-top:.75rem;">
           ${isEdit ? `<button class="btn btn--solid" id="deleteBtn">Löschen</button>` : ``}
@@ -162,9 +219,7 @@ export function renderAddView({
       <div id="sheetRoot"></div>
     </div>
   `;
-  appEl
-    .querySelectorAll("textarea")
-    .forEach(autoGrowTextarea);
+  appEl.querySelectorAll("textarea").forEach(autoGrowTextarea);
   // --- DOM refs
   const titleEl = qs(appEl, "#title");
   const categoryEl = qs(appEl, "#category");
@@ -173,7 +228,18 @@ export function renderAddView({
   const tagsEl = qs(appEl, "#tags");
   const ingredientsEl = qs(appEl, "#ingredients");
   const normalizeIngredientsBtn = qs(appEl, "#normalizeIngredientsBtn");
+  const ingredientsFormatToggleEl = qs(appEl, "#ingredientsFormatToggle");
+  const ingredientsPreviewEl = qs(appEl, "#ingredientsPreview");
+  const ingredientsPreviewWrapEl = qs(appEl, "#ingredientsPreviewWrap");
+  const ingredientsSourceWrapEl = qs(appEl, "#ingredientsSourceWrap");
+  const ingredientsSourceToggleEl = qs(appEl, "#ingredientsSourceToggle");
   const stepsEl = qs(appEl, "#steps");
+  const stepsFormatToggleEl = qs(appEl, "#stepsFormatToggle");
+  const stepsPreviewEl = qs(appEl, "#stepsPreview");
+  const stepsPreviewWrapEl = qs(appEl, "#stepsPreviewWrap");
+  const stepsSourceWrapEl = qs(appEl, "#stepsSourceWrap");
+  const stepsSourceToggleEl = qs(appEl, "#stepsSourceToggle");
+  const notesEl = qs(appEl, "#notes");
 
   const fileEl = qs(appEl, "#image_file");
   const imageUrlEl = qs(appEl, "#image_url");
@@ -211,8 +277,6 @@ export function renderAddView({
     statusEl,
   });
 
-  
-
   // --- Dirty tracker
   const dirty = createDirtyTracker({
     setDirtyIndicator,
@@ -222,12 +286,68 @@ export function renderAddView({
     beforeUnloadKey: "__tinkeroneo_beforeunload_add",
   });
 
+  let ingredientsFormatMode = "ingredientItem";
+  let stepsFormatMode = "title";
+  let ingredientsSourceVisible = false;
+  let stepsSourceVisible = false;
+
+  const syncIngredientsPreview = () => {
+    if (!ingredientsPreviewEl) return;
+    ingredientsPreviewEl.innerHTML = renderIngredientPreviewHtml(ingredientsEl?.value || "");
+  };
+
+  const syncStepsPreview = () => {
+    if (!stepsPreviewEl) return;
+    stepsPreviewEl.innerHTML = renderStepPreviewHtml(stepsEl?.value || "");
+  };
+
+  const syncIngredientsFormatDock = () => {
+    const on = !!ingredientsFormatToggleEl?.checked;
+    if (ingredientsPreviewWrapEl) ingredientsPreviewWrapEl.style.display = on ? "" : "none";
+    if (ingredientsSourceToggleEl) {
+      ingredientsSourceToggleEl.style.display = on ? "inline-flex" : "none";
+      ingredientsSourceToggleEl.textContent = ingredientsSourceVisible ? "Rohtext ausblenden" : "Rohtext bearbeiten";
+    }
+    if (ingredientsSourceWrapEl) ingredientsSourceWrapEl.style.display = on && !ingredientsSourceVisible ? "none" : "";
+    ingredientsPreviewWrapEl
+      ?.querySelectorAll("[data-preview-ingredients-format]")
+      .forEach((btn) =>
+        btn.classList.toggle(
+          "btn--solid",
+          btn.getAttribute("data-preview-ingredients-format") === ingredientsFormatMode,
+        ),
+      );
+  };
+
+  const syncStepsFormatDock = () => {
+    const on = !!stepsFormatToggleEl?.checked;
+    if (stepsPreviewWrapEl) stepsPreviewWrapEl.style.display = on ? "" : "none";
+    if (stepsSourceToggleEl) {
+      stepsSourceToggleEl.style.display = on ? "inline-flex" : "none";
+      stepsSourceToggleEl.textContent = stepsSourceVisible ? "Rohtext ausblenden" : "Rohtext bearbeiten";
+    }
+    if (stepsSourceWrapEl) stepsSourceWrapEl.style.display = on && !stepsSourceVisible ? "none" : "";
+    stepsPreviewWrapEl
+      ?.querySelectorAll("[data-preview-step-format]")
+      .forEach((btn) =>
+        btn.classList.toggle(
+          "btn--solid",
+          btn.getAttribute("data-preview-step-format") === stepsFormatMode,
+        ),
+      );
+  };
+
+  syncIngredientsPreview();
+  syncStepsPreview();
+  syncIngredientsFormatDock();
+  syncStepsFormatDock();
+
   // If write is blocked, disable form after initial render (but keep preview visible)
   if (writeBlocked) {
     setFormDisabled(appEl, true);
     // Re-enable preview-related elements so the image preview still renders
     // (it is static HTML anyway, but keep it safe)
-    previewWrap?.querySelectorAll("*").forEach(() => { });
+    previewWrap?.querySelectorAll("*").forEach(() => {});
     return; // No handlers when read-only
   }
 
@@ -240,10 +360,94 @@ export function renderAddView({
     tagsEl,
     ingredientsEl,
     stepsEl,
+    notesEl,
     imageUrlEl,
   ].forEach((el) => el?.addEventListener("input", dirty.markDirty));
 
   fileEl?.addEventListener("change", dirty.markDirty);
+
+  ingredientsEl?.addEventListener("input", syncIngredientsPreview);
+  stepsEl?.addEventListener("input", syncStepsPreview);
+
+  ingredientsFormatToggleEl?.addEventListener("change", () => {
+    ingredientsSourceVisible = false;
+    syncIngredientsFormatDock();
+  });
+
+  stepsFormatToggleEl?.addEventListener("change", () => {
+    stepsSourceVisible = false;
+    syncStepsFormatDock();
+  });
+
+  ingredientsSourceToggleEl?.addEventListener("click", () => {
+    ingredientsSourceVisible = !ingredientsSourceVisible;
+    syncIngredientsFormatDock();
+    if (ingredientsSourceVisible) ingredientsEl?.focus();
+  });
+
+  stepsSourceToggleEl?.addEventListener("click", () => {
+    stepsSourceVisible = !stepsSourceVisible;
+    syncStepsFormatDock();
+    if (stepsSourceVisible) stepsEl?.focus();
+  });
+
+  ingredientsPreviewWrapEl?.querySelectorAll("[data-preview-ingredients-format]")?.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      ingredientsFormatMode = btn.getAttribute("data-preview-ingredients-format") || "plain";
+      syncIngredientsFormatDock();
+    });
+  });
+
+  stepsPreviewWrapEl?.querySelectorAll("[data-preview-step-format]")?.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      stepsFormatMode = btn.getAttribute("data-preview-step-format") || "plain";
+      syncStepsFormatDock();
+    });
+  });
+
+  ingredientsPreviewEl?.addEventListener("click", (event) => {
+    if (!ingredientsFormatToggleEl?.checked) return;
+    const target = event.target?.closest?.("[data-line-index]");
+    if (!target) return;
+    const lineIndex = Number(target.getAttribute("data-line-index"));
+    if (!Number.isInteger(lineIndex)) return;
+    ingredientsEl.value = applyFormatToLineIndex(ingredientsEl.value || "", lineIndex, ingredientsFormatMode);
+    ingredientsEl.dispatchEvent(new window.Event("input"));
+  });
+
+  stepsPreviewEl?.addEventListener("click", (event) => {
+    if (!stepsFormatToggleEl?.checked) return;
+    const target = event.target?.closest?.("[data-line-index]");
+    if (!target) return;
+    const lineIndex = Number(target.getAttribute("data-line-index"));
+    if (!Number.isInteger(lineIndex)) return;
+    stepsEl.value = applyFormatToLineIndex(stepsEl.value || "", lineIndex, stepsFormatMode);
+    stepsEl.dispatchEvent(new window.Event("input"));
+  });
+
+  ingredientsEl?.addEventListener("click", () => {
+    if (!ingredientsFormatToggleEl?.checked) return;
+    const result = applyStepLineFormatAtCursor({
+      text: ingredientsEl.value || "",
+      cursor: ingredientsEl.selectionStart ?? 0,
+      mode: ingredientsFormatMode,
+    });
+    ingredientsEl.value = result.text;
+    ingredientsEl.setSelectionRange(result.cursor, result.cursor);
+    ingredientsEl.dispatchEvent(new window.Event("input"));
+  });
+
+  stepsEl?.addEventListener("click", () => {
+    if (!stepsFormatToggleEl?.checked) return;
+    const result = applyStepLineFormatAtCursor({
+      text: stepsEl.value || "",
+      cursor: stepsEl.selectionStart ?? 0,
+      mode: stepsFormatMode,
+    });
+    stepsEl.value = result.text;
+    stepsEl.setSelectionRange(result.cursor, result.cursor);
+    stepsEl.dispatchEvent(new window.Event("input"));
+  });
 
   normalizeIngredientsBtn?.addEventListener("click", () => {
     const lines = String(ingredientsEl?.value || "").split("\n");
@@ -260,14 +464,14 @@ export function renderAddView({
   // --- Delete (edit only)
   qs(appEl, "#deleteBtn")?.addEventListener("click", async () => {
     if (!confirm("Rezept wirklich löschen?")) return;
-    await sbDelete?.(r.id).catch(() => { });
+    await sbDelete?.(r.id).catch(() => {});
     showSuccess("Rezept gel?scht.");
     setView({ name: "list", selectedId: null, q: state.q });
   });
 
   // --- Save
   qs(appEl, "#saveBtn")?.addEventListener("click", async () => {
-    const title = (titleEl?.value || "").trim();
+    const title = normalizeRecipeTitleInput(titleEl?.value || "");
     if (!title) {
       showError("Bitte einen Titel angeben.");
       return;
@@ -276,6 +480,7 @@ export function renderAddView({
     const category = (categoryEl?.value || "").trim();
     const time = (timeEl?.value || "").trim();
     const source = (sourceEl?.value || "").trim();
+    const description = (notesEl?.value || "").trim();
 
     const tags = String(tagsEl?.value || "")
       .split(",")
@@ -325,15 +530,12 @@ export function renderAddView({
       }
     }
 
-    const ingredients = String(ingredientsEl?.value || "")
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const ingredients = normalizeEditorLines(ingredientsEl?.value || "");
 
-    const steps = String(stepsEl?.value || "")
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const steps = normalizeEditorLines(stepsEl?.value || "", {
+      stripLeadingNumbers: true,
+      stripLeadingBullets: false,
+    });
 
     const updated = {
       ...r,
@@ -341,13 +543,13 @@ export function renderAddView({
       category,
       time,
       source,
+      description,
       tags,
       ingredients,
       steps,
       image_url: image_url || "",
       image_focus,
     };
-
 
     // Save to backend/local FIRST, then navigate (avoids "kick" / stale-space race on refresh)
     const saveBtn = qs(appEl, "#saveBtn");
@@ -401,4 +603,129 @@ function autoGrowTextarea(el) {
   };
   el.addEventListener("input", grow);
   grow(); // initial
+}
+
+function formatStepCardTitle(title, index) {
+  const raw = String(title ?? "").trim();
+  if (/^\d+\.\s/.test(raw)) return raw;
+  return `${index + 1}. ${raw}`;
+}
+
+function applyFormatToLineIndex(text, lineIndex, mode) {
+  const lines = String(text ?? "").split("\n");
+  if (!Number.isInteger(lineIndex) || lineIndex < 0 || lineIndex >= lines.length) return String(text ?? "");
+  lines[lineIndex] = formatStepLine(lines[lineIndex], mode);
+  return lines.join("\n");
+}
+
+function getRawLinesWithIndex(value) {
+  return String(value ?? "")
+    .split("\n")
+    .map((raw, index) => ({ raw: String(raw ?? ""), index }))
+    .filter((entry) => entry.raw.trim());
+}
+
+function renderIngredientPreviewHtml(value) {
+  const entries = getRawLinesWithIndex(value);
+  if (!entries.length) return `<div class="muted">Noch keine Zutaten eingetragen.</div>`;
+
+  return `<ul class="editor-preview-list">${entries
+    .map((entry) => {
+      const line = entry.raw.trim();
+      const isHeader = isIngredientHeader(line);
+      const label = isHeader ? line.replace(/:$/, "") : line;
+      const cls = isHeader ? "editor-line editor-line--header" : "editor-line";
+      return `
+        <li>
+          <button type="button" class="${cls}" data-line-index="${entry.index}">
+            <span>${escapeHtml(label)}</span>
+          </button>
+        </li>
+      `;
+    })
+    .join("")}</ul>`;
+}
+
+function renderStepPreviewHtml(value) {
+  const entries = getRawLinesWithIndex(value).map((entry) => ({
+    ...entry,
+    line: entry.raw.trim(),
+  }));
+  if (!entries.length) return `<div class="muted">Noch keine Schritte eingetragen.</div>`;
+
+  const cards = [];
+  let current = null;
+
+  for (const entry of entries) {
+    if (entry.line.startsWith("## ")) {
+      const explicitTitle = entry.line.slice(3).trim();
+      if (!explicitTitle) continue;
+      if (current) cards.push(current);
+      current = { title: { ...entry, display: explicitTitle }, body: [] };
+      continue;
+    }
+
+    if (/^[-*•]\s+/.test(entry.line)) {
+      const bulletText = entry.line.replace(/^[-*•]\s+/, "").trim();
+      if (!bulletText) continue;
+      if (!current) current = { title: { index: entry.index, display: "Schritt" }, body: [] };
+      current.body.push({ ...entry, display: bulletText, kind: "bullet" });
+      continue;
+    }
+
+    if (isStepTitleLine(entry.line)) {
+      if (current) cards.push(current);
+      current = { title: { ...entry, display: entry.line }, body: [] };
+    } else {
+      if (!current) current = { title: { index: entry.index, display: "Schritt" }, body: [] };
+      current.body.push({ ...entry, display: entry.line, kind: "plain" });
+    }
+  }
+
+  if (current) cards.push(current);
+
+  const fallbackCards =
+    cards.length === 1 && cards[0].title.display === "Schritt"
+      ? splitStepsToCards(entries.map((entry) => entry.line)).map((card, index) => ({
+          title: { display: formatStepCardTitle(card.title, index), index: entries[index]?.index ?? index },
+          body: [
+            {
+              display: card.body.join(" "),
+              index: entries[index]?.index ?? index,
+              kind: "plain",
+            },
+          ],
+        }))
+      : cards.map((card, index) => ({
+          title: {
+            ...card.title,
+            display: formatStepCardTitle(card.title.display, index),
+          },
+          body: card.body,
+        }));
+
+  return `<div class="editor-preview__stack">${fallbackCards
+    .map(
+      (card) => `
+        <div class="card" style="margin-top:0;">
+          <button type="button" class="editor-line editor-line--step-title" data-line-index="${card.title.index}">
+            <span>${escapeHtml(card.title.display)}</span>
+          </button>
+          ${
+            card.body.length
+              ? `<div class="editor-preview__step-body">${card.body
+                  .map(
+                    (line) => `
+                      <button type="button" class="editor-line editor-line--step-body${line.kind === "bullet" ? " editor-line--step-bullet" : ""}" data-line-index="${line.index}">
+                        <span>${escapeHtml(line.display)}</span>
+                      </button>
+                    `,
+                  )
+                  .join("")}</div>`
+              : ""
+          }
+        </div>
+      `,
+    )
+    .join("")}</div>`;
 }
