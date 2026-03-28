@@ -13,7 +13,7 @@ function formatStepCardTitle(title, index) {
 
 export function buildChildrenFromIndex({ recipeId, recipes, partsByParent }) {
   const childIds = partsByParent.get(recipeId) ?? [];
-  return childIds.map(cid => recipes.find(x => x.id === cid)).filter(Boolean);
+  return childIds.map((cid) => recipes.find((x) => x.id === cid)).filter(Boolean);
 }
 
 export function renderDetailHeaderHtml({ r, canWrite }) {
@@ -44,16 +44,18 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
                               </h2>
         ${r.time ? `<div class="muted">${escapeHtml(r.time)}</div>` : ""}
         ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${sourceLink ? `<a href="${escapeHtml(sourceLink.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceLink.label)}</a>` : escapeHtml(r.source)}</div>` : ""}
-        ${isPending
-          ? `<div class="muted" style="margin-top:.35rem;">Sync-Status: &#9888; Ausstehend (lokal geaendert)</div>`
-          : ""}
+        ${r.description ? `<div class="muted" style="margin-top:.45rem; white-space:pre-wrap;">Hinweis: ${escapeHtml(r.description)}</div>` : ""}
+        ${
+          isPending
+            ? `<div class="muted" style="margin-top:.35rem;">Sync-Status: &#9888; Ausstehend (lokal geaendert)</div>`
+            : ""
+        }
       </div>
     </section>
   `;
 }
 
 export function renderDetailImageHtml({ r, showImageModeDebug = false }) {
-
   return `
     <div style="margin:.75rem 0;">
       <div class="img-focus-frame">
@@ -87,12 +89,14 @@ export function renderIngredientsSectionHtml({ r, recipes, partsByParent }) {
     ${
       isMenu
         ? buildMenuIngredients(r, recipes, partsByParent)
-            .map(section => `
+            .map(
+              (section) => `
               <div style="margin-bottom:1rem;">
                 <div class="muted" style="font-weight:800; margin-bottom:.25rem;">${escapeHtml(section.title)}</div>
                 ${renderIngredientsHtml(section.items)}
               </div>
-            `)
+            `,
+            )
             .join("")
         : renderIngredientsHtml(r.ingredients ?? [])
     }
@@ -113,31 +117,37 @@ export function renderStepsSectionHtml({ r, recipes, partsByParent }) {
         ? `
           <div>
             ${stepSections
-              .map(sec => `
+              .map(
+                (sec) => `
                 <div style="margin-top:.75rem;">
                   <div class="muted" style="font-weight:850; margin-bottom:.25rem;">${escapeHtml(sec.title)}</div>
                   ${sec.cards
-                    .map((c, i) => `
+                    .map(
+                      (c, i) => `
                       <div class="card" style="margin-top:.45rem;">
                         <div style="font-weight:800;">${escapeHtml(formatStepCardTitle(c.title, i))}</div>
                         ${c.body.length ? `<div class="muted" style="margin-top:.35rem;">${escapeHtml(c.body.join(" "))}</div>` : ""}
                       </div>
-                    `)
+                    `,
+                    )
                     .join("")}
                 </div>
-              `)
+              `,
+              )
               .join("")}
           </div>
         `
         : `
           <div>
             ${splitStepsToCards(r.steps ?? [])
-              .map((c, i) => `
+              .map(
+                (c, i) => `
                 <div class="card" style="margin-top:.6rem;">
                   <div style="font-weight:800;">${escapeHtml(formatStepCardTitle(c.title, i))}</div>
                   ${c.body.length ? `<div class="muted" style="margin-top:.35rem;">${escapeHtml(c.body.join(" "))}</div>` : ""}
                 </div>
-              `)
+              `,
+              )
               .join("")}
           </div>
         `

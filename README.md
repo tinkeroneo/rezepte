@@ -61,12 +61,12 @@ Der Import ist zentral in `src/domain/import.js` implementiert.
 
 Wichtige Modi:
 
-| Modus | Verhalten |
-| --- | --- |
-| `backendWins` | Backend bleibt führend; neue Rezepte werden angelegt |
-| `jsonWins` | Import überschreibt bestehende Rezepte |
-| `mergePreferBackend` | Merge mit Vorrang für Backend-Daten |
-| `mergePreferJson` | Merge mit Vorrang für JSON-Daten |
+| Modus                | Verhalten                                            |
+| -------------------- | ---------------------------------------------------- |
+| `backendWins`        | Backend bleibt führend; neue Rezepte werden angelegt |
+| `jsonWins`           | Import überschreibt bestehende Rezepte               |
+| `mergePreferBackend` | Merge mit Vorrang für Backend-Daten                  |
+| `mergePreferJson`    | Merge mit Vorrang für JSON-Daten                     |
 
 ---
 
@@ -165,8 +165,19 @@ npm run lint
 Vorhandene kleine Tests:
 
 ```bash
+npm test
+```
+
+Oder einzeln:
+
+```bash
 npm run test:list
 npm run test:list2
+npm run test:recipes
+npm run test:editor
+npm run test:steps
+npm run test:share
+npm run test:pdf
 ```
 
 ---

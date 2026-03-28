@@ -20,7 +20,7 @@ export function seedRecipes() {
         "Paprikapulver",
         "Chili",
         "Kala Namak",
-        "Rucola (zum Bett)"
+        "Rucola (zum Bett)",
       ],
       steps: [
         "Bohnen grob mit der Gabel zerdrücken (stückig lassen).",
@@ -29,10 +29,10 @@ export function seedRecipes() {
         "Bohnen + getrocknete Tomaten zugeben und anbraten.",
         "TK-Spinat einrühren und schmelzen lassen, Flüssigkeit einkochen.",
         "Vom Herd ziehen und mit Kala Namak, Salz, Pfeffer abschmecken.",
-        "Auf Rucola betten und servieren."
+        "Auf Rucola betten und servieren.",
       ],
       createdAt: Date.now(),
-    }
+    },
   ];
 }
 
@@ -40,13 +40,9 @@ export function toLocalShape(r) {
   const normStr = (v) => String(v ?? "").trim();
 
   const normLines = (arr) =>
-    (Array.isArray(arr) ? arr : [])
-      .map((x) => String(x ?? "").trim())
-      .filter(Boolean);
+    (Array.isArray(arr) ? arr : []).map((x) => String(x ?? "").trim()).filter(Boolean);
 
-  const tags =
-    Array.isArray(r.tags) ? r.tags :
-    typeof r.tags === "string" ? r.tags.split(",") : [];
+  const tags = Array.isArray(r.tags) ? r.tags : typeof r.tags === "string" ? r.tags.split(",") : [];
 
   return {
     id: r.id,
@@ -55,15 +51,40 @@ export function toLocalShape(r) {
     category: normStr(r.category),
     time: normStr(r.time),
     image_url: normStr(r.image_url),
-    image_focus: (r.image_focus && typeof r.image_focus === 'object') ? r.image_focus : (r.imageFocus && typeof r.imageFocus === 'object' ? r.imageFocus : null),
+    image_focus:
+      r.image_focus && typeof r.image_focus === "object"
+        ? r.image_focus
+        : r.imageFocus && typeof r.imageFocus === "object"
+          ? r.imageFocus
+          : null,
+    description: normStr(r.description),
     source: normStr(r.source),
     tags: tags.map((t) => String(t).trim()).filter(Boolean),
     ingredients: normLines(r.ingredients),
     steps: normLines(r.steps),
-    createdAt: r.created_at ? new Date(r.created_at).getTime() : (r.createdAt ?? Date.now())
+    createdAt: r.created_at ? new Date(r.created_at).getTime() : (r.createdAt ?? Date.now()),
   };
 }
 
+export function normalizeRecipeTitleInput(value) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function normalizeEditorLines(
+  value,
+  { stripLeadingNumbers = false, stripLeadingBullets = true } = {},
+) {
+  const text = typeof value === "string" ? value : Array.isArray(value) ? value.join("\n") : "";
+  return text
+    .split(/\r?\n/)
+    .map((line) => String(line ?? "").trim())
+    .map((line) => (stripLeadingBullets ? line.replace(/^[-*•]\s+/, "") : line))
+    .map((line) => (stripLeadingNumbers ? line.replace(/^\d+[.)]\s+/, "") : line))
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
 
 export function loadRecipesLocal() {
   const raw = lsGet(KEYS.LOCAL_RECIPES, null);

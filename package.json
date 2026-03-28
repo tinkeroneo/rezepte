@@ -9,8 +9,11 @@
     "lint": "eslint .",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
+    "test": "npm run test:list && npm run test:list2 && npm run test:recipes && npm run test:editor && npm run test:steps && npm run test:share && npm run test:pdf",
     "test:list": "node src/domain/listQuery.test.js",
     "test:list2": "node src/domain/listQuery.test.cjs",
+    "test:recipes": "node src/domain/recipes.normalize.test.js",
+    "test:editor": "node src/domain/stepFormatEditor.test.js",
     "test:steps": "node src/domain/steps.test.js",
     "test:share": "node src/views/share.normalize.test.js",
     "test:pdf": "node src/services/pdfExport.test.js"

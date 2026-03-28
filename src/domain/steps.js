@@ -43,7 +43,9 @@ function fallbackStepBody(line, fallbackTitle) {
     .replace(/^\d+[\].):-]?\s*/, "")
     .trim();
   const escaped = titleWithoutNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const withoutPrefix = comparableRaw.replace(new RegExp(`^${escaped}[,;:!?.-]*\\s*`, "i"), "").trim();
+  const withoutPrefix = comparableRaw
+    .replace(new RegExp(`^${escaped}[,;:!?.-]*\\s*`, "i"), "")
+    .trim();
   return withoutPrefix || comparableRaw || raw;
 }
 
@@ -51,9 +53,25 @@ export function splitStepsToCards(lines) {
   const cards = [];
   let current = null;
 
-  for (const raw of (lines ?? [])) {
+  for (const raw of lines ?? []) {
     const line = (raw ?? "").trim();
     if (!line) continue;
+
+    if (line.startsWith("## ")) {
+      const explicitTitle = line.slice(3).trim();
+      if (!explicitTitle) continue;
+      if (current) cards.push(current);
+      current = { title: explicitTitle, body: [] };
+      continue;
+    }
+
+    if (/^[-*•]\s+/.test(line)) {
+      const bulletText = line.replace(/^[-*•]\s+/, "").trim();
+      if (!bulletText) continue;
+      if (!current) current = { title: "Schritt", body: [] };
+      current.body.push(bulletText);
+      continue;
+    }
 
     if (isStepTitleLine(line)) {
       if (current) cards.push(current);
@@ -69,7 +87,7 @@ export function splitStepsToCards(lines) {
   if (cards.length === 1 && cards[0].title === "Schritt") {
     return (lines ?? []).filter(Boolean).map((line, index) => ({
       title: fallbackStepTitle(line, index),
-      body: [fallbackStepBody(line, fallbackStepTitle(line, index))]
+      body: [fallbackStepBody(line, fallbackStepTitle(line, index))],
     }));
   }
 
