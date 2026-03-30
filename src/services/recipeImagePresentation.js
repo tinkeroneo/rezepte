@@ -1,7 +1,9 @@
-import { escapeHtml } from "../utils.js";
+import { escapeHtml, recipeImageForCard } from "../utils.js";
 
-const ALPHA_CACHE_KEY = "tinkeroneo_alpha_bounds_v3";
+const ALPHA_CACHE_KEY = "tinkeroneo_alpha_bounds_v4";
 const MAX_ALPHA_CACHE = 120;
+const LIST_GRID_ALPHA_INSET = 0.9;
+const LIST_GRID_ALPHA_MAX_SCALE = 2.25;
 const memoryAlphaCache = new Map();
 
 function safeParse(raw, fallback) {
@@ -168,6 +170,8 @@ function analyzeAlphaImage(img) {
   let maxX = -1;
   let maxY = -1;
   let transparentCount = 0;
+  const opaqueByColumn = new Array(sampleWidth).fill(0);
+  const opaqueByRow = new Array(sampleHeight).fill(0);
 
   for (let y = 0; y < sampleHeight; y += 1) {
     for (let x = 0; x < sampleWidth; x += 1) {
@@ -176,6 +180,8 @@ function analyzeAlphaImage(img) {
         transparentCount += 1;
         continue;
       }
+      opaqueByColumn[x] += 1;
+      opaqueByRow[y] += 1;
       if (x < minX) minX = x;
       if (y < minY) minY = y;
       if (x > maxX) maxX = x;
@@ -197,6 +203,33 @@ function analyzeAlphaImage(img) {
       sampleWidth,
       sampleHeight,
     };
+  }
+
+  const mainColumnThreshold = Math.max(2, Math.round(sampleHeight * 0.05));
+  const mainRowThreshold = Math.max(2, Math.round(sampleWidth * 0.05));
+  let denseMinX = sampleWidth;
+  let denseMaxX = -1;
+  let denseMinY = sampleHeight;
+  let denseMaxY = -1;
+
+  for (let x = 0; x < sampleWidth; x += 1) {
+    if (opaqueByColumn[x] >= mainColumnThreshold) {
+      if (x < denseMinX) denseMinX = x;
+      if (x > denseMaxX) denseMaxX = x;
+    }
+  }
+  for (let y = 0; y < sampleHeight; y += 1) {
+    if (opaqueByRow[y] >= mainRowThreshold) {
+      if (y < denseMinY) denseMinY = y;
+      if (y > denseMaxY) denseMaxY = y;
+    }
+  }
+
+  if (denseMaxX >= denseMinX && denseMaxY >= denseMinY) {
+    minX = denseMinX;
+    maxX = denseMaxX;
+    minY = denseMinY;
+    maxY = denseMaxY;
   }
 
   const width = (maxX - minX + 1) / sampleWidth;
@@ -271,7 +304,8 @@ export async function detectAlphaBoundsForFile(file) {
 }
 
 export async function detectAlphaBoundsForRenderedImage(img) {
-  const src = alphaCacheKey(img?.currentSrc || img?.src || "");
+  const preferredSrc = alphaCacheKey(img?.dataset?.imageOriginalUrl || "");
+  const src = preferredSrc || alphaCacheKey(img?.currentSrc || img?.src || "");
   if (!src || /\.svg(?:$|\?)/i.test(src)) return null;
 
   const cached = readCachedAlphaBounds(src);
@@ -286,6 +320,41 @@ export async function detectAlphaBoundsForRenderedImage(img) {
   } catch {
     return null;
   }
+}
+
+function isCardImageContext(context) {
+  return context === "grid" || context === "list";
+}
+
+function waitForImageLoad(img) {
+  return new Promise((resolve) => {
+    const done = () => resolve();
+    img.addEventListener("load", done, { once: true });
+    img.addEventListener("error", done, { once: true });
+  });
+}
+
+async function ensureAlphaFitCardSource(img) {
+  const context = String(img?.dataset?.imageContext || "");
+  if (!isCardImageContext(context)) return;
+
+  const originalUrl = String(img?.dataset?.imageOriginalUrl || "").trim();
+  if (!originalUrl) return;
+
+  let targetSrc = "";
+  try {
+    targetSrc = recipeImageForCard(originalUrl, context, { resize: "contain" });
+  } catch {
+    return;
+  }
+  if (!targetSrc) return;
+
+  const currentSrc = alphaCacheKey(img.currentSrc || img.src || "");
+  const nextSrc = alphaCacheKey(targetSrc);
+  if (!nextSrc || currentSrc === nextSrc) return;
+
+  img.src = targetSrc;
+  await waitForImageLoad(img);
 }
 
 export async function analyzeRenderedImageTransparency(img) {
@@ -347,7 +416,7 @@ function resetImageStyle(img) {
   img.style.transformOrigin = "50% 50%";
 }
 
-function applyAlphaFit(img, bounds) {
+function applyAlphaFit(img, bounds, { inset = 1, maxScale = 3.5 } = {}) {
   const parent = img.parentElement;
   if (!parent) return false;
 
@@ -364,7 +433,13 @@ function applyAlphaFit(img, bounds) {
   const bboxHeight = bounds.height * baseHeight;
   if (!bboxWidth || !bboxHeight) return false;
 
-  const fitScale = Math.min(containerWidth / bboxWidth, containerHeight / bboxHeight, 3.5);
+  const safeInset = Math.max(0.1, Math.min(1, Number(inset) || 1));
+  const safeMaxScale = Math.max(1, Number(maxScale) || 3.5);
+  const fitScale = Math.min(
+    (containerWidth * safeInset) / bboxWidth,
+    (containerHeight * safeInset) / bboxHeight,
+    safeMaxScale
+  );
   const finalWidth = baseWidth * fitScale;
   const finalHeight = baseHeight * fitScale;
   const centerX = (bounds.left + bounds.width / 2) * finalWidth;
@@ -407,8 +482,10 @@ export function applyImageFocusToElement(img, focus) {
   if (f.mode === "alpha-fit" && f.alphaBounds) {
     img.dataset.imageModeEffective = "alpha-fit";
     if (context === "grid" || context === "list") {
-      img.style.objectFit = "contain";
-      img.style.objectPosition = "50% 50%";
+      if (!applyAlphaFit(img, f.alphaBounds, { inset: LIST_GRID_ALPHA_INSET, maxScale: LIST_GRID_ALPHA_MAX_SCALE })) {
+        img.style.objectFit = "contain";
+        img.style.objectPosition = "50% 50%";
+      }
     } else {
       applyAlphaFit(img, f.alphaBounds);
     }
@@ -433,6 +510,7 @@ async function processManagedImage(img) {
 
   const bounds = focus.alphaBounds || await detectAlphaBoundsForRenderedImage(img);
   if (!bounds) return;
+  await ensureAlphaFitCardSource(img);
   applyImageFocusToElement(img, { ...focus, mode: "alpha-fit", alphaBounds: bounds });
 }
 
