@@ -2,8 +2,9 @@ import { escapeHtml, recipeImageForCard } from "../utils.js";
 
 const ALPHA_CACHE_KEY = "tinkeroneo_alpha_bounds_v4";
 const MAX_ALPHA_CACHE = 120;
-const LIST_GRID_ALPHA_INSET = 0.9;
-const LIST_GRID_ALPHA_MAX_SCALE = 2.25;
+const LIST_GRID_ALPHA_INSET = 0.92;
+const LIST_GRID_ALPHA_MAX_SCALE = 1.35;
+const LIST_GRID_ALPHA_MAX_SHIFT = 0.12;
 const memoryAlphaCache = new Map();
 
 function safeParse(raw, fallback) {
@@ -461,6 +462,51 @@ function applyAlphaFit(img, bounds, { inset = 1, maxScale = 3.5 } = {}) {
   return true;
 }
 
+function applyContainedAlphaFit(img, bounds, {
+  inset = 1,
+  maxScale = 1.35,
+  maxShift = 0.12,
+} = {}) {
+  const parent = img.parentElement;
+  if (!parent) return false;
+
+  const containerWidth = parent.clientWidth;
+  const containerHeight = parent.clientHeight;
+  const naturalWidth = Number(img.naturalWidth || 0);
+  const naturalHeight = Number(img.naturalHeight || 0);
+  if (!containerWidth || !containerHeight || !naturalWidth || !naturalHeight) return false;
+
+  const containScale = Math.min(containerWidth / naturalWidth, containerHeight / naturalHeight);
+  const contentWidth = naturalWidth * containScale;
+  const contentHeight = naturalHeight * containScale;
+  const bboxWidth = bounds.width * contentWidth;
+  const bboxHeight = bounds.height * contentHeight;
+  if (!bboxWidth || !bboxHeight) return false;
+
+  const safeInset = Math.max(0.1, Math.min(1, Number(inset) || 1));
+  const safeMaxScale = Math.max(1, Number(maxScale) || 1.35);
+  const scale = Math.min(
+    (containerWidth * safeInset) / bboxWidth,
+    (containerHeight * safeInset) / bboxHeight,
+    safeMaxScale
+  );
+
+  const contentLeft = (containerWidth - contentWidth) / 2;
+  const contentTop = (containerHeight - contentHeight) / 2;
+  const centerX = contentLeft + (bounds.left + bounds.width / 2) * contentWidth;
+  const centerY = contentTop + (bounds.top + bounds.height / 2) * contentHeight;
+  const maxShiftX = containerWidth * Math.max(0, Math.min(0.5, Number(maxShift) || 0));
+  const maxShiftY = containerHeight * Math.max(0, Math.min(0.5, Number(maxShift) || 0));
+  const translateX = Math.max(-maxShiftX, Math.min(maxShiftX, (containerWidth / 2 - centerX) * scale));
+  const translateY = Math.max(-maxShiftY, Math.min(maxShiftY, (containerHeight / 2 - centerY) * scale));
+
+  img.style.objectFit = "contain";
+  img.style.objectPosition = "50% 50%";
+  img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+  img.style.transformOrigin = "50% 50%";
+  return true;
+}
+
 export function applyImageFocusToElement(img, focus) {
   if (!img) return;
   const f = normalizeImageFocus(focus);
@@ -482,7 +528,11 @@ export function applyImageFocusToElement(img, focus) {
   if (f.mode === "alpha-fit" && f.alphaBounds) {
     img.dataset.imageModeEffective = "alpha-fit";
     if (context === "grid" || context === "list") {
-      if (!applyAlphaFit(img, f.alphaBounds, { inset: LIST_GRID_ALPHA_INSET, maxScale: LIST_GRID_ALPHA_MAX_SCALE })) {
+      if (!applyContainedAlphaFit(img, f.alphaBounds, {
+        inset: LIST_GRID_ALPHA_INSET,
+        maxScale: LIST_GRID_ALPHA_MAX_SCALE,
+        maxShift: LIST_GRID_ALPHA_MAX_SHIFT,
+      })) {
         img.style.objectFit = "contain";
         img.style.objectPosition = "50% 50%";
       }
