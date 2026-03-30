@@ -1,6 +1,5 @@
 import { escapeHtml, recipeImageOrDefault, recipeImageForCard } from "../utils.js";
 import { encodeImageFocusAttr } from "../services/recipeImagePresentation.js";
-import { isFavorite } from "../domain/favorites.js";
 
 export function renderListItem(r, ctx) {
   const { catAccent, coverFallbackHtml, tagChip, pendingIds } = ctx;
@@ -30,14 +29,6 @@ export function renderListItem(r, ctx) {
 
         <div class="li-body">
           <div class="li-title-row">
-            <button
-              class="fav-inline ${isFavorite(r.id) ? "is-fav" : ""}"
-              data-fav="${escapeHtml(r.id)}"
-              title="Favorit"
-              type="button"
-              aria-pressed="${isFavorite(r.id) ? "true" : "false"}"
-            >★</button>
-
             <div class="li-title">${escapeHtml(r.title)}</div>
           </div>
 

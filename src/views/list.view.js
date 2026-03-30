@@ -2,7 +2,6 @@
 import { escapeHtml, qs } from "../utils.js";
 import { KEYS, lsSet } from "../storage.js";
 
-import { toggleFavorite } from "../domain/favorites.js";
 import { getTagColors } from "../domain/tagColors.js";
 import { getColorForCategory } from "../domain/categories.js";
 import { getPendingRecipeIds } from "../domain/offlineQueue.js";
@@ -184,10 +183,6 @@ let ui = {
   // One-time delegated click handlers for results
   bindListResultsEvents({
     resultsEl,
-    onToggleFavorite: (id) => {
-      toggleFavorite(id);
-      renderResults();
-    },
     onOpenRecipe: (id) => {
       setView({ name: "detail", selectedId: id, q: getUi().q ?? (qEl?.value ?? "") });
     }

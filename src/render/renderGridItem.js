@@ -1,6 +1,5 @@
 import { escapeHtml, recipeImageOrDefault, recipeImageForCard } from "../utils.js";
 import { encodeImageFocusAttr } from "../services/recipeImagePresentation.js";
-import { isFavorite } from "../domain/favorites.js";
 
 export function renderGridItem(r, ctx) {
   const { catAccent, coverFallbackHtml, pendingIds } = ctx;
@@ -17,8 +16,6 @@ export function renderGridItem(r, ctx) {
           : coverFallbackHtml(r, "grid-img")
         }
         ${isTodo ? `<span class="todo-ribbon" aria-hidden="true">ToDo</span>` : ``}
-
-        <button class="fav-overlay ${isFavorite(r.id) ? "is-fav" : ""}" data-fav="${escapeHtml(r.id)}" title="Favorit" type="button" aria-pressed="${isFavorite(r.id) ? "true" : "false"}">★</button>
 
         ${isPending
           ? `<span class="pill pill-warn pending-overlay" title="Wartet auf Sync">&#9888;</span>`
