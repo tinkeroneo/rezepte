@@ -37,6 +37,10 @@ function normalizeImportedRecipe(raw, toLocalShape) {
   if (base.steps === null || base.steps === undefined) {
     if (base.schritte !== null && base.schritte !== undefined) base.steps = base.schritte;
   }
+  if (base.description === null || base.description === undefined) {
+    if (base.notes !== null && base.notes !== undefined) base.description = base.notes;
+    else if (base.desc !== null && base.desc !== undefined) base.description = base.desc;
+  }
 
   const normalized = toLocalShape ? toLocalShape(base) : base;
   const out = {

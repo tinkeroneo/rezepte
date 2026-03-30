@@ -19,6 +19,7 @@ export function buildChildrenFromIndex({ recipeId, recipes, partsByParent }) {
 export function renderDetailHeaderHtml({ r, canWrite }) {
   const isPending = !!r?._pending;
   const sourceLink = parseSourceLink(r.source);
+  const description = String(r.description || r.notes || r.desc || "").trim();
   return `
     <section class="card">
       <div class="card__hd">
@@ -44,7 +45,7 @@ export function renderDetailHeaderHtml({ r, canWrite }) {
                               </h2>
         ${r.time ? `<div class="muted">${escapeHtml(r.time)}</div>` : ""}
         ${r.source ? `<div class="muted" style="margin-top:.35rem;">Quelle: ${sourceLink ? `<a href="${escapeHtml(sourceLink.href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(sourceLink.label)}</a>` : escapeHtml(r.source)}</div>` : ""}
-        ${r.description ? `<div class="muted" style="margin-top:.45rem; white-space:pre-wrap;">Hinweis: ${escapeHtml(r.description)}</div>` : ""}
+        ${description ? `<div class="muted" style="margin-top:.45rem; white-space:pre-wrap;">Hinweis: ${escapeHtml(description)}</div>` : ""}
         ${
           isPending
             ? `<div class="muted" style="margin-top:.35rem;">Sync-Status: &#9888; Ausstehend (lokal geaendert)</div>`

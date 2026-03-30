@@ -49,6 +49,23 @@ function run() {
   assert.equal(r3.length, 1);
   assert.equal(r3[0].id, "3");
 
+  const r4 = applyListQuery({
+    recipes: [
+      {
+        id: "4",
+        title: "Suppe",
+        category: "Abend",
+        description: "Schmeckt am nächsten Tag noch besser",
+        createdAt: 4,
+      },
+    ],
+    query: "nächsten tag",
+    sort: "new",
+    sortDir: "desc",
+  });
+  assert.equal(r4.length, 1);
+  assert.equal(r4[0].id, "4");
+
   console.log("✅ listQuery tests passed");
 }
 

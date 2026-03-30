@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { normalizeEditorLines, normalizeRecipeTitleInput } from "./recipes.js";
+import { normalizeEditorLines, normalizeRecipeTitleInput, toLocalShape } from "./recipes.js";
 
 function run() {
   assert.equal(normalizeRecipeTitleInput("  Chili   sin   Carne  "), "Chili sin Carne");
@@ -20,6 +20,11 @@ function run() {
   assert.deepEqual(
     normalizeEditorLines("- Unterpunkt A\n- Unterpunkt B", { stripLeadingBullets: false }),
     ["- Unterpunkt A", "- Unterpunkt B"],
+  );
+
+  assert.equal(
+    toLocalShape({ id: "r1", title: "Test", notes: "Am Vortag ziehen lassen." }).description,
+    "Am Vortag ziehen lassen.",
   );
 
   console.log("✅ recipes normalize tests passed");

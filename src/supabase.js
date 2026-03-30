@@ -1054,6 +1054,7 @@ export async function upsertRecipe(recipe) {
     title: recipe.title,
     category: recipe.category ?? "",
     time: recipe.time ?? "",
+    description: recipe.description ?? recipe.notes ?? recipe.desc ?? "",
     ingredients: recipe.ingredients ?? [],
     steps: recipe.steps ?? [],
     image_url: recipe.image_url ?? null,

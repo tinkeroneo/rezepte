@@ -88,6 +88,7 @@ export async function renderShareView({
 
   // image_url ist das Standardfeld in diesem Projekt
   const imgUrl = recipeImageOrDefault(r?.image_url || r?.imageUrl || r?.img || "");
+  const desc = String(r?.description || r?.notes || r?.desc || "").trim();
 
   const ingredientsHtml = renderIngredientsHtml(r.ingredients || []);
   const cards = splitStepsToCards(r.steps || []);
@@ -104,6 +105,7 @@ export async function renderShareView({
       const pr = p?.recipe || null;
       if (!pr?.id) return "";
       const pImg = recipeImageOrDefault(pr?.image_url || pr?.imageUrl || pr?.img || "");
+      const pDesc = String(pr?.description || pr?.notes || pr?.desc || "").trim();
       const pIngr = renderIngredientsHtml(pr.ingredients || []);
       const pCards = splitStepsToCards(pr.steps || []);
       const pSteps = (pCards?.length ? pCards : [])
@@ -125,6 +127,7 @@ export async function renderShareView({
             </div>
 
             <div style="margin-top:.75rem;">
+              ${pDesc ? `<div class="hint" style="white-space:pre-wrap; margin:0 0 .55rem 0;">Hinweis: ${escapeHtml(pDesc)}</div>` : ""}
               <div class="label" style="margin:0 0 .35rem 0;">Zutaten</div>
               ${pIngr || `<div class="hint">Keine Zutaten.</div>`}
             </div>
@@ -167,6 +170,7 @@ export async function renderShareView({
         </div>
         <div class="card__bd">
           ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" alt="" data-default-img="${r.image_url ? "" : "1"}" style="width:100%; max-height:320px; object-fit:cover; border-radius:14px;" />` : ""}
+          ${desc ? `<div class="hint" style="margin-top:1rem; white-space:pre-wrap;">Hinweis: ${escapeHtml(desc)}</div>` : ""}
           <h2 style="margin:1rem 0 .5rem 0;">Zutaten</h2>
           <div>${ingredientsHtml || `<div class="hint">Keine Zutaten.</div>`}</div>
 

@@ -115,6 +115,7 @@ export function applyListQuery({
       r.category,
       r.time,
       r.source,
+      r.description ?? r.notes ?? r.desc,
       ...(Array.isArray(r.tags) ? r.tags : []),
       ...normalizeRecipeTextLines(r.ingredients),
       ...normalizeRecipeTextLines(r.steps),

@@ -57,7 +57,7 @@ export function toLocalShape(r) {
         : r.imageFocus && typeof r.imageFocus === "object"
           ? r.imageFocus
           : null,
-    description: normStr(r.description),
+    description: normStr(r.description ?? r.notes ?? r.desc),
     source: normStr(r.source),
     tags: tags.map((t) => String(t).trim()).filter(Boolean),
     ingredients: normLines(r.ingredients),
