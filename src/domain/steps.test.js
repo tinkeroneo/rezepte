@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { splitStepsToCards } from "./steps.js";
+import { parseDurationSeconds, splitStepsToCards } from "./steps.js";
 
 function run() {
   const plainSteps = [
@@ -32,6 +32,10 @@ function run() {
   assert.deepEqual(structured[0].body, ["Tomaten einkochen.", "Abschmecken."]);
   assert.equal(structured[1].title, "Finish");
   assert.deepEqual(structured[1].body, ["Basilikum drüber."]);
+
+  assert.equal(parseDurationSeconds("20 - 30 Minuten"), 20 * 60);
+  assert.equal(parseDurationSeconds("20 bis 30 Minuten"), 20 * 60);
+  assert.equal(parseDurationSeconds("1-2 h"), 1 * 3600);
 
   console.log("✅ steps tests passed");
 }

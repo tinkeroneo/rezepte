@@ -100,6 +100,13 @@ export function stepDoneKey(recipeId, cardIndex) {
 
 export function parseDurationSeconds(text) {
   const t = (text ?? "").toString().toLowerCase();
+  const rangeSep = "(?:-|–|—|bis|to)";
+
+  const minRange = t.match(new RegExp(`\\b(\\d{1,3})\\s*${rangeSep}\\s*(\\d{1,3})\\s*(min|mins|minuten|minute)\\b`));
+  if (minRange) return parseInt(minRange[1], 10) * 60;
+
+  const hrRange = t.match(new RegExp(`\\b(\\d{1,2})\\s*${rangeSep}\\s*(\\d{1,2})\\s*(h|std|stunde|stunden)\\b`));
+  if (hrRange) return parseInt(hrRange[1], 10) * 3600;
 
   const mmss = t.match(/\b(\d{1,2})\s*:\s*(\d{2})\b/);
   if (mmss) {
