@@ -1,4 +1,4 @@
-import { escapeHtml, recipeImageOrDefault, recipeImageForCard } from "../utils.js";
+import { escapeHtml, recipeImageOrDefault } from "../utils.js";
 import { encodeImageFocusAttr } from "../services/recipeImagePresentation.js";
 
 export function renderListItem(r, ctx) {
@@ -6,8 +6,6 @@ export function renderListItem(r, ctx) {
 
   const isPending = r._pending || (pendingIds && pendingIds.has(r.id));
   const isTodo = Array.isArray(r.tags) && r.tags.some((t) => String(t || "").trim().toLowerCase() === "todo");
-  const resizeMode = r?.image_focus?.mode === "alpha-fit" ? "contain" : "cover";
-
   return `
     <div class="list-item"
          data-id="${escapeHtml(r.id)}"
@@ -16,7 +14,7 @@ export function renderListItem(r, ctx) {
       <div class="li-left">
         <div class="li-media">
           ${recipeImageOrDefault(r.image_url)
-            ? `<img class="li-thumb" src="${escapeHtml(recipeImageForCard(r.image_url, "list", { resize: resizeMode }))}" data-default-img="${r.image_url ? "" : "1"}" data-image-original-url="${escapeHtml(r.image_url || "")}" data-image-focus="${encodeImageFocusAttr(r.image_focus)}" data-image-context="list" data-auto-alpha="1" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
+            ? `<img class="li-thumb" src="${escapeHtml(recipeImageOrDefault(r.image_url))}" data-default-img="${r.image_url ? "" : "1"}" data-image-original-url="${escapeHtml(r.image_url || "")}" data-image-focus="${encodeImageFocusAttr(r.image_focus)}" data-image-context="list" data-auto-alpha="1" alt="${escapeHtml(r.title)}" loading="lazy" decoding="async" fetchpriority="low" />`
             : coverFallbackHtml(r, "li-thumb li-thumb--empty")
           }
           ${isTodo ? `<span class="todo-ribbon" aria-hidden="true">ToDo</span>` : ``}

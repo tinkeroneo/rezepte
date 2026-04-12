@@ -1,4 +1,4 @@
-import { escapeHtml, recipeImageForCard } from "../utils.js";
+import { defaultRecipeImageUrl, escapeHtml } from "../utils.js";
 
 const ALPHA_CACHE_KEY = "tinkeroneo_alpha_bounds_v4";
 const MAX_ALPHA_CACHE = 120;
@@ -323,41 +323,6 @@ export async function detectAlphaBoundsForRenderedImage(img) {
   }
 }
 
-function isCardImageContext(context) {
-  return context === "grid" || context === "list";
-}
-
-function waitForImageLoad(img) {
-  return new Promise((resolve) => {
-    const done = () => resolve();
-    img.addEventListener("load", done, { once: true });
-    img.addEventListener("error", done, { once: true });
-  });
-}
-
-async function ensureAlphaFitCardSource(img) {
-  const context = String(img?.dataset?.imageContext || "");
-  if (!isCardImageContext(context)) return;
-
-  const originalUrl = String(img?.dataset?.imageOriginalUrl || "").trim();
-  if (!originalUrl) return;
-
-  let targetSrc = "";
-  try {
-    targetSrc = recipeImageForCard(originalUrl, context, { resize: "contain" });
-  } catch {
-    return;
-  }
-  if (!targetSrc) return;
-
-  const currentSrc = alphaCacheKey(img.currentSrc || img.src || "");
-  const nextSrc = alphaCacheKey(targetSrc);
-  if (!nextSrc || currentSrc === nextSrc) return;
-
-  img.src = targetSrc;
-  await waitForImageLoad(img);
-}
-
 export async function analyzeRenderedImageTransparency(img) {
   if (!(img instanceof window.HTMLImageElement)) {
     return { ok: false, reason: "not-an-image" };
@@ -550,6 +515,39 @@ function parseFocusAttr(img) {
   return raw ? normalizeImageFocus(safeParse(raw, null)) : normalizeImageFocus(null);
 }
 
+function reapplyFocusOnNextLoad(img) {
+  const focus = parseFocusAttr(img);
+  img.addEventListener("load", () => {
+    applyImageFocusToElement(img, focus);
+  }, { once: true });
+}
+
+function handleManagedImageError(img) {
+  if (!(img instanceof window.HTMLImageElement)) return;
+
+  const originalUrl = String(img.dataset.imageOriginalUrl || "").trim();
+  const currentSrc = alphaCacheKey(img.currentSrc || img.src || "");
+  const originalSrc = alphaCacheKey(originalUrl);
+
+  if (originalSrc && currentSrc !== originalSrc && img.dataset.imageFallbackOriginalTried !== "1") {
+    img.dataset.imageFallbackOriginalTried = "1";
+    img.setAttribute("data-auto-alpha", "0");
+    reapplyFocusOnNextLoad(img);
+    img.src = originalUrl;
+    return;
+  }
+
+  const fallbackSrc = defaultRecipeImageUrl();
+  const fallbackKey = alphaCacheKey(fallbackSrc);
+  if (!fallbackKey || currentSrc === fallbackKey || img.dataset.imageFallbackDefaultTried === "1") return;
+
+  img.dataset.imageFallbackDefaultTried = "1";
+  img.setAttribute("data-auto-alpha", "0");
+  img.setAttribute("data-default-img", "1");
+  reapplyFocusOnNextLoad(img);
+  img.src = fallbackSrc;
+}
+
 async function processManagedImage(img) {
   if (!(img instanceof window.HTMLImageElement)) return;
   const focus = parseFocusAttr(img);
@@ -560,13 +558,19 @@ async function processManagedImage(img) {
 
   const bounds = focus.alphaBounds || await detectAlphaBoundsForRenderedImage(img);
   if (!bounds) return;
-  await ensureAlphaFitCardSource(img);
   applyImageFocusToElement(img, { ...focus, mode: "alpha-fit", alphaBounds: bounds });
 }
 
 function queueProcess(img) {
+  if (!img.__managedRecipeImageErrorHandler) {
+    const onError = () => handleManagedImageError(img);
+    img.addEventListener("error", onError);
+    img.__managedRecipeImageErrorHandler = onError;
+  }
+
   const run = () => processManagedImage(img).catch(() => {});
   if (img.complete && img.naturalWidth) run();
+  else if (img.complete && !img.naturalWidth) handleManagedImageError(img);
   else img.addEventListener("load", run, { once: true });
 }
 
