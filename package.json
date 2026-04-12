@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/bump-sw-version.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
