@@ -1,5 +1,5 @@
 // sw.js - minimal offline cache for app shell (no build step)
-const SW_VERSION = "2026-03-14-1";
+const SW_VERSION = "2026-04-12-1";
 const CACHE = `tinkeroneo-${SW_VERSION}`;
 
 const ASSETS = [
